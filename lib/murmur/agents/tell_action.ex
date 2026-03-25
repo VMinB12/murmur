@@ -15,7 +15,7 @@ defmodule Murmur.Agents.TellAction do
       message: [type: :string, required: true, doc: "The message to send to the target agent"]
     ]
 
-  alias Murmur.Agents.PubSubBridge
+  alias Murmur.Agents.Catalog
   alias Murmur.Workspaces
 
   @max_hops 5
@@ -52,22 +52,51 @@ defmodule Murmur.Agents.TellAction do
     pid = Murmur.Jido.whereis(target_session.id)
 
     if pid do
-      topic = PubSubBridge.topic(target_session.workspace_id, target_session.id)
+      agent_module = Catalog.agent_module(target_session.agent_profile_id)
+      topic = "workspace:#{target_session.workspace_id}:agent:#{target_session.id}"
 
-      # Persist and broadcast the inter-agent message
-      {:ok, msg} =
-        Murmur.Chat.create_message(%{
-          agent_session_id: target_session.id,
-          role: "user",
-          content: message,
-          sender_name: String.replace(message, ~r/^\[([^\]]+)\]:.*/, "\\1"),
-          metadata: %{"hop_count" => hop_count}
-        })
+      # Broadcast inter-agent message to PubSub for LiveView display
+      inter_msg = %{
+        id: Ecto.UUID.generate(),
+        role: "user",
+        content: message,
+        sender_name: String.replace(message, ~r/^\[([^\]]+)\]:.*/, "\\1"),
+        metadata: %{"hop_count" => hop_count}
+      }
 
-      Phoenix.PubSub.broadcast(Murmur.PubSub, topic, {:new_message, target_session.id, msg})
+      Phoenix.PubSub.broadcast(Murmur.PubSub, topic, {:new_message, target_session.id, inter_msg})
 
-      # Send to the agent
-      PubSubBridge.send_message(target_session, message)
+      # Send to the agent via ask/await in an async task
+      Task.Supervisor.start_child(Murmur.Jido.task_supervisor_name(), fn ->
+        try do
+          {:ok, req} = agent_module.ask(pid, message)
+          result = agent_module.await(req, timeout: 120_000)
+
+          case result do
+            {:ok, response} ->
+              Phoenix.PubSub.broadcast(
+                Murmur.PubSub,
+                topic,
+                {:message_completed, target_session.id, response}
+              )
+
+            {:error, reason} ->
+              Phoenix.PubSub.broadcast(
+                Murmur.PubSub,
+                topic,
+                {:request_failed, target_session.id, reason}
+              )
+          end
+        rescue
+          e ->
+            Phoenix.PubSub.broadcast(
+              Murmur.PubSub,
+              topic,
+              {:request_failed, target_session.id, Exception.message(e)}
+            )
+        end
+      end)
+
       :ok
     else
       {:error, :agent_not_running}

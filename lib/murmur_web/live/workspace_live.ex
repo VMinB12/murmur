@@ -1,8 +1,7 @@
 defmodule MurmurWeb.WorkspaceLive do
   use MurmurWeb, :live_view
 
-  alias Murmur.Agents.{Catalog, PubSubBridge}
-  alias Murmur.Chat
+  alias Murmur.Agents.Catalog
   alias Murmur.Workspaces
 
   @impl true
@@ -11,10 +10,10 @@ defmodule MurmurWeb.WorkspaceLive do
     agent_sessions = Workspaces.list_agent_sessions(workspace_id)
     profiles = Catalog.list_profiles()
 
-    # Build initial messages map from DB
+    # Build initial messages map from agent threads or persisted storage
     messages_map =
       Map.new(agent_sessions, fn session ->
-        {session.id, Chat.list_messages(session.id)}
+        {session.id, load_messages_for_session(session)}
       end)
 
     socket =
@@ -30,9 +29,9 @@ defmodule MurmurWeb.WorkspaceLive do
     socket =
       if connected?(socket) do
         Enum.reduce(agent_sessions, socket, fn session, acc ->
-          topic = PubSubBridge.topic(workspace_id, session.id)
+          topic = agent_topic(workspace_id, session.id)
           Phoenix.PubSub.subscribe(Murmur.PubSub, topic)
-          PubSubBridge.start_agent(session)
+          ensure_agent_started(session)
 
           status = get_agent_status(session.id)
           update(acc, :agent_statuses, &Map.put(&1, session.id, status))
@@ -58,18 +57,26 @@ defmodule MurmurWeb.WorkspaceLive do
       {:noreply, socket}
     else
       session = Workspaces.get_agent_session!(session_id)
+      workspace_id = socket.assigns.workspace.id
+      topic = agent_topic(workspace_id, session_id)
 
-      {:ok, user_msg} =
-        Chat.create_message(%{
-          agent_session_id: session_id,
-          role: "user",
-          content: content,
-          sender_name: "You"
-        })
+      # Add user message to local display immediately
+      user_msg = %{
+        id: Ecto.UUID.generate(),
+        role: "user",
+        content: content,
+        sender_name: "You"
+      }
 
-      topic = PubSubBridge.topic(socket.assigns.workspace.id, session_id)
-      Phoenix.PubSub.broadcast(Murmur.PubSub, topic, {:new_message, session_id, user_msg})
-      PubSubBridge.send_message(session, content)
+      socket =
+        socket
+        |> update(:messages, fn msgs ->
+          Map.update(msgs, session_id, [user_msg], &(&1 ++ [user_msg]))
+        end)
+        |> update(:agent_statuses, &Map.put(&1, session_id, :busy))
+
+      # Send to agent via ask/await in an async task
+      send_to_agent(session, content, topic)
 
       {:noreply, socket}
     end
@@ -88,9 +95,9 @@ defmodule MurmurWeb.WorkspaceLive do
            "display_name" => display_name
          }) do
       {:ok, session} ->
-        topic = PubSubBridge.topic(workspace.id, session.id)
+        topic = agent_topic(workspace.id, session.id)
         Phoenix.PubSub.subscribe(Murmur.PubSub, topic)
-        PubSubBridge.start_agent(session)
+        ensure_agent_started(session)
 
         socket =
           socket
@@ -116,9 +123,10 @@ defmodule MurmurWeb.WorkspaceLive do
   @impl true
   def handle_event("remove_agent", %{"session-id" => session_id}, socket) do
     session = Workspaces.get_agent_session!(session_id)
-    topic = PubSubBridge.topic(socket.assigns.workspace.id, session_id)
+    topic = agent_topic(socket.assigns.workspace.id, session_id)
     Phoenix.PubSub.unsubscribe(Murmur.PubSub, topic)
-    PubSubBridge.stop_agent(session_id)
+    stop_agent(session_id)
+    cleanup_storage(session)
     Workspaces.delete_agent_session(session)
 
     socket =
@@ -136,6 +144,47 @@ defmodule MurmurWeb.WorkspaceLive do
   # --- PubSub Handlers ---
 
   @impl true
+  def handle_info({:message_completed, session_id, response}, socket) do
+    content = extract_response_content(response)
+
+    assistant_msg = %{
+      id: Ecto.UUID.generate(),
+      role: "assistant",
+      content: content,
+      sender_name: nil
+    }
+
+    socket =
+      socket
+      |> update(:messages, fn msgs ->
+        Map.update(msgs, session_id, [assistant_msg], &(&1 ++ [assistant_msg]))
+      end)
+      |> update(:agent_statuses, &Map.put(&1, session_id, :idle))
+      |> update(:streaming_tokens, &Map.put(&1, session_id, ""))
+
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_info({:request_failed, session_id, reason}, socket) do
+    error_msg = %{
+      id: Ecto.UUID.generate(),
+      role: "assistant",
+      content: "⚠️ Error: #{inspect(reason)}",
+      sender_name: nil
+    }
+
+    socket =
+      socket
+      |> update(:messages, fn msgs ->
+        Map.update(msgs, session_id, [error_msg], &(&1 ++ [error_msg]))
+      end)
+      |> update(:agent_statuses, &Map.put(&1, session_id, :idle))
+
+    {:noreply, socket}
+  end
+
+  @impl true
   def handle_info({:new_message, session_id, message}, socket) do
     socket =
       update(socket, :messages, fn msgs ->
@@ -147,11 +196,8 @@ defmodule MurmurWeb.WorkspaceLive do
 
   @impl true
   def handle_info({:status_change, session_id, status}, socket) do
-    socket =
-      socket
-      |> update(:agent_statuses, &Map.put(&1, session_id, status))
+    socket = update(socket, :agent_statuses, &Map.put(&1, session_id, status))
 
-    # Clear streaming tokens when going idle
     socket =
       if status == :idle do
         update(socket, :streaming_tokens, &Map.put(&1, session_id, ""))
@@ -159,48 +205,6 @@ defmodule MurmurWeb.WorkspaceLive do
         socket
       end
 
-    {:noreply, socket}
-  end
-
-  @impl true
-  def handle_info({:message_completed, session_id, response}, socket) do
-    {:ok, assistant_msg} =
-      Chat.create_message(%{
-        agent_session_id: session_id,
-        role: "assistant",
-        content: extract_response_content(response)
-      })
-
-    socket =
-      socket
-      |> update(:messages, fn msgs ->
-        Map.update(msgs, session_id, [assistant_msg], &(&1 ++ [assistant_msg]))
-      end)
-      |> update(:streaming_tokens, &Map.put(&1, session_id, ""))
-
-    {:noreply, socket}
-  end
-
-  @impl true
-  def handle_info({:request_failed, session_id, reason}, socket) do
-    {:ok, error_msg} =
-      Chat.create_message(%{
-        agent_session_id: session_id,
-        role: "assistant",
-        content: "⚠️ Error: #{inspect(reason)}"
-      })
-
-    socket =
-      update(socket, :messages, fn msgs ->
-        Map.update(msgs, session_id, [error_msg], &(&1 ++ [error_msg]))
-      end)
-
-    {:noreply, socket}
-  end
-
-  # Handle ReAct streaming events
-  @impl true
-  def handle_info(%{kind: :llm_delta, data: %{delta: _delta}} = _event, socket) do
     {:noreply, socket}
   end
 
@@ -214,9 +218,131 @@ defmodule MurmurWeb.WorkspaceLive do
     {:noreply, socket}
   end
 
-  # Catch-all for other PubSub messages
+  # Catch-all for other messages
   @impl true
   def handle_info(_msg, socket), do: {:noreply, socket}
+
+  # --- Agent Communication ---
+
+  defp send_to_agent(session, content, topic) do
+    agent_module = Catalog.agent_module(session.agent_profile_id)
+    pid = Murmur.Jido.whereis(session.id)
+
+    if pid do
+      Task.Supervisor.start_child(Murmur.Jido.task_supervisor_name(), fn ->
+        try do
+          {:ok, req} = agent_module.ask(pid, content)
+          result = agent_module.await(req, timeout: 120_000)
+
+          case result do
+            {:ok, response} ->
+              hibernate_agent(session.id)
+              broadcast(topic, {:message_completed, session.id, response})
+
+            {:error, reason} ->
+              broadcast(topic, {:request_failed, session.id, reason})
+          end
+        rescue
+          e ->
+            broadcast(topic, {:request_failed, session.id, Exception.message(e)})
+        end
+      end)
+    end
+  end
+
+  # --- Thread / State Helpers ---
+
+  defp load_messages_for_session(session) do
+    pid = Murmur.Jido.whereis(session.id)
+
+    if pid do
+      case Jido.AgentServer.state(pid) do
+        {:ok, agent_state} -> project_thread(agent_state)
+        _ -> load_messages_from_storage(session)
+      end
+    else
+      load_messages_from_storage(session)
+    end
+  end
+
+  defp load_messages_from_storage(session) do
+    agent_module = Catalog.agent_module(session.agent_profile_id)
+
+    case Murmur.Jido.thaw(agent_module, session.id) do
+      {:ok, agent} -> project_thread(agent)
+      {:error, :not_found} -> []
+    end
+  end
+
+  defp project_thread(agent) do
+    thread = get_in_thread(agent)
+
+    if thread do
+      thread.entries
+      |> Enum.filter(&(&1.kind == :message))
+      |> Enum.map(fn entry ->
+        %{
+          id: entry.id || Ecto.UUID.generate(),
+          role: to_string(entry.payload[:role] || entry.payload["role"] || "assistant"),
+          content: entry.payload[:content] || entry.payload["content"] || "",
+          sender_name: entry.payload[:sender_name] || entry.payload["sender_name"]
+        }
+      end)
+    else
+      []
+    end
+  end
+
+  defp get_in_thread(%{state: %{__thread__: thread}}) when not is_nil(thread), do: thread
+  defp get_in_thread(_), do: nil
+
+  defp hibernate_agent(session_id) do
+    pid = Murmur.Jido.whereis(session_id)
+
+    if pid do
+      case Jido.AgentServer.state(pid) do
+        {:ok, agent} -> Murmur.Jido.hibernate(agent)
+        _ -> :ok
+      end
+    end
+  rescue
+    _ -> :ok
+  end
+
+  defp cleanup_storage(session) do
+    {adapter, opts} = Murmur.Jido.__jido_storage__()
+    agent_module = Catalog.agent_module(session.agent_profile_id)
+    checkpoint_key = {agent_module, session.id}
+
+    adapter.delete_checkpoint(checkpoint_key, opts)
+    adapter.delete_thread(session.id, opts)
+  rescue
+    _ -> :ok
+  end
+
+  # --- Agent Lifecycle ---
+
+  defp ensure_agent_started(session) do
+    agent_module = Catalog.agent_module(session.agent_profile_id)
+
+    case Murmur.Jido.start_agent(agent_module, id: session.id) do
+      {:ok, _pid} -> :ok
+      {:error, {:already_started, _pid}} -> :ok
+      {:error, {:already_registered, _pid}} -> :ok
+      _ -> :ok
+    end
+  end
+
+  defp stop_agent(session_id) do
+    case Murmur.Jido.whereis(session_id) do
+      nil -> :ok
+      _pid -> Murmur.Jido.stop_agent(session_id)
+    end
+  end
+
+  defp agent_topic(workspace_id, session_id) do
+    "workspace:#{workspace_id}:agent:#{session_id}"
+  end
 
   # --- Helpers ---
 
@@ -224,6 +350,10 @@ defmodule MurmurWeb.WorkspaceLive do
   defp extract_response_content(%{result: result}) when is_binary(result), do: result
   defp extract_response_content(%{content: content}) when is_binary(content), do: content
   defp extract_response_content(response), do: inspect(response)
+
+  defp broadcast(topic, message) do
+    Phoenix.PubSub.broadcast(Murmur.PubSub, topic, message)
+  end
 
   defp agent_header_class(profile_id) do
     case profile_id do

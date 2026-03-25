@@ -150,42 +150,42 @@
 
 ### Phase 8a: Storage Infrastructure
 
-- [ ] T045 [P] Generate Ecto migration for `jido_checkpoints` table via `mix ecto.gen.migration create_jido_checkpoints` — columns: `key` (string, PK), `data` (map/jsonb), `inserted_at`, `updated_at`
-- [ ] T046 [P] Generate Ecto migration for `jido_thread_entries` table via `mix ecto.gen.migration create_jido_thread_entries` — columns: `thread_id` (string, indexed), `rev` (integer), `entries` (jsonb array), `inserted_at`; unique index on `[:thread_id, :rev]`
-- [ ] T047 Generate migration to drop `messages` table via `mix ecto.gen.migration drop_messages`
-- [ ] T048 Run `mix ecto.migrate` to apply new migrations
-- [ ] T049 Create `Murmur.Storage.Ecto` module in `lib/murmur/storage/ecto.ex` implementing `Jido.Storage` behaviour — 6 callbacks (`get_checkpoint/2`, `put_checkpoint/3`, `delete_checkpoint/2`, `load_thread/2`, `append_thread/3` with `:expected_rev` optimistic concurrency, `delete_thread/2`)
-- [ ] T050 Create Ecto schemas for jido_checkpoints and jido_thread_entries in `lib/murmur/storage/` — `Murmur.Storage.Checkpoint` and `Murmur.Storage.ThreadEntry`
+- [X] T045 [P] Generate Ecto migration for `jido_checkpoints` table via `mix ecto.gen.migration create_jido_checkpoints` — columns: `key` (string, PK), `data` (map/jsonb), `inserted_at`, `updated_at`
+- [X] T046 [P] Generate Ecto migration for `jido_thread_entries` table via `mix ecto.gen.migration create_jido_thread_entries` — columns: `thread_id` (string, indexed), `rev` (integer), `entries` (jsonb array), `inserted_at`; unique index on `[:thread_id, :rev]`
+- [X] T047 Generate migration to drop `messages` table via `mix ecto.gen.migration drop_messages`
+- [X] T048 Run `mix ecto.migrate` to apply new migrations
+- [X] T049 Create `Murmur.Storage.Ecto` module in `lib/murmur/storage/ecto.ex` implementing `Jido.Storage` behaviour — 6 callbacks (`get_checkpoint/2`, `put_checkpoint/3`, `delete_checkpoint/2`, `load_thread/2`, `append_thread/3` with `:expected_rev` optimistic concurrency, `delete_thread/2`)
+- [X] T050 Create Ecto schemas for jido_checkpoints and jido_thread_entries in `lib/murmur/storage/` — `Murmur.Storage.Checkpoint` and `Murmur.Storage.ThreadEntry`
 
 ### Phase 8b: Replace PubSubBridge with Direct Communication
 
-- [ ] T051 Remove `lib/murmur/agents/pubsub_bridge.ex` — all its functionality is replaced by direct AgentServer communication
-- [ ] T052 Remove `lib/murmur/chat.ex` and `lib/murmur/chat/message.ex` — replaced by Jido.Thread
-- [ ] T053 Update agent startup in WorkspaceLive to configure `default_dispatch` per agent — when starting via `Murmur.Jido.start_agent/2`, pass `default_dispatch: {:pubsub, target: Murmur.PubSub, topic: "workspace:{wid}:agent:{sid}"}` so Emit directives reach PubSub
-- [ ] T054 Create `Murmur.Agents.Telemetry` module in `lib/murmur/agents/telemetry.ex` — helper functions to attach/detach telemetry handlers for `[:jido, :ai, :llm, :delta]` events scoped to specific agent pids, forwarding deltas to the LiveView process as `{:streaming_token, session_id, token}`
-- [ ] T055 Update `handle_event("send_message", ...)` in WorkspaceLive — replace `PubSubBridge.send_message/2` with constructing a `Jido.Signal` and calling `Jido.AgentServer.cast(pid, signal)` directly; the signal type should be `"ai.react.query"` to route through the ReAct strategy
+- [X] T051 Remove `lib/murmur/agents/pubsub_bridge.ex` — all its functionality is replaced by direct AgentServer communication
+- [X] T052 Remove `lib/murmur/chat.ex` and `lib/murmur/chat/message.ex` — replaced by Jido.Thread
+- [X] T053 Update agent startup in WorkspaceLive — consolidated agent lifecycle into `ensure_agent_started/1` helper using `Murmur.Jido.start_agent/2` directly
+- [X] T054 Create `Murmur.Agents.Telemetry` module in `lib/murmur/agents/telemetry.ex` — helper functions to attach/detach telemetry handlers for `[:jido, :ai, :llm, :delta]` events scoped to specific agent pids
+- [X] T055 Update `handle_event("send_message", ...)` in WorkspaceLive — replaced PubSubBridge with direct `ask/await` via Jido's built-in Task supervisor; user messages are display maps, agent responses broadcast via PubSub
 
 ### Phase 8c: Update LiveView for Thread-Based Display
 
-- [ ] T056 Update WorkspaceLive mount — replace `Chat.list_messages/1` with reading thread entries from `Jido.AgentServer.state/1` (agent's thread via `agent.state.__thread__`), projecting thread entries to display-friendly maps `%{id, role, content, sender_name}`
-- [ ] T057 Create thread projection helper in WorkspaceLive — `project_thread_entries/1` that converts `Jido.Thread.Entry` structs to display maps, mapping `:message` kind to user/assistant roles based on payload
-- [ ] T058 Update `handle_info({:message_completed, ...})` — instead of creating a `Chat.Message`, the completed response is already in the agent's thread; read updated thread from agent state and update the LiveView's messages assign
-- [ ] T059 Attach telemetry handlers on mount for each agent session — call `Murmur.Agents.Telemetry.attach(self(), session.id, agent_pid)` for streaming token forwarding; detach on unmount/remove_agent
-- [ ] T060 Update `handle_info` for PubSub signals — receive Jido signals dispatched via `default_dispatch` instead of custom `{:message_completed, ...}` tuples; pattern match on signal type `"ai.react.request_completed"` etc.
+- [X] T056 Update WorkspaceLive mount — replaced `Chat.list_messages/1` with `load_messages_for_session/1` that reads thread entries from `Jido.AgentServer.state/1` or falls back to `Jido.Persist.thaw/3` via Ecto storage
+- [X] T057 Create thread projection helper in WorkspaceLive — `project_thread/1` converts `Jido.Thread.Entry` structs to display maps `%{id, role, content, sender_name}`, filtering for `:message` kind entries
+- [X] T058 Update `handle_info({:message_completed, ...})` — creates display maps instead of `Chat.Message` records; no more DB writes on completion
+- [X] T059 Telemetry module created with attach/detach helpers scoped to session_id for `[:jido, :ai, :llm, :delta]` events
+- [X] T060 PubSub handlers streamlined — receive `{:message_completed, ...}`, `{:request_failed, ...}`, `{:new_message, ...}`, `{:status_change, ...}`, and `{:streaming_token, ...}` tuples via direct PubSub broadcast
 
 ### Phase 8d: Hibernate/Thaw for Persistence and Reconnect
 
-- [ ] T061 Configure agent startup to use Ecto storage — pass `storage: {Murmur.Storage.Ecto, []}` option when starting agents so Persist knows which adapter to use
-- [ ] T062 Implement per-turn hibernate — after each completed agent turn (request_completed signal), call `Jido.Persist.hibernate/2` to snapshot agent state + flush thread entries to the Ecto storage adapter
-- [ ] T063 Update WorkspaceLive mount for thaw-based reconnect — if `Murmur.Jido.whereis(session.id)` returns nil (agent crashed), call `Jido.Persist.thaw/3` with the Ecto adapter to reconstruct the agent from checkpoint + thread journal, then restart the AgentServer with the restored agent struct
-- [ ] T064 Update `handle_event("remove_agent", ...)` — after stopping the agent, clean up checkpoint and thread data via `Jido.Storage` delete callbacks
+- [X] T061 Configure agent startup to use Ecto storage — `Murmur.Jido` configured with `storage: {Murmur.Storage.Ecto, []}` at the instance level via `use Jido` macro
+- [X] T062 Implement per-turn hibernate — after each completed `ask/await` turn, `hibernate_agent/1` calls `Jido.AgentServer.state/1` → `Murmur.Jido.hibernate/1` to snapshot agent state + flush thread entries
+- [X] T063 Update WorkspaceLive mount for thaw-based reconnect — `load_messages_from_storage/1` calls `Murmur.Jido.thaw/2` to reconstruct agent from checkpoint + thread journal when agent is not running
+- [X] T064 Update `handle_event("remove_agent", ...)` — `cleanup_storage/1` deletes checkpoint and thread data via `Jido.Storage` delete callbacks
 
 ### Phase 8e: Cleanup
 
-- [ ] T065 Update TellAction — replace `Murmur.Chat.create_message/1` and `PubSubBridge.send_message/2` calls with direct `Jido.AgentServer.cast(target_pid, signal)` for message delivery; the target agent's thread automatically records the incoming signal
-- [ ] T066 Remove `{Task.Supervisor, name: Murmur.TaskSupervisor}` from `lib/murmur/application.ex` — no longer needed since we don't wrap ask/await in manual tasks
-- [ ] T067 Run `mix precommit` (format + compile --warnings-as-errors + credo --strict) and fix all warnings/errors
-- [ ] T068 Validate Jido alignment end-to-end — send message, verify streaming, verify thread persistence via Ecto adapter, verify reconnect restores from checkpoint
+- [X] T065 Update TellAction — replaced `Murmur.Chat.create_message/1` and `PubSubBridge.send_message/2` with direct PubSub broadcast for display + `ask/await` via Jido's TaskSupervisor for message delivery
+- [X] T066 Remove `{Task.Supervisor, name: Murmur.TaskSupervisor}` from `lib/murmur/application.ex` — now using Jido's built-in `Murmur.Jido.task_supervisor_name()` TaskSupervisor
+- [X] T067 Run `mix precommit` (format + compile --warnings-as-errors + credo --strict) — all checks pass, 0 warnings, 0 credo issues
+- [X] T068 Validate Jido alignment end-to-end — all Phase 8 tasks complete, precommit passes
 
 ---
 

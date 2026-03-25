@@ -12,7 +12,6 @@ defmodule Murmur.Application do
       Murmur.Repo,
       {DNSCluster, query: Application.get_env(:murmur, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: Murmur.PubSub},
-      {Task.Supervisor, name: Murmur.TaskSupervisor},
       MurmurWeb.Endpoint,
       Murmur.Jido
     ]

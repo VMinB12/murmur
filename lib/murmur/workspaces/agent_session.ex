@@ -12,8 +12,6 @@ defmodule Murmur.Workspaces.AgentSession do
 
     belongs_to :workspace, Murmur.Workspaces.Workspace
 
-    has_many :messages, Murmur.Chat.Message
-
     timestamps(type: :utc_datetime_usec)
   end
 

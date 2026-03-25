@@ -142,6 +142,53 @@
 
 ---
 
+## Phase 8: Jido Framework Alignment Refactor
+
+**Purpose**: Eliminate hand-rolled infrastructure that duplicates Jido primitives. Replace custom Chat persistence with Jido.Thread + Jido.Persist. Replace PubSubBridge with direct AgentServer.cast + telemetry. Add hibernate/thaw for proper state persistence.
+
+**Research decisions**: R9 (Thread as single source of truth), R10 (Persist with Ecto adapter), R11 (Direct cast + telemetry), R12 (Reconnect via thaw)
+
+### Phase 8a: Storage Infrastructure
+
+- [ ] T045 [P] Generate Ecto migration for `jido_checkpoints` table via `mix ecto.gen.migration create_jido_checkpoints` — columns: `key` (string, PK), `data` (map/jsonb), `inserted_at`, `updated_at`
+- [ ] T046 [P] Generate Ecto migration for `jido_thread_entries` table via `mix ecto.gen.migration create_jido_thread_entries` — columns: `thread_id` (string, indexed), `rev` (integer), `entries` (jsonb array), `inserted_at`; unique index on `[:thread_id, :rev]`
+- [ ] T047 Generate migration to drop `messages` table via `mix ecto.gen.migration drop_messages`
+- [ ] T048 Run `mix ecto.migrate` to apply new migrations
+- [ ] T049 Create `Murmur.Storage.Ecto` module in `lib/murmur/storage/ecto.ex` implementing `Jido.Storage` behaviour — 6 callbacks (`get_checkpoint/2`, `put_checkpoint/3`, `delete_checkpoint/2`, `load_thread/2`, `append_thread/3` with `:expected_rev` optimistic concurrency, `delete_thread/2`)
+- [ ] T050 Create Ecto schemas for jido_checkpoints and jido_thread_entries in `lib/murmur/storage/` — `Murmur.Storage.Checkpoint` and `Murmur.Storage.ThreadEntry`
+
+### Phase 8b: Replace PubSubBridge with Direct Communication
+
+- [ ] T051 Remove `lib/murmur/agents/pubsub_bridge.ex` — all its functionality is replaced by direct AgentServer communication
+- [ ] T052 Remove `lib/murmur/chat.ex` and `lib/murmur/chat/message.ex` — replaced by Jido.Thread
+- [ ] T053 Update agent startup in WorkspaceLive to configure `default_dispatch` per agent — when starting via `Murmur.Jido.start_agent/2`, pass `default_dispatch: {:pubsub, target: Murmur.PubSub, topic: "workspace:{wid}:agent:{sid}"}` so Emit directives reach PubSub
+- [ ] T054 Create `Murmur.Agents.Telemetry` module in `lib/murmur/agents/telemetry.ex` — helper functions to attach/detach telemetry handlers for `[:jido, :ai, :llm, :delta]` events scoped to specific agent pids, forwarding deltas to the LiveView process as `{:streaming_token, session_id, token}`
+- [ ] T055 Update `handle_event("send_message", ...)` in WorkspaceLive — replace `PubSubBridge.send_message/2` with constructing a `Jido.Signal` and calling `Jido.AgentServer.cast(pid, signal)` directly; the signal type should be `"ai.react.query"` to route through the ReAct strategy
+
+### Phase 8c: Update LiveView for Thread-Based Display
+
+- [ ] T056 Update WorkspaceLive mount — replace `Chat.list_messages/1` with reading thread entries from `Jido.AgentServer.state/1` (agent's thread via `agent.state.__thread__`), projecting thread entries to display-friendly maps `%{id, role, content, sender_name}`
+- [ ] T057 Create thread projection helper in WorkspaceLive — `project_thread_entries/1` that converts `Jido.Thread.Entry` structs to display maps, mapping `:message` kind to user/assistant roles based on payload
+- [ ] T058 Update `handle_info({:message_completed, ...})` — instead of creating a `Chat.Message`, the completed response is already in the agent's thread; read updated thread from agent state and update the LiveView's messages assign
+- [ ] T059 Attach telemetry handlers on mount for each agent session — call `Murmur.Agents.Telemetry.attach(self(), session.id, agent_pid)` for streaming token forwarding; detach on unmount/remove_agent
+- [ ] T060 Update `handle_info` for PubSub signals — receive Jido signals dispatched via `default_dispatch` instead of custom `{:message_completed, ...}` tuples; pattern match on signal type `"ai.react.request_completed"` etc.
+
+### Phase 8d: Hibernate/Thaw for Persistence and Reconnect
+
+- [ ] T061 Configure agent startup to use Ecto storage — pass `storage: {Murmur.Storage.Ecto, []}` option when starting agents so Persist knows which adapter to use
+- [ ] T062 Implement per-turn hibernate — after each completed agent turn (request_completed signal), call `Jido.Persist.hibernate/2` to snapshot agent state + flush thread entries to the Ecto storage adapter
+- [ ] T063 Update WorkspaceLive mount for thaw-based reconnect — if `Murmur.Jido.whereis(session.id)` returns nil (agent crashed), call `Jido.Persist.thaw/3` with the Ecto adapter to reconstruct the agent from checkpoint + thread journal, then restart the AgentServer with the restored agent struct
+- [ ] T064 Update `handle_event("remove_agent", ...)` — after stopping the agent, clean up checkpoint and thread data via `Jido.Storage` delete callbacks
+
+### Phase 8e: Cleanup
+
+- [ ] T065 Update TellAction — replace `Murmur.Chat.create_message/1` and `PubSubBridge.send_message/2` calls with direct `Jido.AgentServer.cast(target_pid, signal)` for message delivery; the target agent's thread automatically records the incoming signal
+- [ ] T066 Remove `{Task.Supervisor, name: Murmur.TaskSupervisor}` from `lib/murmur/application.ex` — no longer needed since we don't wrap ask/await in manual tasks
+- [ ] T067 Run `mix precommit` (format + compile --warnings-as-errors + credo --strict) and fix all warnings/errors
+- [ ] T068 Validate Jido alignment end-to-end — send message, verify streaming, verify thread persistence via Ecto adapter, verify reconnect restores from checkpoint
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies
@@ -153,6 +200,7 @@
 - **Phase 5 (US3)**: Depends on Phase 4 (tell requires multiple agents in workspace) + Phase 3 (agents must be able to chat)
 - **Phase 6 (US4)**: Depends on Phase 3 (streaming must work to test reconnect); can be done in parallel with Phase 5
 - **Phase 7 (Polish)**: Depends on all desired user stories being complete
+- **Phase 8 (Jido Alignment)**: Depends on Phases 1-7 being complete — refactors existing implementation to use Jido primitives
 
 ### User Story Dependencies
 

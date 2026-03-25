@@ -88,3 +88,55 @@
 - Separate profile structs duplicating model/tools/system_prompt: Creates two sources of truth for agent identity. Rejected because `Jido.AI.Agent` already owns this configuration.
 - Database-backed catalog: Over-engineering for v1 where catalog is static. Rejected.
 - YAML/JSON config files: Adds a parsing step and loses compile-time guarantees. Rejected.
+
+## R9: Jido.Thread as Single Source of Truth for Conversation History (Alignment Refactor)
+
+**Decision**: Replace the custom `Chat.Message` Ecto schema and `Chat` context with `Jido.Thread` as the canonical conversation history. Each agent already has a Thread via the default `Jido.Thread.Plugin`. Thread entries (`:message`, `:tool_call`, `:tool_result`, `:instruction_start`, `:instruction_end`) replace our `messages` table rows.
+
+**Rationale**: The v1 implementation maintained two parallel histories — a Jido Thread in-memory (used by the ReAct strategy for LLM context) and an Ecto `messages` table (used for display and rehydration). This is dual bookkeeping. Jido.Thread already provides append-only semantics, automatic sequencing, revision tracking, and entry filtering by kind. Using it as the single source of truth eliminates the `Chat` context, `Message` schema, and the `messages` migration entirely.
+
+For the LiveView display, Thread entries are projected to display-friendly structs. The `Jido.AI.Thread` extension (from `jido_ai`) provides role-based messaging and provider-agnostic projection.
+
+**Alternatives considered**:
+- Keep both: Custom Ecto table for display, Thread for LLM context. Rejected because it creates two sources of truth and requires sync logic.
+- Use Thread only in-memory, no DB persistence: Would lose history on agent crash. Rejected — we need persistence via `Jido.Persist`.
+
+## R10: Jido.Persist with Ecto Storage Adapter for Durable History (Alignment Refactor)
+
+**Decision**: Use `Jido.Persist.hibernate/2` and `Jido.Persist.thaw/3` for agent state persistence. Implement a custom `Murmur.Storage.Ecto` adapter that satisfies the `Jido.Storage` behaviour (6 callbacks: `get_checkpoint/2`, `put_checkpoint/3`, `delete_checkpoint/2`, `load_thread/2`, `append_thread/3`, `delete_thread/2`). This adapter stores checkpoints and thread journals in two Ecto tables (`jido_checkpoints` and `jido_thread_entries`).
+
+**Rationale**: Jido's Persist system separates checkpoints (agent state snapshots, overwrite semantics) from journals (thread entries, append-only). The checkpoint stores the full agent state minus the thread, plus a thread pointer. The journal stores thread entries with optimistic concurrency via `expected_rev`. This design keeps checkpoints small regardless of thread length, and gives us hibernate/thaw semantics — snapshot the agent before shutdown, restore it on restart.
+
+The built-in `Jido.Storage.ETS` adapter is ephemeral (dev only) and `Jido.Storage.File` is single-node. An Ecto adapter provides durable persistence across restarts and scales with PostgreSQL.
+
+**Alternatives considered**:
+- Continue using custom `messages` table: Doesn't capture full agent state (strategy state, memory, thread rev). Rejected.
+- Use `Jido.Storage.File`: Not suitable for multi-process production environments. Rejected.
+
+## R11: Direct AgentServer.cast/2 + Telemetry for Communication (Alignment Refactor)
+
+**Decision**: Replace the custom `PubSubBridge` module with direct communication patterns:
+
+1. **User input → Agent**: LiveView calls `AgentServer.cast(pid, signal)` with a user message signal. The signal routes through the agent's signal router to the ReAct strategy.
+2. **Streaming tokens → LiveView**: The LiveView process attaches a telemetry handler for `[:jido, :ai, :llm, :delta]` events scoped to the specific agent. Delta events are sent to the LiveView pid, which updates the UI.
+3. **Completed response → LiveView**: The agent's `default_dispatch` is configured as `{:pubsub, target: Murmur.PubSub, topic: "workspace:{wid}:agent:{sid}"}`. When the agent emits request-completed signals, they dispatch to PubSub and the LiveView receives them.
+4. **Status changes**: Observed via the same signal dispatch — the agent emits status signals through its effect policy.
+
+**Rationale**: The PubSubBridge wraps `ask/await` in a `Task.Supervisor.start_child`, then manually broadcasts results. This bypasses Jido's signal system. `AgentServer.cast/2` is already async — the agent processes the signal in its own supervised context. Using `default_dispatch` for output means agent Emit directives naturally flow to PubSub, which the LiveView subscribes to.
+
+For streaming tokens specifically, jido_ai uses `:telemetry.execute` (not Emit directives), so we attach telemetry handlers rather than relying on `default_dispatch`. This is the correct integration point — it's how jido_ai is designed to expose streaming data.
+
+**Alternatives considered**:
+- Keep PubSubBridge: Works but duplicates Jido's signal/dispatch system and adds a custom Task.Supervisor layer. Rejected.
+- Use only `default_dispatch` for everything including streaming: jido_ai emits tokens via telemetry, not directives. Rejected as incompatible with the framework's design.
+- Use a Jido Sensor for LiveView input: Possible but overengineering — the LiveView can cast signals directly. Rejected for YAGNI.
+
+## R12: Reconnect via Jido.Persist.thaw/3 (Alignment Refactor)
+
+**Decision**: On LiveView mount/reconnect, check if the AgentServer is still running. If yes, use `Jido.AgentServer.state/1` to get current state (unchanged from v1). If the AgentServer has crashed and not restarted, use `Jido.Persist.thaw/3` with the Ecto storage adapter to reconstruct the agent from the last checkpoint + thread journal. This covers the case where the supervision tree restarted the process but the old state was lost.
+
+**Rationale**: v1 only reloads from the Ecto `messages` table, which loses strategy state, memory, thread revisions, and any in-progress tool call context. `thaw/3` reconstructs the full cognitive state — thread, memory, strategy state — from the durable checkpoint. This aligns with Jido's persistence design where hibernate/thaw is the proper lifecycle for agent state across restarts.
+
+**Alternatives considered**:
+- Continue reading from Ecto messages: Loses cognitive state. Rejected.
+- Only rely on GenServer staying alive: No durability guarantee. Rejected.

@@ -99,7 +99,9 @@ test/
         └── workspace_live_test.exs
 ```
 
-**Structure Decision**: Standard Phoenix single-project layout. Domain logic split into three contexts: `Workspaces` (workspace + session CRUD), `Chat` (message persistence and queries), and `Agents` (runtime execution via Jido). Agent profiles are `Jido.AI.Agent` modules started directly via `Murmur.Jido.start_agent/2` — no wrapper GenServer needed since `Jido.AgentServer` is the runtime. This follows Phoenix convention and the constitution's single-responsibility and avoid-indirection principles.
+**Structure Decision**: Standard Phoenix single-project layout. Domain logic split into two contexts: `Workspaces` (workspace + session CRUD) and `Agents` (runtime execution via Jido). Agent profiles are `Jido.AI.Agent` modules started directly via `Murmur.Jido.start_agent/2` — no wrapper GenServer needed since `Jido.AgentServer` is the runtime.
+
+**Jido Alignment (Phase 8 refactor)**: Conversation history uses `Jido.Thread` as the single source of truth (not a custom Ecto messages table). Persistence uses `Jido.Persist` with a custom Ecto-backed `Jido.Storage` adapter for checkpoint/journal operations. The LiveView communicates with agents via `AgentServer.cast/2` (signals) instead of a custom PubSubBridge module. Token streaming is observed via `:telemetry.attach` on `[:jido, :ai, :llm, :delta]` events. Completed responses arrive via Jido's `default_dispatch` configured to broadcast to Phoenix.PubSub. Reconnect uses `Jido.Persist.thaw/3` when an AgentServer has crashed, and `Jido.AgentServer.state/1` when it's still alive.
 
 ## Complexity Tracking
 

@@ -141,7 +141,14 @@ A user is watching a streamed response when their browser loses connection (e.g.
 
 ## Clarifications
 
-### Session 2026-03-25
+### Session 2026-03-25 (Jido Alignment Review)
+
+- Q: Should we use Jido.Thread instead of a custom Ecto messages table for conversation history? → A: Yes. Jido.Thread is the canonical append-only interaction log built into every agent. It already tracks messages, tool calls, tool results, and instruction events with automatic sequence numbering and revision tracking. The `messages` Ecto table duplicates this. We should use Jido.Thread as the single source of truth and persist it via `Jido.Persist` with a custom Ecto-backed Storage adapter. This eliminates dual bookkeeping and gives us hibernate/thaw for free.
+- Q: Should we replace PubSubBridge with direct AgentServer.cast + signal dispatch? → A: Yes. The current PubSubBridge manually wraps ask/await in a Task.Supervisor, then broadcasts results via Phoenix.PubSub. Jido's AgentServer natively handles async signal processing — `AgentServer.cast/2` sends a signal and the agent processes it asynchronously. For streaming tokens, jido_ai emits telemetry events (`:jido, :ai, :llm, :delta`) which we can subscribe to from the LiveView process via `:telemetry.attach`. For completed responses, the agent emits request-completed signals. The LiveView subscribes to the agent's PubSub topic configured via `default_dispatch: {:pubsub, target: Murmur.PubSub, topic: topic}`.
+- Q: Should we use Jido.Persist for reconnect state rehydration instead of reloading from Ecto? → A: Yes. `Jido.Persist.hibernate/2` snapshots agent state (including thread) to storage, and `Jido.Persist.thaw/3` restores it. For reconnect, if the AgentServer is still running, we read state directly from it. If it crashed and was restarted, thaw reconstructs the full agent cognitive state. This preserves thread + memory + strategy state, not just message text.
+- Q: Should the messages Ecto table be dropped entirely? → A: Yes for new schema. The Thread-based approach replaces it. The `agent_sessions` table remains for workspace membership. Thread persistence is handled by `.Persist` + a Storage adapter that uses Ecto under the hood, but the schema is Jido's checkpoint/journal format, not our custom messages table.
+
+### Session 2026-03-25 (Original)
 
 - Q: Should Story 1 address per-agent history persistence? → A: Yes, each agent persists its own independent history; no shared exchange concept. Belongs in Story 1 as it is foundational.
 - Q: Story 3 scenario 4 says "both agents finish" — when does persistence happen? → A: Each agent persists its own history immediately upon its own completion, not when all agents collectively finish.

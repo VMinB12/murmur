@@ -40,6 +40,7 @@ defmodule Murmur.MixProject do
   # Type `mix help deps` for examples and options.
   defp deps do
     [
+      {:credo, "~> 1.0", only: [:dev, :test]},
       {:jido, "~> 2.0"},
       {:phoenix, "~> 1.8.5"},
       {:phoenix_ecto, "~> 4.5"},

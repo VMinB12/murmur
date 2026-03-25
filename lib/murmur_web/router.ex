@@ -18,6 +18,9 @@ defmodule MurmurWeb.Router do
     pipe_through :browser
 
     get "/", PageController, :home
+
+    live "/workspaces", WorkspaceListLive
+    live "/workspaces/:id", WorkspaceLive
   end
 
   # Other scopes may use custom stacks.

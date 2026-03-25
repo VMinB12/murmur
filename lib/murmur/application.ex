@@ -12,9 +12,7 @@ defmodule Murmur.Application do
       Murmur.Repo,
       {DNSCluster, query: Application.get_env(:murmur, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: Murmur.PubSub},
-      # Start a worker by calling: Murmur.Worker.start_link(arg)
-      # {Murmur.Worker, arg},
-      # Start to serve requests, typically the last entry
+      {Task.Supervisor, name: Murmur.TaskSupervisor},
       MurmurWeb.Endpoint,
       Murmur.Jido
     ]

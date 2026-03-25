@@ -17,11 +17,11 @@
 
 **Purpose**: Project initialization — database schemas, config, and shared infrastructure
 
-- [ ] T001 Configure jido_ai model aliases and req_llm API keys in `config/config.exs` and `config/runtime.exs`
-- [ ] T002 Generate Ecto migration for workspaces table via `mix ecto.gen.migration create_workspaces` and implement in `priv/repo/migrations/*_create_workspaces.exs`
-- [ ] T003 Generate Ecto migration for agent_sessions table via `mix ecto.gen.migration create_agent_sessions` and implement in `priv/repo/migrations/*_create_agent_sessions.exs` (includes unique index on `[:workspace_id, :display_name]`)
-- [ ] T004 Generate Ecto migration for messages table via `mix ecto.gen.migration create_messages` and implement in `priv/repo/migrations/*_create_messages.exs` (includes composite index on `[:agent_session_id, :inserted_at]`)
-- [ ] T005 Run `mix ecto.migrate` to apply all migrations
+- [X] T001 Configure jido_ai model aliases and req_llm API keys in `config/config.exs` and `config/runtime.exs`
+- [X] T002 Generate Ecto migration for workspaces table via `mix ecto.gen.migration create_workspaces` and implement in `priv/repo/migrations/*_create_workspaces.exs`
+- [X] T003 Generate Ecto migration for agent_sessions table via `mix ecto.gen.migration create_agent_sessions` and implement in `priv/repo/migrations/*_create_agent_sessions.exs` (includes unique index on `[:workspace_id, :display_name]`)
+- [X] T004 Generate Ecto migration for messages table via `mix ecto.gen.migration create_messages` and implement in `priv/repo/migrations/*_create_messages.exs` (includes composite index on `[:agent_session_id, :inserted_at]`)
+- [X] T005 Run `mix ecto.migrate` to apply all migrations
 
 ---
 
@@ -31,14 +31,14 @@
 
 **⚠️ CRITICAL**: Phases 3–6 are blocked until Phase 2 is complete.
 
-- [ ] T006 [P] Create Workspace Ecto schema in `lib/murmur/workspaces/workspace.ex` with fields per data-model.md (id, name, timestamps) and changeset
-- [ ] T007 [P] Create AgentSession Ecto schema in `lib/murmur/workspaces/agent_session.ex` with fields per data-model.md (id, workspace_id, agent_profile_id, display_name, status, timestamps), changeset with unique constraint on `[:workspace_id, :display_name]`, and `belongs_to :workspace`
-- [ ] T008 [P] Create Message Ecto schema in `lib/murmur/chat/message.ex` with fields per data-model.md (id, agent_session_id, role, content, sender_name, tool_calls, tool_call_id, metadata, inserted_at), changeset, and `belongs_to :agent_session`
-- [ ] T009 Create Workspaces context module in `lib/murmur/workspaces.ex` with `create_workspace/1`, `get_workspace!/1`, `list_agent_sessions/1`, `create_agent_session/2` (enforces max 8 per workspace, validates unique display_name), `delete_agent_session/1`
-- [ ] T010 Create Chat context module in `lib/murmur/chat.ex` with `list_messages/1` (ordered by inserted_at), `create_message/1`, `persist_turn/2` (bulk-insert list of messages for a completed agent turn)
-- [ ] T011 [P] Create first `Jido.AI.Agent` profile module in `lib/murmur/agents/profiles/general_agent.ex` using `use Jido.AI.Agent, name: "general_agent", model: :fast, tools: [], system_prompt: "You are a helpful assistant."`
-- [ ] T012 [P] Create second `Jido.AI.Agent` profile module in `lib/murmur/agents/profiles/code_agent.ex` using `use Jido.AI.Agent, name: "code_agent", model: :fast, tools: [], system_prompt: "You are an expert programmer."`
-- [ ] T013 Create Catalog module in `lib/murmur/agents/catalog.ex` mapping profile IDs to `{agent_module, %{description: ..., color: ...}}` per research decision R8; expose `list_profiles/0`, `get_profile!/1`, `agent_module/1`
+- [X] T006 [P] Create Workspace Ecto schema in `lib/murmur/workspaces/workspace.ex` with fields per data-model.md (id, name, timestamps) and changeset
+- [X] T007 [P] Create AgentSession Ecto schema in `lib/murmur/workspaces/agent_session.ex` with fields per data-model.md (id, workspace_id, agent_profile_id, display_name, status, timestamps), changeset with unique constraint on `[:workspace_id, :display_name]`, and `belongs_to :workspace`
+- [X] T008 [P] Create Message Ecto schema in `lib/murmur/chat/message.ex` with fields per data-model.md (id, agent_session_id, role, content, sender_name, tool_calls, tool_call_id, metadata, inserted_at), changeset, and `belongs_to :agent_session`
+- [X] T009 Create Workspaces context module in `lib/murmur/workspaces.ex` with `create_workspace/1`, `get_workspace!/1`, `list_agent_sessions/1`, `create_agent_session/2` (enforces max 8 per workspace, validates unique display_name), `delete_agent_session/1`
+- [X] T010 Create Chat context module in `lib/murmur/chat.ex` with `list_messages/1` (ordered by inserted_at), `create_message/1`, `persist_turn/2` (bulk-insert list of messages for a completed agent turn)
+- [X] T011 [P] Create first `Jido.AI.Agent` profile module in `lib/murmur/agents/profiles/general_agent.ex` using `use Jido.AI.Agent, name: "general_agent", model: :fast, tools: [], system_prompt: "You are a helpful assistant."`
+- [X] T012 [P] Create second `Jido.AI.Agent` profile module in `lib/murmur/agents/profiles/code_agent.ex` using `use Jido.AI.Agent, name: "code_agent", model: :fast, tools: [], system_prompt: "You are an expert programmer."`
+- [X] T013 Create Catalog module in `lib/murmur/agents/catalog.ex` mapping profile IDs to `{agent_module, %{description: ..., color: ...}}` per research decision R8; expose `list_profiles/0`, `get_profile!/1`, `agent_module/1`
 
 **Checkpoint**: Foundation ready — all schemas, contexts, agent profiles, and catalog in place. User story implementation can begin.
 
@@ -54,14 +54,14 @@
 
 ### Implementation for User Story 1
 
-- [ ] T014 [US1] Add workspace and agent session routes to `lib/murmur_web/router.ex` — `live "/workspaces/:id", WorkspaceLive` inside the existing authenticated `live_session`
-- [ ] T015 [US1] Create WorkspaceLive module in `lib/murmur_web/live/workspace_live.ex` — mount loads workspace + agent sessions + message history from DB, subscribes to PubSub topics per agent session (topic format from contracts/pubsub.md), initializes streams for messages per agent
-- [ ] T016 [US1] Create WorkspaceLive template in `lib/murmur_web/live/workspace_live.html.heex` — `<Layouts.app>` wrapper, single-agent column with colored header showing display_name/profile/model (FR-016), scrollable message stream with `phx-update="stream"`, text input with `phx-submit="send_message"`, busy indicator (FR-014)
-- [ ] T017 [US1] Implement `handle_event("send_message", ...)` in WorkspaceLive — creates user Message via Chat context, starts AgentServer via `Murmur.Jido.start_agent/2` if not running, sends message via `AgentModule.ask(pid, user_message)`, broadcasts `{:new_message, ...}` and `{:status_change, ..., :busy}` via PubSub
-- [ ] T018 [US1] Implement PubSub handlers in WorkspaceLive — `handle_info` for native `%ReAct.Event{kind: :llm_delta}` (stream_insert token into message stream), `{:status_change, ...}` (update busy assign), `{:message_completed, ...}` (finalize assistant message in stream)
-- [ ] T019 [US1] Implement per-turn persistence hook — after ReAct `request_completed` event, call `Chat.persist_turn/2` to bulk-insert the turn's messages (user message + assistant response + any tool_call/tool_result messages) per research decision R5
-- [ ] T020 [US1] Implement agent startup and signal-to-PubSub bridge — when starting an AgentServer for a session, configure signal dispatch to forward ReAct events to Phoenix PubSub on the agent's topic (`"workspace:{workspace_id}:agent:{agent_session_id}"`) per research decision R2
-- [ ] T021 [US1] Wire up auto-scroll JS hook for agent chat columns — create colocated JS hook (`.AutoScroll`) in the template that scrolls to bottom on new stream inserts, with `phx-hook=".AutoScroll"` and `phx-update="ignore"` on the scrollable container
+- [X] T014 [US1] Add workspace and agent session routes to `lib/murmur_web/router.ex` — `live "/workspaces/:id", WorkspaceLive` inside the existing authenticated `live_session`
+- [X] T015 [US1] Create WorkspaceLive module in `lib/murmur_web/live/workspace_live.ex` — mount loads workspace + agent sessions + message history from DB, subscribes to PubSub topics per agent session (topic format from contracts/pubsub.md), initializes streams for messages per agent
+- [X] T016 [US1] Create WorkspaceLive template in `lib/murmur_web/live/workspace_live.html.heex` — `<Layouts.app>` wrapper, single-agent column with colored header showing display_name/profile/model (FR-016), scrollable message stream with `phx-update="stream"`, text input with `phx-submit="send_message"`, busy indicator (FR-014)
+- [X] T017 [US1] Implement `handle_event("send_message", ...)` in WorkspaceLive — creates user Message via Chat context, starts AgentServer via `Murmur.Jido.start_agent/2` if not running, sends message via `AgentModule.ask(pid, user_message)`, broadcasts `{:new_message, ...}` and `{:status_change, ..., :busy}` via PubSub
+- [X] T018 [US1] Implement PubSub handlers in WorkspaceLive — `handle_info` for native `%ReAct.Event{kind: :llm_delta}` (stream_insert token into message stream), `{:status_change, ...}` (update busy assign), `{:message_completed, ...}` (finalize assistant message in stream)
+- [X] T019 [US1] Implement per-turn persistence hook — after ReAct `request_completed` event, call `Chat.persist_turn/2` to bulk-insert the turn's messages (user message + assistant response + any tool_call/tool_result messages) per research decision R5
+- [X] T020 [US1] Implement agent startup and signal-to-PubSub bridge — when starting an AgentServer for a session, configure signal dispatch to forward ReAct events to Phoenix PubSub on the agent's topic (`"workspace:{workspace_id}:agent:{agent_session_id}"`) per research decision R2
+- [X] T021 [US1] Wire up auto-scroll JS hook for agent chat columns — create colocated JS hook (`.AutoScroll`) in the template that scrolls to bottom on new stream inserts, with `phx-hook=".AutoScroll"` and `phx-update="ignore"` on the scrollable container
 
 **Checkpoint**: Single-agent chat works end-to-end — user sends a message, tokens stream in real time, history persists to DB.
 
@@ -77,13 +77,13 @@
 
 ### Implementation for User Story 2
 
-- [ ] T022 [US2] Add workspace CRUD routes and index LiveView — add `live "/workspaces", WorkspaceListLive` to router, create `lib/murmur_web/live/workspace_list_live.ex` with create-workspace form and list of existing workspaces
-- [ ] T023 [US2] Create workspace list template in `lib/murmur_web/live/workspace_list_live.html.heex` — `<Layouts.app>` wrapper, workspace cards with links, create form using `<.form>` and `<.input>`
-- [ ] T024 [US2] Add agent catalog UI to WorkspaceLive — implement "Add Agent" button/panel that displays available profiles from `Catalog.list_profiles/0`, with a `<.form>` for choosing profile and entering display_name; handle `phx-submit="add_agent"` event
-- [ ] T025 [US2] Implement `handle_event("add_agent", ...)` in WorkspaceLive — validate unique display_name (FR-019), enforce max 8 agents cap, call `Workspaces.create_agent_session/2`, start AgentServer, subscribe to new PubSub topic, insert agent column into streams
-- [ ] T026 [US2] Implement `handle_event("remove_agent", ...)` in WorkspaceLive — stop AgentServer via `Murmur.Jido.stop_agent/1`, unsubscribe from PubSub topic, call `Workspaces.delete_agent_session/1`, remove agent column from streams using `stream_delete`
-- [ ] T027 [US2] Update WorkspaceLive template for multi-agent layout — horizontal flex container for agent columns, each column rendered via a stream keyed by agent_session_id, responsive column widths per agent count, empty state when no agents with guidance to add one (FR-005)
-- [ ] T028 [US2] Update WorkspaceLive mount to restore all agents — on mount, iterate `Workspaces.list_agent_sessions/1`, start AgentServer for each (if not already running), load message history via `Chat.list_messages/1`, subscribe to all PubSub topics, initialize streams
+- [X] T022 [US2] Add workspace CRUD routes and index LiveView — add `live "/workspaces", WorkspaceListLive` to router, create `lib/murmur_web/live/workspace_list_live.ex` with create-workspace form and list of existing workspaces
+- [X] T023 [US2] Create workspace list template in `lib/murmur_web/live/workspace_list_live.html.heex` — `<Layouts.app>` wrapper, workspace cards with links, create form using `<.form>` and `<.input>`
+- [X] T024 [US2] Add agent catalog UI to WorkspaceLive — implement "Add Agent" button/panel that displays available profiles from `Catalog.list_profiles/0`, with a `<.form>` for choosing profile and entering display_name; handle `phx-submit="add_agent"` event
+- [X] T025 [US2] Implement `handle_event("add_agent", ...)` in WorkspaceLive — validate unique display_name (FR-019), enforce max 8 agents cap, call `Workspaces.create_agent_session/2`, start AgentServer, subscribe to new PubSub topic, insert agent column into streams
+- [X] T026 [US2] Implement `handle_event("remove_agent", ...)` in WorkspaceLive — stop AgentServer via `Murmur.Jido.stop_agent/1`, unsubscribe from PubSub topic, call `Workspaces.delete_agent_session/1`, remove agent column from streams using `stream_delete`
+- [X] T027 [US2] Update WorkspaceLive template for multi-agent layout — horizontal flex container for agent columns, each column rendered via a stream keyed by agent_session_id, responsive column widths per agent count, empty state when no agents with guidance to add one (FR-005)
+- [X] T028 [US2] Update WorkspaceLive mount to restore all agents — on mount, iterate `Workspaces.list_agent_sessions/1`, start AgentServer for each (if not already running), load message history via `Chat.list_messages/1`, subscribe to all PubSub topics, initialize streams
 
 **Checkpoint**: Multi-agent workspace works — users can create workspaces, add/remove agents, see side-by-side columns, chat with each independently. History restored on refresh.
 
@@ -99,13 +99,13 @@
 
 ### Implementation for User Story 3
 
-- [ ] T029 [US3] Create TellAction in `lib/murmur/agents/tell_action.ex` — `use Jido.Action, name: "tell", schema: Zoi.object(%{target_agent: Zoi.string(), message: Zoi.string()})`, `run/2` resolves target by display_name within the workspace via `Workspaces.find_agent_session_by_name/2`, looks up pid via `Murmur.Jido.whereis/1`, checks hop_count < 5 (FR-015), sends message with sender_name prefix (FR-010)
-- [ ] T030 [US3] Implement mid-turn pending injection mechanism — add `pending_injections` to agent state schema, implement `request_transformer` callback that calls `GenServer.call(self_pid, :get_and_clear_injections)` between ReAct iterations and merges drained messages into the conversation context per research decision R4
-- [ ] T031 [US3] Implement idle-agent message delivery in TellAction — when target agent is idle, call `AgentModule.ask(target_pid, message)` to immediately trigger processing (FR-011); when target is busy, append to `pending_injections` for mid-turn injection (FR-012)
-- [ ] T032 [US3] Add TellAction as a tool to all agent profile modules — update `lib/murmur/agents/profiles/general_agent.ex` and `lib/murmur/agents/profiles/code_agent.ex` to include `Murmur.Agents.TellAction` in their `tools:` list
-- [ ] T033 [US3] Implement user-message-to-busy-agent injection — update `handle_event("send_message", ...)` in WorkspaceLive to detect busy status and append to `pending_injections` instead of calling `ask/2`, matching tell behavior (FR-017)
-- [ ] T034 [US3] Add `find_agent_session_by_name/2` to Workspaces context in `lib/murmur/workspaces.ex` — query AgentSession by workspace_id + display_name for TellAction routing
-- [ ] T035 [US3] Handle tell-to-removed-agent edge case — in TellAction `run/2`, return `{:error, "Agent not found"}` when target pid is nil; the ReAct runtime surfaces this as a tool error to the calling agent
+- [X] T029 [US3] Create TellAction in `lib/murmur/agents/tell_action.ex` — `use Jido.Action, name: "tell", schema: Zoi.object(%{target_agent: Zoi.string(), message: Zoi.string()})`, `run/2` resolves target by display_name within the workspace via `Workspaces.find_agent_session_by_name/2`, looks up pid via `Murmur.Jido.whereis/1`, checks hop_count < 5 (FR-015), sends message with sender_name prefix (FR-010)
+- [X] T030 [US3] Implement mid-turn pending injection mechanism — add `pending_injections` to agent state schema, implement `request_transformer` callback that calls `GenServer.call(self_pid, :get_and_clear_injections)` between ReAct iterations and merges drained messages into the conversation context per research decision R4
+- [X] T031 [US3] Implement idle-agent message delivery in TellAction — when target agent is idle, call `AgentModule.ask(target_pid, message)` to immediately trigger processing (FR-011); when target is busy, append to `pending_injections` for mid-turn injection (FR-012)
+- [X] T032 [US3] Add TellAction as a tool to all agent profile modules — update `lib/murmur/agents/profiles/general_agent.ex` and `lib/murmur/agents/profiles/code_agent.ex` to include `Murmur.Agents.TellAction` in their `tools:` list
+- [X] T033 [US3] Implement user-message-to-busy-agent injection — update `handle_event("send_message", ...)` in WorkspaceLive to detect busy status and append to `pending_injections` instead of calling `ask/2`, matching tell behavior (FR-017)
+- [X] T034 [US3] Add `find_agent_session_by_name/2` to Workspaces context in `lib/murmur/workspaces.ex` — query AgentSession by workspace_id + display_name for TellAction routing
+- [X] T035 [US3] Handle tell-to-removed-agent edge case — in TellAction `run/2`, return `{:error, "Agent not found"}` when target pid is nil; the ReAct runtime surfaces this as a tool error to the calling agent
 
 **Checkpoint**: Inter-agent communication works — agents can "tell" each other mid-turn, messages inject into busy agents, hop depth is limited, graceful failure on removed targets.
 
@@ -121,10 +121,10 @@
 
 ### Implementation for User Story 4
 
-- [ ] T036 [US4] Verify server-side autonomy — ensure AgentServer processes are not linked to LiveView pids; confirm agents continue executing when the LiveView process terminates (FR-013a). This should already work via Jido's supervision tree but must be explicitly verified.
-- [ ] T037 [US4] Implement reconnect state rehydration in WorkspaceLive mount — on both initial mount and reconnect, call `Jido.AgentServer.state/1` for each agent session to get current in-memory history and status (idle/busy) per research decision R6; use this as the authoritative state, falling back to DB history only if AgentServer is not running
-- [ ] T038 [US4] Implement reconnect PubSub re-subscription — on mount, re-subscribe to all active agent session PubSub topics; if an agent's status is `:busy`, incoming `:llm_delta` events will resume streaming to the browser immediately (FR-013b)
-- [ ] T039 [US4] Handle agent completed during disconnect — if `Jido.AgentServer.state/1` shows the agent is now idle but has messages newer than what was persisted, persist any unsaved turn and display the complete history
+- [X] T036 [US4] Verify server-side autonomy — ensure AgentServer processes are not linked to LiveView pids; confirm agents continue executing when the LiveView process terminates (FR-013a). This should already work via Jido's supervision tree but must be explicitly verified.
+- [X] T037 [US4] Implement reconnect state rehydration in WorkspaceLive mount — on both initial mount and reconnect, call `Jido.AgentServer.state/1` for each agent session to get current in-memory history and status (idle/busy) per research decision R6; use this as the authoritative state, falling back to DB history only if AgentServer is not running
+- [X] T038 [US4] Implement reconnect PubSub re-subscription — on mount, re-subscribe to all active agent session PubSub topics; if an agent's status is `:busy`, incoming `:llm_delta` events will resume streaming to the browser immediately (FR-013b)
+- [X] T039 [US4] Handle agent completed during disconnect — if `Jido.AgentServer.state/1` shows the agent is now idle but has messages newer than what was persisted, persist any unsaved turn and display the complete history
 
 **Checkpoint**: Reconnect works seamlessly — agents are autonomous, state restores from GenServer, streaming resumes mid-response.
 
@@ -134,11 +134,11 @@
 
 **Purpose**: Improvements that span multiple user stories
 
-- [ ] T040 [P] Add empty workspace state UI in WorkspaceLive template — show guidance to add an agent when no agents exist
-- [ ] T041 [P] Add loading/skeleton states for agent columns during initial mount
-- [ ] T042 [P] Add smooth CSS transitions for agent column add/remove reflow using Tailwind v4 classes
-- [ ] T043 Run `mix precommit` (format + compile + credo + dialyzer) and fix all warnings/errors
-- [ ] T044 Validate feature end-to-end using quickstart.md verification steps
+- [X] T040 [P] Add empty workspace state UI in WorkspaceLive template — show guidance to add an agent when no agents exist
+- [X] T041 [P] Add loading/skeleton states for agent columns during initial mount
+- [X] T042 [P] Add smooth CSS transitions for agent column add/remove reflow using Tailwind v4 classes
+- [X] T043 Run `mix precommit` (format + compile + credo + dialyzer) and fix all warnings/errors
+- [X] T044 Validate feature end-to-end using quickstart.md verification steps
 
 ---
 

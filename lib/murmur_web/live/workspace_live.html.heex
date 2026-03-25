@@ -1,0 +1,225 @@
+<Layouts.app flash={@flash}>
+  <div class="flex flex-col h-[calc(100vh-8rem)] -mt-16">
+    <%!-- Workspace Header --%>
+    <div class="flex items-center justify-between px-2 py-3 border-b border-base-300">
+      <div class="flex items-center gap-3">
+        <.link navigate={~p"/workspaces"} class="btn btn-ghost btn-sm">
+          <.icon name="hero-arrow-left" class="w-4 h-4" />
+        </.link>
+        <h1 class="text-lg font-semibold tracking-tight">{@workspace.name}</h1>
+        <span class="text-xs text-base-content/50">{length(@agent_sessions)} agent(s)</span>
+      </div>
+      <button
+        class="btn btn-primary btn-sm"
+        onclick="document.getElementById('add-agent-dialog').showModal()"
+      >
+        <.icon name="hero-plus" class="w-4 h-4" /> Add Agent
+      </button>
+    </div>
+
+    <%!-- Agent Columns --%>
+    <%= if @agent_sessions == [] do %>
+      <div class="flex-1 flex items-center justify-center">
+        <div class="text-center space-y-4 max-w-sm">
+          <div class="text-6xl">🤖</div>
+          <h2 class="text-xl font-semibold">No agents yet</h2>
+          <p class="text-base-content/60 text-sm">
+            Add an agent from the catalog to start chatting.
+          </p>
+          <button
+            class="btn btn-primary"
+            onclick="document.getElementById('add-agent-dialog').showModal()"
+          >
+            <.icon name="hero-plus" class="w-4 h-4" /> Add Your First Agent
+          </button>
+        </div>
+      </div>
+    <% else %>
+      <div class="flex-1 flex gap-0.5 overflow-x-auto min-h-0">
+        <%= for session <- @agent_sessions do %>
+          <div class={[
+            "flex flex-col min-w-[320px] border-r border-base-300 last:border-r-0 agent-column-enter transition-all duration-200",
+            if(length(@agent_sessions) == 1, do: "flex-1", else: "flex-1 max-w-[50%]")
+          ]}>
+            <%!-- Agent Header --%>
+            <div class={[
+              "flex items-center justify-between px-3 py-2 border-b",
+              agent_header_class(session.agent_profile_id)
+            ]}>
+              <div class="flex items-center gap-2 min-w-0">
+                <div class={[
+                  "w-2 h-2 rounded-full shrink-0",
+                  agent_dot_class(session.agent_profile_id)
+                ]}>
+                </div>
+                <span class="font-medium text-sm truncate">{session.display_name}</span>
+                <span class="text-xs opacity-60 shrink-0">{session.agent_profile_id}</span>
+              </div>
+              <div class="flex items-center gap-1 shrink-0">
+                <%= if Map.get(@agent_statuses, session.id) == :busy do %>
+                  <span class="loading loading-dots loading-xs text-warning"></span>
+                <% end %>
+                <button
+                  phx-click="remove_agent"
+                  phx-value-session-id={session.id}
+                  data-confirm="Remove this agent? Chat history will be preserved."
+                  class="btn btn-ghost btn-xs opacity-40 hover:opacity-100"
+                >
+                  <.icon name="hero-x-mark" class="w-3 h-3" />
+                </button>
+              </div>
+            </div>
+
+            <%!-- Messages --%>
+            <div
+              id={"messages-#{session.id}"}
+              phx-hook=".AutoScroll"
+              class="flex-1 overflow-y-auto px-3 py-2 space-y-3"
+            >
+              <%= if Map.get(@messages, session.id, []) == [] and Map.get(@streaming_tokens, session.id, "") == "" do %>
+                <div class="flex items-center justify-center h-full text-base-content/40 text-sm">
+                  Send a message to start chatting
+                </div>
+              <% end %>
+              <%= for msg <- Map.get(@messages, session.id, []) do %>
+                <div
+                  id={"msg-#{msg.id}"}
+                  class={[
+                    "flex flex-col gap-0.5",
+                    if(msg.role == "user", do: "items-end", else: "items-start")
+                  ]}
+                >
+                  <span class="text-[10px] uppercase tracking-wider text-base-content/40 px-1">
+                    {msg.sender_name || msg.role}
+                  </span>
+                  <div class={[
+                    "rounded-xl px-3 py-2 text-sm max-w-[85%] whitespace-pre-wrap break-words",
+                    if(msg.role == "user",
+                      do: "bg-primary text-primary-content rounded-br-sm",
+                      else: "bg-base-200 text-base-content rounded-bl-sm"
+                    )
+                  ]}>
+                    {msg.content}
+                  </div>
+                </div>
+              <% end %>
+
+              <%!-- Streaming tokens --%>
+              <%= if Map.get(@streaming_tokens, session.id, "") != "" do %>
+                <div class="flex flex-col gap-0.5 items-start">
+                  <span class="text-[10px] uppercase tracking-wider text-base-content/40 px-1">
+                    assistant
+                  </span>
+                  <div class="bg-base-200 text-base-content rounded-xl rounded-bl-sm px-3 py-2 text-sm max-w-[85%] whitespace-pre-wrap break-words">
+                    {Map.get(@streaming_tokens, session.id, "")}
+                    <span class="inline-block w-1 h-4 bg-primary animate-pulse ml-0.5 align-text-bottom">
+                    </span>
+                  </div>
+                </div>
+              <% end %>
+            </div>
+
+            <%!-- Input --%>
+            <div class="px-3 py-2 border-t border-base-300">
+              <.form
+                for={%{}}
+                id={"msg-form-#{session.id}"}
+                phx-submit="send_message"
+                class="flex gap-2"
+              >
+                <input type="hidden" name="message[session_id]" value={session.id} />
+                <input
+                  type="text"
+                  name="message[content]"
+                  placeholder="Type a message..."
+                  autocomplete="off"
+                  class="input input-bordered input-sm flex-1"
+                  phx-debounce="100"
+                />
+                <button
+                  type="submit"
+                  class="btn btn-primary btn-sm"
+                  disabled={Map.get(@agent_statuses, session.id) == :busy}
+                >
+                  <.icon name="hero-paper-airplane" class="w-4 h-4" />
+                </button>
+              </.form>
+            </div>
+          </div>
+        <% end %>
+      </div>
+    <% end %>
+  </div>
+
+  <%!-- Add Agent Dialog --%>
+  <dialog id="add-agent-dialog" class="modal">
+    <div class="modal-box">
+      <h3 class="font-bold text-lg mb-4">Add Agent to Workspace</h3>
+      <.form for={@add_agent_form} id="add-agent-form" phx-submit="add_agent" class="space-y-4">
+        <div class="form-control">
+          <label class="label"><span class="label-text">Agent Profile</span></label>
+          <select name="agent[profile_id]" class="select select-bordered w-full" required>
+            <option value="" disabled selected>Choose a profile...</option>
+            <%= for profile <- @profiles do %>
+              <option value={profile.id}>{profile.id} — {profile.description}</option>
+            <% end %>
+          </select>
+        </div>
+        <div class="form-control">
+          <label class="label"><span class="label-text">Display Name</span></label>
+          <input
+            type="text"
+            name="agent[display_name]"
+            class="input input-bordered w-full"
+            placeholder="e.g. Research Assistant"
+            required
+          />
+          <label class="label">
+            <span class="label-text-alt text-base-content/50">
+              Must be unique within this workspace
+            </span>
+          </label>
+        </div>
+        <div class="modal-action">
+          <button
+            type="button"
+            class="btn"
+            onclick="document.getElementById('add-agent-dialog').close()"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            class="btn btn-primary"
+            onclick="document.getElementById('add-agent-dialog').close()"
+          >
+            Add Agent
+          </button>
+        </div>
+      </.form>
+    </div>
+    <form method="dialog" class="modal-backdrop">
+      <button>close</button>
+    </form>
+  </dialog>
+
+  <%!-- AutoScroll colocated JS hook --%>
+  <script :type={Phoenix.LiveView.ColocatedHook} name=".AutoScroll">
+    export default {
+      mounted() {
+        this.scrollToBottom()
+        this.observer = new MutationObserver(() => this.scrollToBottom())
+        this.observer.observe(this.el, { childList: true, subtree: true })
+      },
+      updated() {
+        this.scrollToBottom()
+      },
+      destroyed() {
+        if (this.observer) this.observer.disconnect()
+      },
+      scrollToBottom() {
+        this.el.scrollTop = this.el.scrollHeight
+      }
+    }
+  </script>
+</Layouts.app>

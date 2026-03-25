@@ -20,6 +20,15 @@ if System.get_env("PHX_SERVER") do
   config :murmur, MurmurWeb.Endpoint, server: true
 end
 
+# LLM API keys for jido_ai / req_llm
+if api_key = System.get_env("ANTHROPIC_API_KEY") do
+  config :req_llm, anthropic_api_key: api_key
+end
+
+if api_key = System.get_env("OPENAI_API_KEY") do
+  config :req_llm, openai_api_key: api_key
+end
+
 config :murmur, MurmurWeb.Endpoint,
   http: [port: String.to_integer(System.get_env("PORT", "4000"))]
 

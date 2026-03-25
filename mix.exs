@@ -40,6 +40,7 @@ defmodule Murmur.MixProject do
   # Type `mix help deps` for examples and options.
   defp deps do
     [
+      {:git_hooks, "~> 0.8", only: [:dev]},
       {:dialyxir, "~> 1.0", only: [:dev, :test]},
       {:credo, "~> 1.0", only: [:dev, :test]},
       {:jido, "~> 2.0"},

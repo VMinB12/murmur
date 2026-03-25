@@ -7,6 +7,13 @@
 # General application configuration
 import Config
 
+config :jido_ai,
+  model_aliases: %{
+    capable: "anthropic:claude-sonnet-4-20250514",
+    fast: "anthropic:claude-haiku-4-5"
+  }
+
+config :jido_action, default_timeout: 30000, default_max_retries: 1, default_backoff: 250
 config :murmur, Murmur.Jido, max_tasks: 1000, agent_pools: []
 
 config :murmur,

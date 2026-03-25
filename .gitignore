@@ -35,3 +35,4 @@ murmur-*.tar
 npm-debug.log
 /assets/node_modules/
 
+data/

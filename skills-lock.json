@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "skills": {
+    "elixir-ecto-patterns": {
+      "source": "thebushidocollective/han",
+      "sourceType": "github",
+      "computedHash": "328d78bb90461f3ace2ef5b4991c003cb2658400119affe594a62961760c9882"
+    },
+    "elixir-otp-patterns": {
+      "source": "thebushidocollective/han",
+      "sourceType": "github",
+      "computedHash": "24f02e9e6f341feeca3ec85d302abfa980b4681731bd4654a5bee4d73ff3bc39"
+    },
+    "elixir-pattern-matching": {
+      "source": "thebushidocollective/han",
+      "sourceType": "github",
+      "computedHash": "c2b29dea8d622e0005d12a8debd68079f9b85131ddef6c4c1809c14361b68d48"
+    }
+  }
+}

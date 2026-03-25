@@ -69,7 +69,13 @@ defmodule Murmur.Agents.TellAction do
       # Send to the agent via ask/await in an async task
       Task.Supervisor.start_child(Murmur.Jido.task_supervisor_name(), fn ->
         try do
-          {:ok, req} = agent_module.ask(pid, message)
+          tool_ctx = %{
+            workspace_id: target_session.workspace_id,
+            sender_name: target_session.display_name,
+            hop_count: hop_count
+          }
+
+          {:ok, req} = agent_module.ask(pid, message, tool_context: tool_ctx)
           result = agent_module.await(req, timeout: 120_000)
 
           case result do

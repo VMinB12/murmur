@@ -231,7 +231,12 @@ defmodule MurmurWeb.WorkspaceLive do
     if pid do
       Task.Supervisor.start_child(Murmur.Jido.task_supervisor_name(), fn ->
         try do
-          {:ok, req} = agent_module.ask(pid, content)
+          tool_ctx = %{
+            workspace_id: session.workspace_id,
+            sender_name: session.display_name
+          }
+
+          {:ok, req} = agent_module.ask(pid, content, tool_context: tool_ctx)
           result = agent_module.await(req, timeout: 120_000)
 
           case result do

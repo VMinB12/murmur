@@ -7,6 +7,8 @@
 # General application configuration
 import Config
 
+config :murmur, Murmur.Jido, max_tasks: 1000, agent_pools: []
+
 config :murmur,
   ecto_repos: [Murmur.Repo],
   generators: [timestamp_type: :utc_datetime]

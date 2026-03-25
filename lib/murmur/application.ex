@@ -15,7 +15,8 @@ defmodule Murmur.Application do
       # Start a worker by calling: Murmur.Worker.start_link(arg)
       # {Murmur.Worker, arg},
       # Start to serve requests, typically the last entry
-      MurmurWeb.Endpoint
+      MurmurWeb.Endpoint,
+      Murmur.Jido
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html

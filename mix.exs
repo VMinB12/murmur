@@ -45,7 +45,7 @@ defmodule Murmur.MixProject do
       {:jido_action, "~> 2.0"},
       {:req_llm, "~> 1.0"},
       {:git_hooks, "~> 0.8", only: [:dev]},
-      {:dialyxir, "~> 1.0", only: [:dev, :test]},
+      {:dialyxir, "~> 1.0", only: [:dev, :test], runtime: false},
       {:credo, "~> 1.0", only: [:dev, :test]},
       {:jido, "~> 2.0"},
       {:phoenix, "~> 1.8.5"},

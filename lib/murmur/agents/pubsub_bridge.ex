@@ -22,6 +22,7 @@ defmodule Murmur.Agents.PubSubBridge do
     case Murmur.Jido.start_agent(agent_module, id: agent_session.id) do
       {:ok, pid} -> {:ok, pid}
       {:error, {:already_started, pid}} -> {:ok, pid}
+      {:error, {:already_registered, pid}} -> {:ok, pid}
       error -> error
     end
   end

@@ -9,8 +9,8 @@ import Config
 
 config :jido_ai,
   model_aliases: %{
-    capable: "anthropic:claude-sonnet-4-20250514",
-    fast: "anthropic:claude-haiku-4-5"
+    capable: "openai:gpt-5-mini",
+    fast: "openai:gpt-5-mini"
   }
 
 config :jido_action, default_timeout: 30000, default_max_retries: 1, default_backoff: 250

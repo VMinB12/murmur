@@ -16,6 +16,10 @@ defmodule Murmur.Chat do
   def create_message(attrs) do
     %Message{}
     |> Message.changeset(attrs)
+    |> Ecto.Changeset.put_change(
+      :agent_session_id,
+      attrs[:agent_session_id] || attrs["agent_session_id"]
+    )
     |> Ecto.Changeset.put_change(:inserted_at, DateTime.utc_now())
     |> Repo.insert()
   end

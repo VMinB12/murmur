@@ -17,8 +17,7 @@ defmodule MurmurWeb.Router do
   scope "/", MurmurWeb do
     pipe_through :browser
 
-    get "/", PageController, :home
-
+    live "/", WorkspaceListLive
     live "/workspaces", WorkspaceListLive
     live "/workspaces/:id", WorkspaceLive
   end

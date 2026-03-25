@@ -40,9 +40,9 @@ An active instance of an Agent Profile within a Workspace. Each session has its 
 
 **Relationships**: belongs_to `Workspace`, has_many `Message`
 
-**Indexes**: `[:workspace_id]`
+**Indexes**: `[:workspace_id]`, unique: `[:workspace_id, :display_name]`
 
-**Notes**: No unique constraint on `(workspace_id, agent_profile_id)` — multiple instances of the same profile are allowed per spec. The `status` column is informational (the GenServer is the source of truth at runtime).
+**Notes**: Multiple instances of the same profile are allowed per spec, but display names MUST be unique within a workspace (enforced by unique DB index). The `status` column is informational (the GenServer is the source of truth at runtime).
 
 ### Message
 
@@ -99,7 +99,7 @@ idle ─────────────────────────
 ## Validation Rules
 
 - **Workspace.name**: Required, max 255 characters
-- **AgentSession.display_name**: Required, max 255 characters
+- **AgentSession.display_name**: Required, max 255 characters, unique within workspace (DB constraint)
 - **AgentSession.agent_profile_id**: Must reference a valid entry in `Murmur.Agents.Catalog`
 - **Message.role**: Must be one of `["user", "assistant", "tool_call", "tool_result"]`
 - **Message.content**: Required when role is "user" or "assistant"

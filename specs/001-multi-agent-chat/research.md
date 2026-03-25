@@ -15,12 +15,13 @@
 
 ## R2: Async LLM Execution and Token Streaming
 
-**Decision**: Agent execution happens within the AgentServer via Jido's directive system. LLM calls are non-blocking — the AgentServer dispatches a `RunInstruction` directive that executes in an async Task. Tokens stream back via PubSub broadcasts.
+**Decision**: Agent profiles use `Jido.AI.Agent` (not plain `Jido.Agent`). Each agent defines `model`, `tools`, and `system_prompt`. LLM execution uses the built-in `ask/2` + `await/2` lifecycle for async request handling with per-request correlation. Token streaming uses `Jido.AI.Reasoning.ReAct.stream/3` which emits `:llm_delta` events for each token. The LiveView subscribes to the agent's PubSub topic and uses `stream_insert` to append tokens.
 
-**Rationale**: The Jido AgentServer processes directives asynchronously. The `Directive.RunInstruction` can spawn async work. Token streaming is achieved by having the LLM action emit `{:token, message_id, token_string}` signals via PubSub during execution. The LiveView subscribes to the agent's PubSub topic and uses `stream_insert` to append tokens.
+**Rationale**: `jido_ai` 2.0 provides a complete AI agent lifecycle out of the box. `Jido.AI.Agent` wraps ReAct reasoning, tool calling, and LLM interaction. The `ask/await` pattern gives per-request correlation IDs. The standalone `ReAct.stream/3` emits a lazy `Enumerable` of `ReAct.Event` structs — the `:llm_delta` event kind carries individual streaming tokens. No need to build custom streaming infrastructure.
 
 **Alternatives considered**:
-- `Task.Supervisor.async_nolink` outside Jido: Bypasses Jido's directive system and loses integration with the agent's state machine. Rejected.
+- Raw `Req` HTTP calls to OpenAI: Would bypass Jido's tool-calling loop, model aliasing, and ReAct reasoning. Rejected.
+- `Task.Supervisor.async_nolink` outside Jido: Bypasses Jido's directive system and loses request correlation. Rejected.
 - Synchronous LLM calls in GenServer: Would block the GenServer, violating FR-013a (agents must continue regardless of browser state). Rejected.
 
 ## R3: PubSub Topic Design

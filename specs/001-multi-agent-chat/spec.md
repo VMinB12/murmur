@@ -80,7 +80,7 @@ A user is watching a streamed response when their browser loses connection (e.g.
 - What happens when the user sends a message to an agent that is already busy? The message is injected into the agent's pending messages, identical to how the "tell" mechanism works. This reflects a core design principle: there is very little that distinguishes humans from agents — both interact with agents the same way.
 - What happens when an agent's "tell" targets an agent that has been removed from the workspace? The tool call should fail gracefully and the originating agent should be informed the target is unavailable.
 - What happens when a workspace has no agents? The UI should display a clear empty state with guidance to add an agent from the catalog.
-- What happens when the user adds the same agent profile twice? This is allowed. When adding an agent, the user gives it a display name. The same agent profile can be added multiple times with different names. Name uniqueness is not enforced — that is the user's responsibility.
+- What happens when the user adds the same agent profile twice? This is allowed. When adding an agent, the user gives it a display name. The same agent profile can be added multiple times, but each display name MUST be unique within the workspace. The system rejects duplicate display names at add time.
 - What happens when an inter-agent "tell" creates a circular loop (Agent A tells B, B tells A, etc.)? The system should limit the depth of chained inter-agent invocations to prevent runaway loops.
 
 ## Requirements *(mandatory)*
@@ -106,7 +106,8 @@ A user is watching a streamed response when their browser loses connection (e.g.
 - **FR-015**: The system MUST limit the depth of chained inter-agent invocations to prevent runaway loops (maximum 5 hops per originating user message)
 - **FR-016**: Each agent column MUST display the agent's user-given name, profile type, model, and a visual identifier (e.g., colored header)
 - **FR-017**: When a user sends a message to a busy agent, the system MUST inject it into the agent's pending messages (identical to "tell" behavior) rather than blocking or disabling input
-- **FR-018**: Multiple instances of the same agent profile MUST be allowed within a single workspace, each with a user-given display name
+- **FR-018**: Multiple instances of the same agent profile MUST be allowed within a single workspace, each with a user-given display name that is unique within the workspace
+- **FR-019**: The system MUST enforce unique display names per workspace and reject adding an agent with a display name that already exists in that workspace
 
 ### Key Entities
 
@@ -130,7 +131,7 @@ A user is watching a streamed response when their browser loses connection (e.g.
 ## Assumptions
 
 - Users have a modern browser with WebSocket support and stable internet connectivity
-- Multiple sessions of the same agent profile are allowed in a workspace; the user assigns a display name when adding each agent
+- Multiple sessions of the same agent profile are allowed in a workspace; the user assigns a unique display name when adding each agent; uniqueness is enforced by the system
 - Authentication and user accounts are out of scope for v1; the application runs as a single-user local or dev-mode instance
 - The agent catalog is hardcoded at application startup and does not change at runtime; dynamic agent creation is a future feature
 - Mobile and tablet layouts are out of scope for v1; the side-by-side column layout targets desktop viewports (≥1024px)
@@ -148,3 +149,4 @@ A user is watching a streamed response when their browser loses connection (e.g.
 - Q: Should duplicate agent profiles be allowed in a workspace? → A: Yes, allowed. User gives a display name when adding. No uniqueness enforcement.
 - Q: Should agents continue working when the user disconnects? → A: Yes, agents execute server-side regardless of browser state. On reconnect, still-running agents resume streaming to the user.
 - Q: Persist after every model/tool step, or after each complete agent turn, or only when fully idle? → A: After each complete agent turn (Option B). One full request→response cycle including tool calls. Balances durability with write efficiency.
+- Q: Should agent display names be unique within a workspace? → A: Yes. Unique display names are enforced by the system. This enables unambiguous routing for the "tell" tool — agents reference each other by display name.

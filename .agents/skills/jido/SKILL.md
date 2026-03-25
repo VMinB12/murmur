@@ -398,6 +398,182 @@ For injecting messages into a busy agent (e.g., "tell" tool):
 3. Before each LLM call, drain the queue via `GenServer.call(:get_and_clear_injections)`
 4. Merge drained messages into the active conversation history
 
+---
+
+## Jido.AI — AI Agent Integration (jido_ai 2.0)
+
+`jido_ai` extends Jido with LLM-powered agents, ReAct reasoning, streaming,
+and tool calling. It depends on `req_llm` for HTTP transport to LLM providers.
+
+### Defining an AI Agent
+
+Use `Jido.AI.Agent` (not plain `Jido.Agent`) for agents that call LLMs:
+
+```elixir
+defmodule MyApp.Agents.ResearchAgent do
+  use Jido.AI.Agent,
+    name: "research_agent",
+    model: :fast,                     # model alias (see config below)
+    tools: [MyApp.Actions.SearchWeb], # Jido.Action modules auto-convert to LLM tools
+    max_iterations: 8,
+    system_prompt: "You are a research assistant. Use tools when needed.",
+    llm_opts: [reasoning_effort: :high]
+end
+```
+
+Key options: `model`, `tools`, `system_prompt`, `max_iterations`, `effect_policy`,
+`request_transformer`, `llm_opts`.
+
+### ask / await (Async Request + Correlation)
+
+```elixir
+{:ok, pid} = Jido.AgentServer.start(agent: MyApp.Agents.ResearchAgent)
+
+# Async: returns a request handle immediately
+{:ok, req} = MyApp.Agents.ResearchAgent.ask(pid, "Search for Elixir OTP patterns")
+{:ok, result} = MyApp.Agents.ResearchAgent.await(req, timeout: 15_000)
+
+# Per-request overrides
+{:ok, req2} = MyApp.Agents.ResearchAgent.ask(pid, "Follow up question",
+  allowed_tools: ["search_web"],
+  tool_context: %{tenant_id: "acme"},
+  llm_opts: [reasoning_effort: :medium]
+)
+```
+
+### Standalone ReAct Runtime (Streaming)
+
+For streaming events without a long-lived agent process:
+
+```elixir
+alias Jido.AI.Reasoning.ReAct
+
+config = %{
+  model: :fast,
+  system_prompt: "Solve accurately. Use tools for arithmetic.",
+  tools: [MyApp.Actions.AddNumbers],
+  streaming: true,    # default
+  max_iterations: 10  # default
+}
+
+# Lazy stream of ReAct.Event structs
+events = ReAct.stream("What is 19 + 23?", config)
+events |> Stream.each(fn event ->
+  IO.puts("[#{event.kind}] #{inspect(event.data)}")
+end) |> Stream.run()
+
+# Or collect into a result map
+result = ReAct.stream("What is 19 + 23?", config) |> ReAct.collect_stream()
+# => %{result: "42", termination_reason: :final_answer, usage: %{...}, trace: [...]}
+
+# Run to completion (no streaming needed)
+result = ReAct.run("What is 19 + 23?", config)
+```
+
+Event kinds: `:request_started`, `:llm_started`, `:llm_delta` (streaming token),
+`:llm_completed`, `:tool_started`, `:tool_completed`, `:checkpoint`,
+`:request_completed`, `:request_failed`, `:request_cancelled`.
+
+### LLM Facade (One-Shot Generation)
+
+For simple one-off LLM calls without agent processes:
+
+```elixir
+# Text generation
+{:ok, text} = Jido.AI.ask("Summarize OTP in one sentence.", model: :fast)
+{:ok, response} = Jido.AI.generate_text("Summarize OTP.", model: :fast, temperature: 0.3)
+
+# Structured output
+{:ok, result} = Jido.AI.generate_object("Extract priority from: urgent bug", schema, model: :thinking)
+
+# Streaming (thin pass-through to ReqLLM)
+{:ok, stream_response} = Jido.AI.stream_text("Write release notes", model: :fast)
+```
+
+### Configuration: Model Aliases & API Keys
+
+```elixir
+# config/config.exs
+config :jido_ai,
+  model_aliases: %{
+    fast: "openai:gpt-4o-mini",
+    capable: "openai:gpt-4o",
+    thinking: "openai:o3-mini"
+  },
+  llm_defaults: %{
+    text: %{model: :fast, temperature: 0.2, max_tokens: 1024, timeout: 30_000},
+    stream: %{model: :fast, temperature: 0.2, max_tokens: 1024, timeout: 30_000}
+  }
+
+# config/runtime.exs
+config :req_llm,
+  openai_api_key: System.get_env("OPENAI_API_KEY")
+  # anthropic_api_key: System.get_env("ANTHROPIC_API_KEY")
+```
+
+Built-in aliases: `:fast`, `:capable`, `:thinking`, `:reasoning`, `:planning`,
+`:image`, `:embedding`. Override them in `model_aliases`.
+
+### Tool Actions for AI
+
+Actions work as LLM tools automatically. Define with `Zoi` schemas:
+
+```elixir
+defmodule MyApp.Actions.AddNumbers do
+  use Jido.Action,
+    name: "add_numbers",
+    description: "Add two numbers.",
+    schema: Zoi.object(%{a: Zoi.integer(), b: Zoi.integer()})
+
+  @impl true
+  def run(%{a: a, b: b}, _context), do: {:ok, %{sum: a + b}}
+end
+```
+
+Dynamic tool registration on a running agent:
+
+```elixir
+{:ok, _agent} = Jido.AI.register_tool(agent_pid, MyApp.Actions.AddNumbers)
+{:ok, true}   = Jido.AI.has_tool?(agent_pid, "add_numbers")
+```
+
+Runtime system prompt update:
+
+```elixir
+{:ok, _agent} = Jido.AI.set_system_prompt(pid, "You are a concise support specialist.")
+```
+
+### Conversation Context Restore
+
+Persist and restore conversation history across agent restarts:
+
+```elixir
+# Save: get snapshot
+{:ok, snapshot} = Jido.AgentServer.snapshot(pid)
+saved_messages = snapshot.details.conversation
+
+# Restore: rebuild context and start with it
+context =
+  Jido.AI.Context.new(system_prompt: saved_system_prompt)
+  |> Jido.AI.Context.append_messages(conversation_messages)
+
+Jido.AgentServer.start_link(agent: MyAgent, initial_state: %{context: context})
+```
+
+### ReAct Defaults
+
+| Setting          | Default  |
+| ---------------- | -------- |
+| model            | `:fast`  |
+| streaming        | `true`   |
+| max_iterations   | `10`     |
+| max_tokens       | `4_096`  |
+| temperature      | `0.2`    |
+| tool_choice      | `:auto`  |
+| tool_timeout_ms  | `15_000` |
+| tool_max_retries | `1`      |
+| tool_concurrency | `4`      |
+
 ## Key Gotchas
 
 - `Agent.cmd/2` is **pure** — never do side effects inside it

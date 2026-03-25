@@ -10,7 +10,7 @@ Build a real-time multi-agent chat application where users construct a team of A
 ## Technical Context
 
 **Language/Version**: Elixir ≥ 1.15 on OTP  
-**Primary Dependencies**: Phoenix 1.8, Phoenix LiveView 1.1, Jido 2.0, Ecto SQL 3.13, Postgrex  
+**Primary Dependencies**: Phoenix 1.8, Phoenix LiveView 1.1, Jido 2.0, Jido.AI 2.0, Jido.Action, Jido.Signal, ReqLLM, Ecto SQL 3.13, Postgrex  
 **Storage**: PostgreSQL via Ecto  
 **Testing**: ExUnit with `Phoenix.LiveViewTest` and `LazyHTML`  
 **Target Platform**: Web (desktop browsers ≥ 1024px)  
@@ -69,8 +69,8 @@ lib/
 │       ├── catalog.ex            # Hardcoded agent profile definitions
 │       ├── session_server.ex     # Jido AgentServer wrapper / GenServer
 │       ├── tell_action.ex        # Jido Action for inter-agent "tell"
-│       └── profiles/             # Individual agent profile modules
-│           ├── sql_agent.ex
+│       └── profiles/             # Jido.AI.Agent modules per profile
+│           ├── sql_agent.ex      # use Jido.AI.Agent, model: ..., tools: [...]
 │           └── arxiv_agent.ex
 ├── murmur_web/
 │   ├── router.ex                 # Add workspace routes

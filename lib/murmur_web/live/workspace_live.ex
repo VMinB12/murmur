@@ -257,7 +257,7 @@ defmodule MurmurWeb.WorkspaceLive do
 
     if pid do
       case Jido.AgentServer.state(pid) do
-        {:ok, agent_state} -> project_thread(agent_state)
+        {:ok, %{agent: agent}} -> project_thread(agent)
         _ -> load_messages_from_storage(session)
       end
     else
@@ -279,7 +279,7 @@ defmodule MurmurWeb.WorkspaceLive do
 
     if thread do
       thread.entries
-      |> Enum.filter(&(&1.kind == :message))
+      |> Enum.filter(&(&1.kind in [:message, :ai_message]))
       |> Enum.map(fn entry ->
         %{
           id: entry.id || Ecto.UUID.generate(),
@@ -301,7 +301,7 @@ defmodule MurmurWeb.WorkspaceLive do
 
     if pid do
       case Jido.AgentServer.state(pid) do
-        {:ok, agent} -> Murmur.Jido.hibernate(agent)
+        {:ok, %{agent: agent}} -> Murmur.Jido.hibernate(agent)
         _ -> :ok
       end
     end

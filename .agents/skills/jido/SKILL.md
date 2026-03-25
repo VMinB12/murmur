@@ -4,16 +4,17 @@ description: Use when working with Jido 2.0 agent framework — defining agents,
 ---
 
 %{
-  description: "Jido's primitive map - what each building block is, why it exists, and how they fit together.",
-  title: "Concepts",
-  category: :docs,
-  legacy_paths: ["/docs/core-concepts", "/docs/getting-started/core-concepts"],
-  tags: [:docs, :concepts],
-  order: 20
+description: "Jido's primitive map - what each building block is, why it exists, and how they fit together.",
+title: "Concepts",
+category: :docs,
+legacy_paths: ["/docs/core-concepts", "/docs/getting-started/core-concepts"],
+tags: [:docs, :concepts],
+order: 20
 }
+
 ---
 
-This section is the authoritative reference for Jido's primitives. These pages aren't tutorials - they explain *what* each primitive is, *why* it exists, and *how* it fits with the others. Read them in order the first time through; each concept builds on the one before it.
+This section is the authoritative reference for Jido's primitives. These pages aren't tutorials - they explain _what_ each primitive is, _why_ it exists, and _how_ it fits with the others. Read them in order the first time through; each concept builds on the one before it.
 
 ## The core model
 

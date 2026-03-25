@@ -22,17 +22,32 @@ Each LiveView subscribes to one topic per active agent session upon mount.
 
 ### Token Streaming
 
-Sent by the LLM execution Task during response generation.
+The AgentServer's ReAct runtime emits `Jido.AI.Reasoning.ReAct.Event` structs via signal dispatch. Events with `kind: :llm_delta` carry individual streaming tokens. These are forwarded to PubSub by the agent's signal dispatch configuration.
+
+The LiveView handles the native event struct directly:
 
 ```elixir
-{:token, agent_session_id, message_id, token_string}
+%Jido.AI.Reasoning.ReAct.Event{
+  kind: :llm_delta,
+  run_id: "run_abc123",
+  request_id: "req_def456",
+  iteration: 1,
+  data: %{delta: "token text here"},
+  at_ms: 1740268800000
+}
 ```
 
 | Field | Type | Description |
 |-------|------|-------------|
-| agent_session_id | string (uuid) | Identifies which agent column to update |
-| message_id | string (uuid) | Stable ID for the in-progress assistant message |
-| token_string | string | The text chunk to append |
+| kind | atom | `:llm_delta` for streaming tokens |
+| run_id | string | Identifies the current ReAct run |
+| request_id | string | Correlates to the `ask/2` request |
+| data.delta | string | The text chunk to append |
+
+Other useful event kinds the LiveView may handle:
+- `:request_completed` — turn finished (final answer ready)
+- `:tool_started` / `:tool_completed` — tool execution visibility
+- `:request_failed` — error handling
 
 ### Message Completed
 

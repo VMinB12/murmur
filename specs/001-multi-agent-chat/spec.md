@@ -146,7 +146,7 @@ A user is watching a streamed response when their browser loses connection (e.g.
 - Q: Should Story 1 address per-agent history persistence? → A: Yes, each agent persists its own independent history; no shared exchange concept. Belongs in Story 1 as it is foundational.
 - Q: Story 3 scenario 4 says "both agents finish" — when does persistence happen? → A: Each agent persists its own history immediately upon its own completion, not when all agents collectively finish.
 - Q: What happens when a user sends a message to a busy agent? → A: Message is injected into pending messages, identical to "tell" behavior. Core principle: humans and agents interact with agents the same way.
-- Q: Should duplicate agent profiles be allowed in a workspace? → A: Yes, allowed. User gives a display name when adding. No uniqueness enforcement.
+- Q: Should duplicate agent profiles be allowed in a workspace? → A: Yes, allowed. User gives a unique display name when adding. Uniqueness enforced by the system (see below).
 - Q: Should agents continue working when the user disconnects? → A: Yes, agents execute server-side regardless of browser state. On reconnect, still-running agents resume streaming to the user.
 - Q: Persist after every model/tool step, or after each complete agent turn, or only when fully idle? → A: After each complete agent turn (Option B). One full request→response cycle including tool calls. Balances durability with write efficiency.
 - Q: Should agent display names be unique within a workspace? → A: Yes. Unique display names are enforced by the system. This enables unambiguous routing for the "tell" tool — agents reference each other by display name.

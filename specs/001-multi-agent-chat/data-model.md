@@ -68,16 +68,13 @@ A single entry in an Agent Session's conversation history.
 
 ## Agent Profile (In-Memory Only)
 
-Agent Profiles are **not** database entities. They are hardcoded Elixir structs defined in `Murmur.Agents.Catalog`.
+Agent Profiles are **not** database entities. Each profile is a `Jido.AI.Agent` module (e.g., `Murmur.Agents.Profiles.SqlAgent`) that declares its own `model`, `system_prompt`, and `tools`. The `Murmur.Agents.Catalog` module maps profile IDs to their module plus display-only metadata.
 
 | Field | Type | Notes |
 |-------|------|-------|
 | id | string | Unique identifier (e.g., "sql_agent") |
-| name | string | Display name (e.g., "SQL Agent") |
+| agent_module | module | The `Jido.AI.Agent` module (e.g., `Murmur.Agents.Profiles.SqlAgent`) |
 | description | string | Short description shown in catalog UI |
-| model | string | Fixed LLM model (e.g., "gpt-4o-mini") |
-| system_prompt | string | System prompt for the agent |
-| tools | list | List of available Jido Action modules |
 | color | string | Tailwind color class for the agent's header |
 
 ## State Transitions

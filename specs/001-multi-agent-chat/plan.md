@@ -66,8 +66,7 @@ lib/
 │   │   ├── message.ex            # Ecto schema
 │   │   └── chat.ex               # Context module (queries, persistence)
 │   └── agents/                   # Agent domain
-│       ├── catalog.ex            # Hardcoded agent profile definitions
-│       ├── session_server.ex     # Jido AgentServer wrapper / GenServer
+│       ├── catalog.ex            # Profile registry: maps IDs to {module, display_meta}
 │       ├── tell_action.ex        # Jido Action for inter-agent "tell"
 │       └── profiles/             # Jido.AI.Agent modules per profile
 │           ├── sql_agent.ex      # use Jido.AI.Agent, model: ..., tools: [...]
@@ -94,14 +93,13 @@ test/
 │   ├── chat_test.exs
 │   └── agents/
 │       ├── catalog_test.exs
-│       ├── session_server_test.exs
 │       └── tell_action_test.exs
 └── murmur_web/
     └── live/
         └── workspace_live_test.exs
 ```
 
-**Structure Decision**: Standard Phoenix single-project layout. Domain logic split into three contexts: `Workspaces` (workspace + session CRUD), `Chat` (message persistence and queries), and `Agents` (runtime execution via Jido). This follows Phoenix convention and the constitution's single-responsibility principle.
+**Structure Decision**: Standard Phoenix single-project layout. Domain logic split into three contexts: `Workspaces` (workspace + session CRUD), `Chat` (message persistence and queries), and `Agents` (runtime execution via Jido). Agent profiles are `Jido.AI.Agent` modules started directly via `Murmur.Jido.start_agent/2` — no wrapper GenServer needed since `Jido.AgentServer` is the runtime. This follows Phoenix convention and the constitution's single-responsibility and avoid-indirection principles.
 
 ## Complexity Tracking
 

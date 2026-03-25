@@ -21,6 +21,11 @@
       "sourceType": "github",
       "computedHash": "c2b29dea8d622e0005d12a8debd68079f9b85131ddef6c4c1809c14361b68d48"
     },
+    "frontend-design": {
+      "source": "anthropics/skills",
+      "sourceType": "github",
+      "computedHash": "063a0e6448123cd359ad0044cc46b0e490cc7964d45ef4bb9fd842bd2ffbca67"
+    },
     "yuma-design": {
       "source": "b12consulting/skills",
       "sourceType": "github",

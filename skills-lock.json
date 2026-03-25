@@ -1,6 +1,11 @@
 {
   "version": 1,
   "skills": {
+    "code-simplifier": {
+      "source": "b12consulting/skills",
+      "sourceType": "github",
+      "computedHash": "9f71b3d33b6100a82895632166cde21901b5538611293a31d1e42476d390e51a"
+    },
     "elixir-ecto-patterns": {
       "source": "thebushidocollective/han",
       "sourceType": "github",
@@ -15,6 +20,11 @@
       "source": "thebushidocollective/han",
       "sourceType": "github",
       "computedHash": "c2b29dea8d622e0005d12a8debd68079f9b85131ddef6c4c1809c14361b68d48"
+    },
+    "yuma-design": {
+      "source": "b12consulting/skills",
+      "sourceType": "github",
+      "computedHash": "dc28f9d55b6906a57f2bab8a9f0ef99b6500d2eaef778bc261854d74b4e81872"
     }
   }
 }

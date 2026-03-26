@@ -428,55 +428,11 @@ defmodule MurmurWeb.WorkspaceLive do
         Map.merge(msg, %{
           session_id: session_id,
           agent_name: agent_name,
-          agent_color: agent_color(profile_id, agent_name)
+          agent_color: Catalog.agent_color(profile_id, agent_name)
         })
       end)
     end)
     |> Enum.sort_by(& &1.id)
-  end
-
-  @agent_colors [
-    "bg-blue-500",
-    "bg-emerald-500",
-    "bg-violet-500",
-    "bg-amber-500",
-    "bg-rose-500",
-    "bg-cyan-500",
-    "bg-fuchsia-500",
-    "bg-lime-500"
-  ]
-
-  @agent_text_colors [
-    "text-blue-500",
-    "text-emerald-500",
-    "text-violet-500",
-    "text-amber-500",
-    "text-rose-500",
-    "text-cyan-500",
-    "text-fuchsia-500",
-    "text-lime-500"
-  ]
-
-  @agent_bg_colors [
-    "bg-blue-500/10",
-    "bg-emerald-500/10",
-    "bg-violet-500/10",
-    "bg-amber-500/10",
-    "bg-rose-500/10",
-    "bg-cyan-500/10",
-    "bg-fuchsia-500/10",
-    "bg-lime-500/10"
-  ]
-
-  @doc false
-  def agent_color(_profile_id, agent_name) do
-    idx = :erlang.phash2(agent_name, length(@agent_colors))
-
-    %{
-      dot: Enum.at(@agent_colors, idx),
-      text: Enum.at(@agent_text_colors, idx),
-      bg: Enum.at(@agent_bg_colors, idx)
-    }
   end
 
   defp append_assistant_message(messages, response) do
@@ -498,19 +454,11 @@ defmodule MurmurWeb.WorkspaceLive do
   defp extract_response_content(response), do: inspect(response)
 
   defp agent_header_class(profile_id) do
-    case profile_id do
-      "general_agent" -> "border-blue-500/20 bg-blue-500/5"
-      "code_agent" -> "border-emerald-500/20 bg-emerald-500/5"
-      _ -> "border-base-300 bg-base-200/30"
-    end
+    Catalog.agent_color(profile_id, profile_id).header
   end
 
   defp agent_dot_class(profile_id) do
-    case profile_id do
-      "general_agent" -> "bg-blue-500"
-      "code_agent" -> "bg-emerald-500"
-      _ -> "bg-gray-500"
-    end
+    Catalog.agent_color(profile_id, profile_id).dot
   end
 
   defp get_agent_status(agent_session_id) do

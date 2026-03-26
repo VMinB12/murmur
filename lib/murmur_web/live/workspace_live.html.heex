@@ -267,7 +267,7 @@
             <div class="flex-1 overflow-y-auto py-1">
               <%= for session <- @agent_sessions do %>
                 <% colors =
-                  MurmurWeb.WorkspaceLive.agent_color(
+                  Catalog.agent_color(
                     session.agent_profile_id,
                     session.display_name
                   ) %>
@@ -440,7 +440,7 @@
               <%= for session <- @agent_sessions do %>
                 <%= if Map.get(@streaming_tokens, session.id, "") != "" do %>
                   <% colors =
-                    MurmurWeb.WorkspaceLive.agent_color(
+                    Catalog.agent_color(
                       session.agent_profile_id,
                       session.display_name
                     ) %>

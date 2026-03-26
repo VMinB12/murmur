@@ -40,6 +40,7 @@ defmodule Murmur.MixProject do
   # Type `mix help deps` for examples and options.
   defp deps do
     [
+      {:mox, "~> 1.0", only: [:dev, :test]},
       {:jido_ai, "~> 2.0"},
       {:jido_signal, "~> 2.0"},
       {:jido_action, "~> 2.0"},

@@ -83,7 +83,7 @@ defmodule Murmur.Agents.Runner do
       sender_name: session.display_name
     }
 
-    case do_ask(agent_module, pid, combined, tool_ctx) do
+    case llm_adapter().ask(agent_module, pid, combined, tool_ctx) do
       {:ok, req} ->
         handle_await(agent_module, req, session, topic)
 
@@ -95,7 +95,7 @@ defmodule Murmur.Agents.Runner do
   end
 
   defp handle_await(agent_module, req, session, topic) do
-    case await_result(agent_module, req) do
+    case llm_adapter().await(agent_module, req, timeout: 120_000) do
       {:ok, response} ->
         hibernate_agent(session.id)
         broadcast(topic, {:message_completed, session.id, response})
@@ -105,19 +105,19 @@ defmodule Murmur.Agents.Runner do
     end
   end
 
-  defp do_ask(agent_module, pid, content, tool_ctx) do
-    agent_module.ask(pid, content, tool_context: tool_ctx)
-  rescue
-    e -> {:error, Exception.message(e)}
-  end
-
-  defp await_result(agent_module, req) do
-    agent_module.await(req, timeout: 120_000)
-  rescue
-    e -> {:error, Exception.message(e)}
+  defp llm_adapter do
+    Application.get_env(:murmur, :llm_adapter, Murmur.Agents.LLM.Real)
   end
 
   defp hibernate_agent(session_id) do
+    if Application.get_env(:murmur, :skip_hibernate, false) do
+      :ok
+    else
+      do_hibernate(session_id)
+    end
+  end
+
+  defp do_hibernate(session_id) do
     pid = Murmur.Jido.whereis(session_id)
 
     if pid do
@@ -128,6 +128,8 @@ defmodule Murmur.Agents.Runner do
     end
   rescue
     _ -> :ok
+  catch
+    :exit, _ -> :ok
   end
 
   defp agent_topic(session) do

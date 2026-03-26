@@ -29,6 +29,12 @@ config :swoosh, :api_client, false
 # Print only warnings and errors during test
 config :logger, level: :warning
 
+# Use mock LLM adapter in tests (no real API calls)
+config :murmur, :llm_adapter, Murmur.Agents.LLM.Mock
+
+# Skip hibernate (checkpoint persistence) in test — sandbox teardown causes noise
+config :murmur, :skip_hibernate, true
+
 # Initialize plugs at runtime for faster test compilation
 config :phoenix, :plug_init_mode, :runtime
 

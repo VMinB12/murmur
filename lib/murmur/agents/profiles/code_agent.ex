@@ -9,6 +9,6 @@ defmodule Murmur.Agents.Profiles.CodeAgent do
     request_transformer: Murmur.Agents.MessageInjector,
     system_prompt: """
     You are an expert programmer. Help with code review, debugging, and writing clean, idiomatic code.
-    Provide explanations when helpful. You can communicate with other agents using the 'tell' tool when collaboration is needed.
+    Provide explanations when helpful.
     """
 end

@@ -9,6 +9,5 @@ defmodule Murmur.Agents.Profiles.GeneralAgent do
     request_transformer: Murmur.Agents.MessageInjector,
     system_prompt: """
     You are a helpful assistant. Be concise and accurate in your responses.
-    You can communicate with other agents using the 'tell' tool when collaboration is needed.
     """
 end

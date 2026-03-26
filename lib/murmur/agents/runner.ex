@@ -12,7 +12,8 @@ defmodule Murmur.Agents.Runner do
   - Picked up by the drain loop after the current request completes
   """
 
-  alias Murmur.Agents.{Catalog, PendingQueue}
+  alias Murmur.Agents.Catalog
+  alias Murmur.Agents.PendingQueue
 
   require Logger
 

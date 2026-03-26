@@ -18,17 +18,18 @@ defmodule MurmurWeb.WorkspaceLiveTest do
   import Phoenix.LiveViewTest
 
   alias Murmur.Agents.Catalog
+  alias Murmur.Agents.LLM.Mock
   alias Murmur.Workspaces
 
   setup do
     # LiveView form submissions trigger Runner Tasks that call the LLM mock
     Mox.set_mox_global()
 
-    Mox.stub(Murmur.Agents.LLM.Mock, :ask, fn _mod, _pid, _content, _ctx ->
+    Mox.stub(Mock, :ask, fn _mod, _pid, _content, _ctx ->
       {:ok, make_ref()}
     end)
 
-    Mox.stub(Murmur.Agents.LLM.Mock, :await, fn _mod, _handle, _opts ->
+    Mox.stub(Mock, :await, fn _mod, _handle, _opts ->
       {:ok, "mock response"}
     end)
 
@@ -244,7 +245,8 @@ defmodule MurmurWeb.WorkspaceLiveTest do
       agent = server_state.agent
 
       thread =
-        Jido.Thread.new(id: session.id)
+        [id: session.id]
+        |> Jido.Thread.new()
         |> Jido.Thread.append(%{
           kind: :ai_message,
           payload: %{role: "assistant", content: "Stored msg", sender_name: "Alice"}
@@ -311,11 +313,11 @@ defmodule MurmurWeb.WorkspaceLiveTest do
       session: session
     } do
       # Make the mock LLM slow so busy state is visible
-      Mox.stub(Murmur.Agents.LLM.Mock, :ask, fn _mod, _pid, _content, _ctx ->
+      Mox.stub(Mock, :ask, fn _mod, _pid, _content, _ctx ->
         {:ok, make_ref()}
       end)
 
-      Mox.stub(Murmur.Agents.LLM.Mock, :await, fn _mod, _handle, _opts ->
+      Mox.stub(Mock, :await, fn _mod, _handle, _opts ->
         Process.sleep(1000)
         {:ok, "delayed response"}
       end)

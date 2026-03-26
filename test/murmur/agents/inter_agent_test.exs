@@ -14,7 +14,10 @@ defmodule Murmur.Agents.InterAgentTest do
   """
   use Murmur.AgentCase
 
-  alias Murmur.Agents.{Catalog, PendingQueue, Runner, TellAction}
+  alias Murmur.Agents.Catalog
+  alias Murmur.Agents.PendingQueue
+  alias Murmur.Agents.Runner
+  alias Murmur.Agents.TellAction
   alias Murmur.Workspaces
 
   setup do

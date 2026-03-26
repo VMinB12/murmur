@@ -14,7 +14,8 @@ defmodule Murmur.Agents.TellActionTest do
   """
   use Murmur.AgentCase
 
-  alias Murmur.Agents.{Catalog, TellAction}
+  alias Murmur.Agents.Catalog
+  alias Murmur.Agents.TellAction
   alias Murmur.Workspaces
 
   setup do

@@ -54,7 +54,8 @@ defmodule MurmurWeb.WorkspaceLivePersistenceTest do
       agent = server_state.agent
 
       thread =
-        Jido.Thread.new(id: session.id)
+        [id: session.id]
+        |> Jido.Thread.new()
         |> Jido.Thread.append(%{
           kind: :message,
           payload: %{role: "user", content: "Hello Alice!", sender_name: "User"}

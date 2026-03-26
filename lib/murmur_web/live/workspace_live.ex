@@ -1,10 +1,13 @@
 defmodule MurmurWeb.WorkspaceLive do
+  @moduledoc false
   use MurmurWeb, :live_view
 
-  require Logger
-
-  alias Murmur.Agents.{Catalog, Runner, UITurn}
+  alias Murmur.Agents.Catalog
+  alias Murmur.Agents.Runner
+  alias Murmur.Agents.UITurn
   alias Murmur.Workspaces
+
+  require Logger
 
   @impl true
   def mount(%{"id" => workspace_id}, _session, socket) do
@@ -49,11 +52,7 @@ defmodule MurmurWeb.WorkspaceLive do
   # --- Events ---
 
   @impl true
-  def handle_event(
-        "send_message",
-        %{"message" => %{"content" => content, "session_id" => session_id}},
-        socket
-      ) do
+  def handle_event("send_message", %{"message" => %{"content" => content, "session_id" => session_id}}, socket) do
     content = String.trim(content)
 
     if content == "" do
@@ -86,11 +85,7 @@ defmodule MurmurWeb.WorkspaceLive do
   end
 
   @impl true
-  def handle_event(
-        "add_agent",
-        %{"agent" => %{"profile_id" => profile_id, "display_name" => display_name}},
-        socket
-      ) do
+  def handle_event("add_agent", %{"agent" => %{"profile_id" => profile_id, "display_name" => display_name}}, socket) do
     workspace = socket.assigns.workspace
 
     case Workspaces.create_agent_session(workspace.id, %{
@@ -327,9 +322,7 @@ defmodule MurmurWeb.WorkspaceLive do
     adapter.delete_thread(session.id, opts)
   rescue
     e ->
-      Logger.warning(
-        "Failed to cleanup storage for session #{session.id}: #{Exception.message(e)}"
-      )
+      Logger.warning("Failed to cleanup storage for session #{session.id}: #{Exception.message(e)}")
 
       :ok
   end
@@ -428,7 +421,7 @@ defmodule MurmurWeb.WorkspaceLive do
     |> Enum.flat_map(fn {session_id, msgs} ->
       session = Map.get(session_index, session_id)
       agent_name = if session, do: session.display_name, else: "unknown"
-      profile_id = if session, do: session.agent_profile_id, else: nil
+      profile_id = if session, do: session.agent_profile_id
 
       Enum.map(msgs, fn msg ->
         Map.merge(msg, %{

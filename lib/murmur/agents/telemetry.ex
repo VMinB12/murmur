@@ -32,9 +32,7 @@ defmodule Murmur.Agents.Telemetry do
     :telemetry.detach(handler_id(session_id))
   rescue
     e ->
-      Logger.warning(
-        "Failed to detach telemetry handler for #{session_id}: #{Exception.message(e)}"
-      )
+      Logger.warning("Failed to detach telemetry handler for #{session_id}: #{Exception.message(e)}")
 
       :ok
   end

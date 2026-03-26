@@ -2,8 +2,10 @@ defmodule Murmur.Workspaces do
   @moduledoc "Context for managing workspaces and agent sessions."
 
   import Ecto.Query
+
   alias Murmur.Repo
-  alias Murmur.Workspaces.{AgentSession, Workspace}
+  alias Murmur.Workspaces.AgentSession
+  alias Murmur.Workspaces.Workspace
 
   @max_agents_per_workspace 8
 

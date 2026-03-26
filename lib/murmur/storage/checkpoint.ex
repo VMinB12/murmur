@@ -1,5 +1,7 @@
 defmodule Murmur.Storage.Checkpoint do
+  @moduledoc false
   use Ecto.Schema
+
   import Ecto.Changeset
 
   @primary_key {:key, :string, autogenerate: false}

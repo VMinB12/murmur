@@ -36,8 +36,7 @@ defmodule Murmur.Storage.Ecto do
 
     case Repo.get(Checkpoint, key_str) do
       nil ->
-        %Checkpoint{key: key_str, data: serialized}
-        |> Repo.insert!()
+        Repo.insert!(%Checkpoint{key: key_str, data: serialized})
 
       existing ->
         existing
@@ -93,15 +92,14 @@ defmodule Murmur.Storage.Ecto do
         prepared = EntryNormalizer.normalize_many(entries, current_rev, now)
 
         Enum.each(prepared, fn entry ->
-          %ThreadEntry{
+          Repo.insert!(%ThreadEntry{
             thread_id: thread_id,
             seq: entry.seq,
             kind: to_string(entry.kind),
             payload: entry.payload || %{},
             refs: entry.refs || %{},
             at: entry.at
-          }
-          |> Repo.insert!()
+          })
         end)
 
         load_thread(thread_id, opts)
@@ -159,7 +157,7 @@ defmodule Murmur.Storage.Ecto do
   end
 
   defp serialize_key(key) when is_binary(key), do: key
-  defp serialize_key(key) when is_tuple(key), do: :erlang.term_to_binary(key) |> Base.encode64()
+  defp serialize_key(key) when is_tuple(key), do: key |> :erlang.term_to_binary() |> Base.encode64()
   defp serialize_key(key), do: inspect(key)
 
   defp serialize_checkpoint(data) do

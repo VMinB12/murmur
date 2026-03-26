@@ -13,7 +13,10 @@ defmodule Murmur.Agents.EdgeCaseTest do
   """
   use Murmur.AgentCase
 
-  alias Murmur.Agents.{Catalog, PendingQueue, Runner, TellAction}
+  alias Murmur.Agents.Catalog
+  alias Murmur.Agents.PendingQueue
+  alias Murmur.Agents.Runner
+  alias Murmur.Agents.TellAction
   alias Murmur.Workspaces
 
   describe "message to busy agent is queued (not blocked)" do

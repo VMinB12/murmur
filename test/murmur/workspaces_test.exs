@@ -20,7 +20,7 @@ defmodule Murmur.WorkspacesTest do
     test "creates a workspace with valid attrs" do
       assert {:ok, workspace} = Workspaces.create_workspace(%{"name" => "My Team"})
       assert workspace.name == "My Team"
-      assert workspace.id != nil
+      assert workspace.id
     end
 
     test "rejects workspace without name" do

@@ -18,12 +18,12 @@ defmodule Murmur.DataCase do
 
   using do
     quote do
-      alias Murmur.Repo
-
       import Ecto
       import Ecto.Changeset
       import Ecto.Query
       import Murmur.DataCase
+
+      alias Murmur.Repo
     end
   end
 

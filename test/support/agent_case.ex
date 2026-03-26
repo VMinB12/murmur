@@ -15,6 +15,8 @@ defmodule Murmur.AgentCase do
 
   use ExUnit.CaseTemplate
 
+  alias Murmur.Agents.LLM.Mock
+
   using do
     quote do
       import Mox
@@ -32,11 +34,11 @@ defmodule Murmur.AgentCase do
 
     # Set a safe default stub so lingering Runner Tasks don't crash
     # after the test exits. Tests override with stub_llm_success/1 etc.
-    Mox.stub(Murmur.Agents.LLM.Mock, :ask, fn _mod, _pid, _content, _ctx ->
+    Mox.stub(Mock, :ask, fn _mod, _pid, _content, _ctx ->
       {:ok, make_ref()}
     end)
 
-    Mox.stub(Murmur.Agents.LLM.Mock, :await, fn _mod, _handle, _opts ->
+    Mox.stub(Mock, :await, fn _mod, _handle, _opts ->
       {:ok, "default mock response"}
     end)
 
@@ -75,11 +77,11 @@ defmodule Murmur.AgentCase do
   def stub_llm_success(response \\ "Mock LLM response") do
     handle = make_ref()
 
-    Mox.stub(Murmur.Agents.LLM.Mock, :ask, fn _mod, _pid, _content, _ctx ->
+    Mox.stub(Mock, :ask, fn _mod, _pid, _content, _ctx ->
       {:ok, handle}
     end)
 
-    Mox.stub(Murmur.Agents.LLM.Mock, :await, fn _mod, _handle, _opts ->
+    Mox.stub(Mock, :await, fn _mod, _handle, _opts ->
       {:ok, response}
     end)
 
@@ -90,7 +92,7 @@ defmodule Murmur.AgentCase do
   Stub the LLM mock to return an error from ask.
   """
   def stub_llm_ask_error(reason \\ :api_error) do
-    Mox.stub(Murmur.Agents.LLM.Mock, :ask, fn _mod, _pid, _content, _ctx ->
+    Mox.stub(Mock, :ask, fn _mod, _pid, _content, _ctx ->
       {:error, reason}
     end)
   end
@@ -101,11 +103,11 @@ defmodule Murmur.AgentCase do
   def stub_llm_await_error(reason \\ :timeout) do
     handle = make_ref()
 
-    Mox.stub(Murmur.Agents.LLM.Mock, :ask, fn _mod, _pid, _content, _ctx ->
+    Mox.stub(Mock, :ask, fn _mod, _pid, _content, _ctx ->
       {:ok, handle}
     end)
 
-    Mox.stub(Murmur.Agents.LLM.Mock, :await, fn _mod, _handle, _opts ->
+    Mox.stub(Mock, :await, fn _mod, _handle, _opts ->
       {:error, reason}
     end)
 
@@ -117,13 +119,13 @@ defmodule Murmur.AgentCase do
   asserting on content or tool context passed to the LLM.
   """
   def expect_llm_ask(n \\ 1, fun) do
-    Mox.expect(Murmur.Agents.LLM.Mock, :ask, n, fun)
+    Mox.expect(Mock, :ask, n, fun)
   end
 
   @doc """
   Expect exactly `n` await calls with a custom function.
   """
   def expect_llm_await(n \\ 1, fun) do
-    Mox.expect(Murmur.Agents.LLM.Mock, :await, n, fun)
+    Mox.expect(Mock, :await, n, fun)
   end
 end

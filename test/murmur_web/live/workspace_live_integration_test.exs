@@ -16,17 +16,18 @@ defmodule MurmurWeb.WorkspaceLiveIntegrationTest do
   import Phoenix.LiveViewTest
 
   alias Murmur.Agents.Catalog
+  alias Murmur.Agents.LLM.Mock
   alias Murmur.Workspaces
 
   setup do
     Mox.set_mox_global()
 
     # Safe default stubs for lingering Runner Tasks
-    Mox.stub(Murmur.Agents.LLM.Mock, :ask, fn _mod, _pid, _content, _ctx ->
+    Mox.stub(Mock, :ask, fn _mod, _pid, _content, _ctx ->
       {:ok, make_ref()}
     end)
 
-    Mox.stub(Murmur.Agents.LLM.Mock, :await, fn _mod, _handle, _opts ->
+    Mox.stub(Mock, :await, fn _mod, _handle, _opts ->
       {:ok, "default mock response"}
     end)
 
@@ -180,11 +181,11 @@ defmodule MurmurWeb.WorkspaceLiveIntegrationTest do
   defp stub_llm_success(response) do
     handle = make_ref()
 
-    Mox.stub(Murmur.Agents.LLM.Mock, :ask, fn _mod, _pid, _content, _ctx ->
+    Mox.stub(Mock, :ask, fn _mod, _pid, _content, _ctx ->
       {:ok, handle}
     end)
 
-    Mox.stub(Murmur.Agents.LLM.Mock, :await, fn _mod, _handle, _opts ->
+    Mox.stub(Mock, :await, fn _mod, _handle, _opts ->
       {:ok, response}
     end)
   end

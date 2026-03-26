@@ -7,18 +7,30 @@
 # General application configuration
 import Config
 
+# Configure esbuild (the version is required)
+config :esbuild,
+  version: "0.25.4",
+  murmur: [
+    args:
+      ~w(js/app.js --bundle --target=es2022 --outdir=../priv/static/assets/js --external:/fonts/* --external:/images/* --alias:@=.),
+    cd: Path.expand("../assets", __DIR__),
+    env: %{"NODE_PATH" => [Path.expand("../deps", __DIR__), Mix.Project.build_path()]}
+  ]
+
+config :jido_action, default_timeout: 30_000, default_max_retries: 1, default_backoff: 250
+
 config :jido_ai,
   model_aliases: %{
     capable: "openai:gpt-5-mini",
     fast: "openai:gpt-5-mini"
   }
 
-config :jido_action, default_timeout: 30000, default_max_retries: 1, default_backoff: 250
-config :murmur, Murmur.Jido, max_tasks: 1000, agent_pools: []
+# Configure Elixir's Logger
+config :logger, :default_formatter,
+  format: "$time $metadata[$level] $message\n",
+  metadata: [:request_id]
 
-config :murmur,
-  ecto_repos: [Murmur.Repo],
-  generators: [timestamp_type: :utc_datetime]
+config :murmur, Murmur.Jido, max_tasks: 1000, agent_pools: []
 
 # Configure the endpoint
 config :murmur, MurmurWeb.Endpoint,
@@ -31,19 +43,17 @@ config :murmur, MurmurWeb.Endpoint,
   pubsub_server: Murmur.PubSub,
   live_view: [signing_salt: "78A9aJAw"]
 
-# Configure esbuild (the version is required)
-config :esbuild,
-  version: "0.25.4",
-  murmur: [
-    args:
-      ~w(js/app.js --bundle --target=es2022 --outdir=../priv/static/assets/js --external:/fonts/* --external:/images/* --alias:@=.),
-    cd: Path.expand("../assets", __DIR__),
-    env: %{"NODE_PATH" => [Path.expand("../deps", __DIR__), Mix.Project.build_path()]}
-  ]
+config :murmur,
+  ecto_repos: [Murmur.Repo],
+  generators: [timestamp_type: :utc_datetime]
+
+# Use Jason for JSON parsing in Phoenix
+config :phoenix, :json_library, Jason
 
 # Configure tailwind (the version is required)
 config :tailwind,
   version: "4.1.12",
+  # Use git_hook
   murmur: [
     args: ~w(
       --input=assets/css/app.css
@@ -52,15 +62,6 @@ config :tailwind,
     cd: Path.expand("..", __DIR__)
   ]
 
-# Configure Elixir's Logger
-config :logger, :default_formatter,
-  format: "$time $metadata[$level] $message\n",
-  metadata: [:request_id]
-
-# Use Jason for JSON parsing in Phoenix
-config :phoenix, :json_library, Jason
-
-# Use git_hook
 if Mix.env() == :dev do
   config :git_hooks,
     auto_install: true,

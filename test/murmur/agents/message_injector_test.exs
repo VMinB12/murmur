@@ -16,15 +16,18 @@ defmodule Murmur.Agents.MessageInjectorTest do
   """
   use ExUnit.Case, async: true
 
-  alias Murmur.Agents.{MessageInjector, PendingQueue}
+  alias Murmur.Agents.MessageInjector
+  alias Murmur.Agents.PendingQueue
 
   # Minimal stubs for the ReAct runner types.
   # The transformer receives these as arguments.
   defmodule FakeState do
+    @moduledoc false
     defstruct [:run_id, :request_id, :iteration, :context]
   end
 
   defmodule FakeConfig do
+    @moduledoc false
     defstruct [:request_transformer, :model, :tools]
   end
 

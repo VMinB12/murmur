@@ -1,4 +1,5 @@
 defmodule MurmurWeb.WorkspaceListLive do
+  @moduledoc false
   use MurmurWeb, :live_view
 
   alias Murmur.Workspaces
@@ -19,9 +20,7 @@ defmodule MurmurWeb.WorkspaceListLive do
   def handle_event("create_workspace", %{"workspace" => %{"name" => name}}, socket) do
     case Workspaces.create_workspace(%{name: name}) do
       {:ok, workspace} ->
-        {:noreply,
-         socket
-         |> push_navigate(to: ~p"/workspaces/#{workspace.id}")}
+        {:noreply, push_navigate(socket, to: ~p"/workspaces/#{workspace.id}")}
 
       {:error, changeset} ->
         {:noreply, assign(socket, :form, to_form(changeset))}

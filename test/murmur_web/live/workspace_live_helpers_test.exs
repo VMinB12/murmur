@@ -60,7 +60,8 @@ defmodule MurmurWeb.WorkspaceLiveHelpersTest do
       now = System.system_time(:millisecond)
 
       thread =
-        Jido.Thread.new(id: "test-thread")
+        [id: "test-thread"]
+        |> Jido.Thread.new()
         |> Jido.Thread.append(%{
           kind: :message,
           payload: %{role: "user", content: "Hello"},

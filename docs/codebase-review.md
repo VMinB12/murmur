@@ -298,7 +298,7 @@ Not urgent now, but if workspaces grow, `Flop`/`Flop.Phoenix` gives declarative 
 | 2.3 | Log instead of swallowing exceptions | P2 | Trivial | Observability | ✅ |
 | 3.1 | Ecto.Enum for status | P3 | Low | Type safety |
 | 3.2 | MDEx for Markdown rendering | P3 | Low–Med | UX |
-| 3.3 | Styler formatter plugin | P3 | Trivial | Code quality |
+| 3.3 | Styler formatter plugin | P3 | Trivial | Code quality | ✅ |
 | 3.4 | Centralize color mapping | P3 | Low | Maintainability |
 | 3.5 | Hammer rate limiting | P3 | Low | Cost protection |
 | 4.1 | Phoenix.Presence | P4 | Medium | Scalability |

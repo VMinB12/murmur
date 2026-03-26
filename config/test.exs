@@ -1,5 +1,8 @@
 import Config
 
+# Print only warnings and errors during test
+config :logger, level: :warning
+
 # Configure your database
 #
 # The MIX_TEST_PARTITION environment variable can be used
@@ -20,9 +23,6 @@ config :murmur, MurmurWeb.Endpoint,
   secret_key_base: "vlHcXXv+itjrdV2bB7djTx5qptibFxdal7XJsLZhatmeaCo4mRyEO5ltddLjdMnC",
   server: false
 
-# Print only warnings and errors during test
-config :logger, level: :warning
-
 # Use mock LLM adapter in tests (no real API calls)
 config :murmur, :llm_adapter, Murmur.Agents.LLM.Mock
 
@@ -32,10 +32,10 @@ config :murmur, :skip_hibernate, true
 # Initialize plugs at runtime for faster test compilation
 config :phoenix, :plug_init_mode, :runtime
 
-# Enable helpful, but potentially expensive runtime checks
-config :phoenix_live_view,
-  enable_expensive_runtime_checks: true
-
 # Sort query params output of verified routes for robust url comparisons
 config :phoenix,
   sort_verified_routes_query_params: true
+
+# Enable helpful, but potentially expensive runtime checks
+config :phoenix_live_view,
+  enable_expensive_runtime_checks: true

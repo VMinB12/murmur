@@ -12,7 +12,8 @@ defmodule Murmur.Agents.ReconnectTest do
   """
   use Murmur.AgentCase
 
-  alias Murmur.Agents.{Catalog, Runner}
+  alias Murmur.Agents.Catalog
+  alias Murmur.Agents.Runner
   alias Murmur.Workspaces
 
   setup do
@@ -59,7 +60,7 @@ defmodule Murmur.Agents.ReconnectTest do
       assert_receive {:message_completed, ^session_id, _}, 5000
 
       pid = Murmur.Jido.whereis(session.id)
-      assert pid != nil
+      assert pid
       assert Process.alive?(pid)
     end
   end
@@ -74,10 +75,10 @@ defmodule Murmur.Agents.ReconnectTest do
 
       # Agent should still be queryable
       pid = Murmur.Jido.whereis(session.id)
-      assert pid != nil
+      assert pid
 
       {:ok, server_state} = Jido.AgentServer.state(pid)
-      assert server_state.agent != nil
+      assert server_state.agent
     end
 
     test "multiple messages produce multiple completions", %{session: session} do
@@ -91,7 +92,7 @@ defmodule Murmur.Agents.ReconnectTest do
 
       # Agent still alive
       pid = Murmur.Jido.whereis(session.id)
-      assert pid != nil
+      assert pid
     end
   end
 
@@ -105,7 +106,7 @@ defmodule Murmur.Agents.ReconnectTest do
       assert length(sessions) == 1
 
       found = Enum.find(sessions, &(&1.id == session.id))
-      assert found != nil
+      assert found
       assert found.display_name == "Alice"
     end
 
@@ -119,7 +120,7 @@ defmodule Murmur.Agents.ReconnectTest do
       sessions = Workspaces.list_agent_sessions(workspace.id)
       assert length(sessions) == 2
 
-      names = Enum.map(sessions, & &1.display_name) |> Enum.sort()
+      names = sessions |> Enum.map(& &1.display_name) |> Enum.sort()
       assert names == ["Alice", "Bob"]
     end
   end

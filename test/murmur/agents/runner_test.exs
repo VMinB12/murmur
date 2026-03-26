@@ -14,7 +14,9 @@ defmodule Murmur.Agents.RunnerTest do
   """
   use Murmur.AgentCase
 
-  alias Murmur.Agents.{Catalog, PendingQueue, Runner}
+  alias Murmur.Agents.Catalog
+  alias Murmur.Agents.PendingQueue
+  alias Murmur.Agents.Runner
   alias Murmur.Workspaces
 
   setup do

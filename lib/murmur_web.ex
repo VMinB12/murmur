@@ -23,10 +23,11 @@ defmodule MurmurWeb do
     quote do
       use Phoenix.Router, helpers: false
 
-      # Import common connection and controller functions to use in pipelines
-      import Plug.Conn
       import Phoenix.Controller
       import Phoenix.LiveView.Router
+
+      # Import common connection and controller functions to use in pipelines
+      import Plug.Conn
     end
   end
 
@@ -39,7 +40,6 @@ defmodule MurmurWeb do
   def controller do
     quote do
       use Phoenix.Controller, formats: [:html, :json]
-
       use Gettext, backend: MurmurWeb.Gettext
 
       import Plug.Conn
@@ -82,10 +82,11 @@ defmodule MurmurWeb do
       # Translation
       use Gettext, backend: MurmurWeb.Gettext
 
+      import MurmurWeb.CoreComponents
+
       # HTML escaping functionality
       import Phoenix.HTML
       # Core UI components
-      import MurmurWeb.CoreComponents
 
       # Common modules used in templates
       alias MurmurWeb.Layouts

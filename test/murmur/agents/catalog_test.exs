@@ -8,6 +8,10 @@ defmodule Murmur.Agents.CatalogTest do
   use ExUnit.Case, async: true
 
   alias Murmur.Agents.Catalog
+  alias Murmur.Agents.MessageInjector
+  alias Murmur.Agents.Profiles.CodeAgent
+  alias Murmur.Agents.Profiles.GeneralAgent
+  alias Murmur.Agents.TellAction
 
   describe "list_profiles/0" do
     test "returns a non-empty list of profiles" do
@@ -56,11 +60,11 @@ defmodule Murmur.Agents.CatalogTest do
 
   describe "agent_module/1" do
     test "returns the module for general_agent" do
-      assert Catalog.agent_module("general_agent") == Murmur.Agents.Profiles.GeneralAgent
+      assert Catalog.agent_module("general_agent") == GeneralAgent
     end
 
     test "returns the module for code_agent" do
-      assert Catalog.agent_module("code_agent") == Murmur.Agents.Profiles.CodeAgent
+      assert Catalog.agent_module("code_agent") == CodeAgent
     end
 
     test "raises for unknown profile id" do
@@ -72,25 +76,25 @@ defmodule Murmur.Agents.CatalogTest do
 
   describe "agent profiles have required capabilities" do
     test "GeneralAgent module is a valid Jido.AI.Agent" do
-      Code.ensure_loaded!(Murmur.Agents.Profiles.GeneralAgent)
-      assert function_exported?(Murmur.Agents.Profiles.GeneralAgent, :ask, 3)
-      assert function_exported?(Murmur.Agents.Profiles.GeneralAgent, :await, 2)
+      Code.ensure_loaded!(GeneralAgent)
+      assert function_exported?(GeneralAgent, :ask, 3)
+      assert function_exported?(GeneralAgent, :await, 2)
     end
 
     test "CodeAgent module is a valid Jido.AI.Agent" do
-      Code.ensure_loaded!(Murmur.Agents.Profiles.CodeAgent)
-      assert function_exported?(Murmur.Agents.Profiles.CodeAgent, :ask, 3)
-      assert function_exported?(Murmur.Agents.Profiles.CodeAgent, :await, 2)
+      Code.ensure_loaded!(CodeAgent)
+      assert function_exported?(CodeAgent, :ask, 3)
+      assert function_exported?(CodeAgent, :await, 2)
     end
 
     test "MessageInjector exports transform_request/4" do
-      Code.ensure_loaded!(Murmur.Agents.MessageInjector)
-      assert function_exported?(Murmur.Agents.MessageInjector, :transform_request, 4)
+      Code.ensure_loaded!(MessageInjector)
+      assert function_exported?(MessageInjector, :transform_request, 4)
     end
 
     test "TellAction is a valid Jido.Action" do
-      Code.ensure_loaded!(Murmur.Agents.TellAction)
-      assert function_exported?(Murmur.Agents.TellAction, :run, 2)
+      Code.ensure_loaded!(TellAction)
+      assert function_exported?(TellAction, :run, 2)
     end
   end
 end

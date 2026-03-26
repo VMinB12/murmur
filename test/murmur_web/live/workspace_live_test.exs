@@ -17,6 +17,7 @@ defmodule MurmurWeb.WorkspaceLiveTest do
 
   import Phoenix.LiveViewTest
 
+  alias Murmur.Agents.Catalog
   alias Murmur.Workspaces
 
   setup do
@@ -194,6 +195,74 @@ defmodule MurmurWeb.WorkspaceLiveTest do
       |> render_click()
 
       assert has_element?(view, "h2", "No agents yet")
+    end
+  end
+
+  describe "clear team" do
+    test "clears all conversations but keeps agents", %{conn: conn, workspace: workspace} do
+      {:ok, session} =
+        Workspaces.create_agent_session(workspace.id, %{
+          "agent_profile_id" => "general_agent",
+          "display_name" => "Alice"
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/workspaces/#{workspace.id}")
+
+      # Send a message so there's conversation history
+      topic = "workspace:#{workspace.id}:agent:#{session.id}"
+
+      Phoenix.PubSub.broadcast!(
+        Murmur.PubSub,
+        topic,
+        {:message_completed, session.id, "Hello from Alice"}
+      )
+
+      html = render(view)
+      assert html =~ "Hello from Alice"
+
+      # Click clear team button
+      view
+      |> element("button#clear-team-btn")
+      |> render_click()
+
+      # Agent column still present, but messages gone
+      assert has_element?(view, "span", "Alice")
+      refute render(view) =~ "Hello from Alice"
+    end
+
+    test "clear team also wipes persisted storage", %{conn: conn, workspace: workspace} do
+      {:ok, session} =
+        Workspaces.create_agent_session(workspace.id, %{
+          "agent_profile_id" => "general_agent",
+          "display_name" => "Alice"
+        })
+
+      # Seed storage with a checkpoint and thread entries
+      agent_module = Catalog.agent_module(session.agent_profile_id)
+      {:ok, pid} = Murmur.Jido.start_agent(agent_module, id: session.id)
+      {:ok, server_state} = Jido.AgentServer.state(pid)
+      agent = server_state.agent
+
+      thread =
+        Jido.Thread.new(id: session.id)
+        |> Jido.Thread.append(%{
+          kind: :ai_message,
+          payload: %{role: "assistant", content: "Stored msg", sender_name: "Alice"}
+        })
+
+      agent = %{agent | state: Map.put(agent.state, :__thread__, thread)}
+      :ok = Murmur.Jido.hibernate(agent)
+      Murmur.Jido.stop_agent(session.id)
+
+      # Verify storage has data
+      assert {:ok, _} = Murmur.Jido.thaw(agent_module, session.id)
+
+      # Mount and clear
+      {:ok, view, _html} = live(conn, ~p"/workspaces/#{workspace.id}")
+      view |> element("button#clear-team-btn") |> render_click()
+
+      # Storage should be wiped
+      assert {:error, :not_found} = Murmur.Jido.thaw(agent_module, session.id)
     end
   end
 

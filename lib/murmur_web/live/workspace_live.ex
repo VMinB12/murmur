@@ -1,7 +1,7 @@
 defmodule MurmurWeb.WorkspaceLive do
   use MurmurWeb, :live_view
 
-  alias Murmur.Agents.{Catalog, Runner}
+  alias Murmur.Agents.{Catalog, Runner, UITurn}
   alias Murmur.Workspaces
 
   @impl true
@@ -121,6 +121,30 @@ defmodule MurmurWeb.WorkspaceLive do
   end
 
   @impl true
+  def handle_event("clear_team", _params, socket) do
+    Enum.each(socket.assigns.agent_sessions, fn session ->
+      stop_agent(session.id)
+      cleanup_storage(session)
+    end)
+
+    # Restart agents fresh (no history)
+    Enum.each(socket.assigns.agent_sessions, fn session ->
+      agent_module = Catalog.agent_module(session.agent_profile_id)
+
+      Murmur.Jido.start_agent(agent_module, id: session.id)
+    end)
+
+    empty_messages = Map.new(socket.assigns.agent_sessions, &{&1.id, []})
+    empty_statuses = Map.new(socket.assigns.agent_sessions, &{&1.id, :idle})
+    empty_tokens = Map.new(socket.assigns.agent_sessions, &{&1.id, ""})
+
+    {:noreply,
+     socket
+     |> assign(:messages, empty_messages)
+     |> assign(:agent_statuses, empty_statuses)
+     |> assign(:streaming_tokens, empty_tokens)}
+  end
+
   def handle_event("remove_agent", %{"session-id" => session_id}, socket) do
     session = Workspaces.get_agent_session!(session_id)
     topic = agent_topic(socket.assigns.workspace.id, session_id)
@@ -145,20 +169,28 @@ defmodule MurmurWeb.WorkspaceLive do
 
   @impl true
   def handle_info({:message_completed, session_id, response}, socket) do
-    content = extract_response_content(response)
+    # Try to reload full history from agent thread to capture thinking/tool calls.
+    # Falls back to appending the response text if thread hasn't been populated
+    # (e.g. when using a mock LLM adapter in tests).
+    session = find_session(socket, session_id)
+    current_messages = Map.get(socket.assigns.messages, session_id, [])
 
-    assistant_msg = %{
-      id: Ecto.UUID.generate(),
-      role: "assistant",
-      content: content,
-      sender_name: nil
-    }
+    messages =
+      if session do
+        loaded = load_messages_for_session(session)
+
+        if length(loaded) > length(current_messages) do
+          loaded
+        else
+          append_assistant_message(current_messages, response)
+        end
+      else
+        append_assistant_message(current_messages, response)
+      end
 
     socket =
       socket
-      |> update(:messages, fn msgs ->
-        Map.update(msgs, session_id, [assistant_msg], &(&1 ++ [assistant_msg]))
-      end)
+      |> update(:messages, &Map.put(&1, session_id, messages))
       |> update(:agent_statuses, &Map.put(&1, session_id, :idle))
       |> update(:streaming_tokens, &Map.put(&1, session_id, ""))
 
@@ -258,16 +290,7 @@ defmodule MurmurWeb.WorkspaceLive do
     thread = get_in_thread(agent)
 
     if thread do
-      thread.entries
-      |> Enum.filter(&(&1.kind in [:message, :ai_message]))
-      |> Enum.map(fn entry ->
-        %{
-          id: entry.id || Ecto.UUID.generate(),
-          role: to_string(entry.payload[:role] || entry.payload["role"] || "assistant"),
-          content: entry.payload[:content] || entry.payload["content"] || "",
-          sender_name: entry.payload[:sender_name] || entry.payload["sender_name"]
-        }
-      end)
+      UITurn.project_entries(thread.entries)
     else
       []
     end
@@ -326,6 +349,23 @@ defmodule MurmurWeb.WorkspaceLive do
   end
 
   # --- Helpers ---
+
+  defp find_session(socket, session_id) do
+    Enum.find(socket.assigns.agent_sessions, &(&1.id == session_id))
+  end
+
+  defp append_assistant_message(messages, response) do
+    content = extract_response_content(response)
+
+    assistant_msg = %{
+      id: Ecto.UUID.generate(),
+      role: "assistant",
+      content: content,
+      sender_name: nil
+    }
+
+    messages ++ [assistant_msg]
+  end
 
   defp extract_response_content(response) when is_binary(response), do: response
   defp extract_response_content(%{result: result}) when is_binary(result), do: result

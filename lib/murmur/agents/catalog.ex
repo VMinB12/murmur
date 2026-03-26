@@ -93,14 +93,10 @@ defmodule Murmur.Agents.Catalog do
     Map.get(@color_map, color, @color_map["blue"])
   end
 
-  @doc "Returns color classes for the given profile, falling back to hash-based assignment."
-  def agent_color(profile_id, agent_name) do
-    color =
-      case Map.fetch(@profiles, profile_id) do
-        {:ok, {_module, %{color: c}}} -> c
-        :error -> Enum.at(@color_palette, :erlang.phash2(agent_name, length(@color_palette)))
-      end
-
+  @doc "Returns color classes for the given agent, using name-based hashing for unique colors."
+  def agent_color(_profile_id, agent_name) do
+    idx = :erlang.phash2({:agent_color, agent_name}, length(@color_palette))
+    color = Enum.at(@color_palette, idx)
     color_classes(color)
   end
 end

@@ -599,7 +599,9 @@ defmodule MurmurWeb.WorkspaceLiveTest do
         })
 
       {:ok, _view, html} = live(conn, ~p"/workspaces/#{workspace.id}")
-      assert html =~ "blue"
+      # Color is derived from display_name hash, not profile
+      expected_color = Catalog.agent_color("general_agent", "Alice").dot
+      assert html =~ expected_color
     end
 
     test "agent header shows colored indicator for code_agent", %{
@@ -613,7 +615,8 @@ defmodule MurmurWeb.WorkspaceLiveTest do
         })
 
       {:ok, _view, html} = live(conn, ~p"/workspaces/#{workspace.id}")
-      assert html =~ "emerald"
+      expected_color = Catalog.agent_color("code_agent", "Coder").dot
+      assert html =~ expected_color
     end
   end
 

@@ -453,14 +453,6 @@ defmodule MurmurWeb.WorkspaceLive do
   defp extract_response_content(%{content: content}) when is_binary(content), do: content
   defp extract_response_content(response), do: inspect(response)
 
-  defp agent_header_class(profile_id) do
-    Catalog.agent_color(profile_id, profile_id).header
-  end
-
-  defp agent_dot_class(profile_id) do
-    Catalog.agent_color(profile_id, profile_id).dot
-  end
-
   defp get_agent_status(agent_session_id) do
     pid = Murmur.Jido.whereis(agent_session_id)
     if pid, do: fetch_agent_status(pid), else: :idle

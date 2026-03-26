@@ -17,6 +17,19 @@ defmodule MurmurWeb.WorkspaceLivePersistenceTest do
   alias Murmur.Agents.Catalog
   alias Murmur.Workspaces
 
+  defp assert_eventually(fun, retries \\ 50) do
+    if fun.() do
+      :ok
+    else
+      if retries > 0 do
+        Process.sleep(10)
+        assert_eventually(fun, retries - 1)
+      else
+        flunk("Condition not met after retries")
+      end
+    end
+  end
+
   setup do
     {:ok, workspace} = Workspaces.create_workspace(%{"name" => "Persistence Test"})
 
@@ -74,10 +87,12 @@ defmodule MurmurWeb.WorkspaceLivePersistenceTest do
       assert :ok = Murmur.Jido.hibernate(agent)
 
       # Stop the agent (simulates server restart — agent process is gone)
+      ref = Process.monitor(pid)
       Murmur.Jido.stop_agent(session.id)
+      assert_receive {:DOWN, ^ref, :process, ^pid, _reason}, 5000
 
-      # Verify agent is not running
-      assert Murmur.Jido.whereis(session.id) == nil
+      # Registry cleanup is async — wait for it to propagate
+      assert_eventually(fn -> Murmur.Jido.whereis(session.id) == nil end)
 
       # Mount a fresh LiveView (simulates user opening the page after restart)
       {:ok, _view, html} = live(conn, ~p"/workspaces/#{workspace.id}")

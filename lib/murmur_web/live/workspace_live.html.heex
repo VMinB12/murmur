@@ -77,16 +77,17 @@
       <%= if @view_mode == :split do %>
         <div class="flex-1 flex overflow-x-auto min-h-0">
           <%= for session <- @agent_sessions do %>
+            <% colors = Catalog.agent_color(session.agent_profile_id, session.display_name) %>
             <div class="flex flex-col flex-1 min-w-[300px] border-r border-base-300/50 last:border-r-0 agent-column-enter transition-all duration-200">
               <%!-- Agent Header --%>
               <div class={[
                 "flex items-center justify-between px-3 py-2 border-b",
-                agent_header_class(session.agent_profile_id)
+                colors.header
               ]}>
                 <div class="flex items-center gap-2 min-w-0">
                   <div class={[
                     "w-2 h-2 rounded-full shrink-0",
-                    agent_dot_class(session.agent_profile_id)
+                    colors.dot
                   ]}>
                   </div>
                   <span class="font-medium text-sm truncate">{session.display_name}</span>
@@ -198,13 +199,23 @@
 
                     <%!-- Message content --%>
                     <%= if msg.content && msg.content != "" do %>
+                      <% inter_agent? =
+                        msg.role == "user" and msg.sender_name != "You" and msg.sender_name != nil %>
                       <div class={[
                         "rounded-xl px-3 py-2 text-sm max-w-[85%] break-words",
-                        if(msg.role == "user",
-                          do: "bg-primary text-primary-content rounded-br-sm whitespace-pre-wrap",
-                          else:
+                        cond do
+                          msg.role != "user" ->
                             "bg-base-200 text-base-content rounded-bl-sm prose prose-sm max-w-none"
-                        )
+
+                          inter_agent? ->
+                            [
+                              Catalog.agent_color(nil, msg.sender_name).dot,
+                              "text-white rounded-br-sm whitespace-pre-wrap"
+                            ]
+
+                          true ->
+                            "bg-primary text-primary-content rounded-br-sm whitespace-pre-wrap"
+                        end
                       ]}>
                         <%= if msg.role == "user" do %>
                           {msg.content}

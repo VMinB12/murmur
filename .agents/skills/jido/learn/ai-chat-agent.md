@@ -1,0 +1,218 @@
+%{
+  title: "Build an AI Chat Agent",
+  description: "Build a multi-turn conversational agent with Jido using one agent process, repeated turns, and snapshot inspection.",
+  category: :docs,
+  order: 50,
+  legacy_paths: ["/build/ai-chat-agent"],
+  tags: [:docs, :learn, :build, :ai, :chat, :livebook],
+  prerequisites: ["/docs/getting-started/first-llm-agent"],
+  learning_outcomes: [
+    "Start a chat agent in the default Livebook runtime",
+    "Send multiple turns to the same agent process",
+    "Inspect stored conversation state and optional streaming progress"
+  ],
+  livebook: %{
+    runnable: true,
+    required_env_vars: ["OPENAI_API_KEY"],
+    requires_network: true,
+    setup_instructions: "Set OPENAI_API_KEY or LB_OPENAI_API_KEY before running the chat cells."
+  },
+  draft: false
+}
+---
+## Setup
+
+This notebook is self-contained. Install the dependencies, configure a provider key, start one chat agent, then send multiple turns to that same process. That is the core beginner pattern for chat in Jido.
+
+```elixir
+Mix.install([
+  {{mix_dep:jido}},
+  {{mix_dep:jido_ai}},
+  {{mix_dep:req_llm}}
+])
+
+Logger.configure(level: :warning)
+```
+
+## Configure credentials
+
+In Livebook, store `OPENAI_API_KEY` as a secret. Livebook exposes it as `LB_OPENAI_API_KEY`, so the cell below checks both names.
+
+```elixir
+openai_key = System.get_env("LB_OPENAI_API_KEY") || System.get_env("OPENAI_API_KEY")
+
+configured? =
+  if is_binary(openai_key) do
+    ReqLLM.put_key(:openai_api_key, openai_key)
+    true
+  else
+    IO.puts("Set OPENAI_API_KEY or LB_OPENAI_API_KEY before running the chat cells.")
+    false
+  end
+```
+
+## Define the chat agent
+
+For a basic chat flow, keep the agent small: no tools, a short system prompt, and the standard `Jido.AI.Agent` interface.
+
+```elixir
+defmodule MyApp.ChatAgent do
+  use Jido.AI.Agent,
+    name: "chat_agent",
+    description: "Multi-turn chat agent",
+    tools: [],
+    model: :fast,
+    system_prompt: """
+    You are a concise, friendly chat assistant.
+    Ask a short clarifying question when the user is ambiguous.
+    Keep answers under 6 sentences unless asked to be detailed.
+    """
+end
+```
+
+You do not need custom hooks to get multi-turn chat. Reuse the same agent process across turns and Jido keeps the conversation context for you.
+
+## Start the runtime and agent
+
+```elixir
+{:ok, _} = Jido.start()
+runtime = Jido.default_instance()
+agent_id = "chat-demo-#{System.unique_integer([:positive])}"
+
+{:ok, pid} = Jido.start_agent(runtime, MyApp.ChatAgent, id: agent_id)
+```
+
+## First turn
+
+Use a prompt that makes the follow-up easy to verify.
+
+```elixir
+first_turn =
+  if configured? do
+    MyApp.ChatAgent.ask_sync(
+      pid,
+      "My name is Casey and I'm building a support bot for a weather app. Remember both.",
+      timeout: 30_000
+    )
+  else
+    {:skip, :no_openai_key}
+  end
+
+IO.inspect(first_turn, label: "First turn")
+```
+
+## Second turn on the same pid
+
+The only difference is that you reuse the same `pid`. That is what makes the conversation multi-turn.
+
+```elixir
+second_turn =
+  if configured? do
+    MyApp.ChatAgent.ask_sync(
+      pid,
+      "What name and project did I ask you to remember?",
+      timeout: 30_000
+    )
+  else
+    {:skip, :no_openai_key}
+  end
+
+IO.inspect(second_turn, label: "Second turn")
+```
+
+If the second response repeats Casey and the support bot project, the multi-turn flow is working.
+
+## Inspect the stored conversation
+
+Success first, inspection second: once the turns work, inspect the runtime snapshot to see the message history Jido kept for that agent process.
+
+```elixir
+conversation =
+  case Jido.AgentServer.status(pid) do
+    {:ok, status} ->
+      status.snapshot.details[:conversation] || []
+
+    other ->
+      other
+  end
+
+IO.inspect(conversation, label: "Conversation")
+```
+
+The `conversation` list should include the system prompt plus the user and assistant turns you just sent.
+
+## Update the system prompt at runtime
+
+Inside `use Jido.AI.Agent`, `system_prompt:` is compile-time configuration. When you need runtime values like today's date, update the running agent instead of trying to interpolate them into the module definition.
+
+```elixir
+today = Date.utc_today()
+
+{:ok, _agent} =
+  Jido.AI.set_system_prompt(
+    pid,
+    "You are a concise, friendly chat assistant. Today's date is #{today}."
+  )
+```
+
+After that update, the next turn will use the new system prompt.
+
+## Stream partial text while a turn is running
+
+`ask/3` starts an asynchronous request. Poll `Jido.AgentServer.status/1` and read `status.snapshot.details.streaming_text` to display partial text as it arrives.
+
+```elixir
+streamed_reply =
+  if configured? do
+    {:ok, request} =
+      MyApp.ChatAgent.ask(
+        pid,
+        "Give me a short four-step deployment checklist for a new chat feature.",
+        timeout: 30_000
+      )
+
+    Stream.repeatedly(fn ->
+      Process.sleep(150)
+      {:ok, status} = Jido.AgentServer.status(pid)
+      status.snapshot
+    end)
+    |> Enum.reduce_while("", fn snap, streamed_so_far ->
+      current = snap.details[:streaming_text] || ""
+      delta = String.replace_prefix(current, streamed_so_far, "")
+
+      if delta != "" do
+        IO.write(delta)
+      end
+
+      if snap.done? do
+        IO.puts("")
+        {:halt, MyApp.ChatAgent.await(request, timeout: 30_000)}
+      else
+        {:cont, current}
+      end
+    end)
+  else
+    {:skip, :no_openai_key}
+  end
+
+IO.inspect(streamed_reply, label: "Streamed reply")
+```
+
+This is real partial text streaming, not just completion polling.
+
+## Which surface should you use?
+
+Start with `Jido.AI.Plugins.Chat` when you only need a chat capability on an existing agent. Stay with `Jido.AI.Agent` when you want a dedicated chat agent, custom tool lists, or more control over how the agent is configured.
+
+## Verification
+
+1. Run the first turn and confirm it returns `{:ok, text}`.
+2. Run the second turn on the same `pid` and confirm it remembers Casey and the project.
+3. Inspect `conversation` and confirm it includes multiple turns.
+4. Run the streaming cell and confirm partial text appears before the final `{:ok, text}` result.
+
+## What to try next
+
+- Continue to [AI Agent with Tools](/docs/learn/ai-agent-with-tools) when the agent needs actions or external data.
+- Keep the [Chat Response recipe](/docs/guides/cookbook/chat-response) handy for the smallest possible request-response example.
+- Revisit [Your first LLM agent](/docs/getting-started/first-llm-agent) if you need to adjust provider setup or the runtime pattern.

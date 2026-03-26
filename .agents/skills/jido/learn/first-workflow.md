@@ -1,0 +1,198 @@
+<!-- %{
+  title: "Build your first workflow",
+  description: "Compose multiple actions into a single command with sequential execution and shared state.",
+  category: :docs,
+  order: 13,
+  tags: [:docs, :learn, :tutorial, :workflows, :livebook],
+  draft: false,
+  learning_outcomes: [
+    "Compose multiple actions into a single command",
+    "Understand how action outputs flow through a chain",
+    "Handle directives from multi-step workflows"
+  ],
+  prerequisites: ["/docs/getting-started/first-agent"],
+  livebook: %{
+    runnable: true,
+    required_env_vars: [],
+    requires_network: false,
+    setup_instructions: "No API keys required. Run the setup cell, then execute the examples in order."
+  }
+} -->
+
+## Prerequisites
+
+Complete [Your first agent](/docs/getting-started/first-agent) before starting this tutorial. You need a working agent module and familiarity with single-action execution.
+
+## Setup
+
+```elixir
+Mix.install([
+  {{mix_dep:jido}}
+])
+
+Logger.configure(level: :warning)
+```
+
+This tutorial runs entirely locally. No provider keys or network calls are required.
+
+## Why compose actions?
+
+A single action that does everything is easy to write and hard to maintain. Splitting work into small actions gives you three things: isolated tests, clear failure boundaries, and reuse across agents.
+
+Jido workflows run a list of actions in sequence. Each action returns state updates. `cmd/2` deep-merges them into agent state. The next action reads the updated state through `context.state`.
+
+## Define the agent
+
+The agent declares a schema that describes the shape of its state. All action results merge into this state as the workflow progresses.
+
+```elixir
+defmodule MyApp.OrderAgent do
+  use Jido.Agent,
+    name: "order_agent",
+    description: "Processes orders through validation, discount, and total",
+    schema: Zoi.object(%{
+      order_id: Zoi.string() |> Zoi.default(""),
+      validated: Zoi.boolean() |> Zoi.default(false),
+      discount: Zoi.float() |> Zoi.default(0.0),
+      total: Zoi.float() |> Zoi.default(0.0),
+      status: Zoi.atom() |> Zoi.default(:pending)
+    })
+end
+```
+
+## Define the actions
+
+Build three actions for an order processing workflow. Each action declares its inputs with a Zoi schema and returns a state map.
+
+```elixir
+defmodule MyApp.ValidateOrder do
+  use Jido.Action,
+    name: "validate_order",
+    schema: Zoi.object(%{order_id: Zoi.string()})
+
+  @impl true
+  def run(params, _context) do
+    {:ok, %{order_id: params.order_id, validated: true}}
+  end
+end
+```
+
+`ValidateOrder` takes an `order_id` param and returns `validated: true`. The runtime merges this into the agent's state.
+
+```elixir
+defmodule MyApp.ApplyDiscount do
+  use Jido.Action,
+    name: "apply_discount",
+    schema: Zoi.object(%{})
+
+  @impl true
+  def run(_params, context) do
+    discount = if context.state[:validated], do: 0.1, else: 0.0
+    {:ok, %{discount: discount}}
+  end
+end
+```
+
+`ApplyDiscount` takes no params. It reads `validated` from `context.state`, which holds the agent's current state after prior actions ran.
+
+```elixir
+defmodule MyApp.CalculateTotal do
+  use Jido.Action,
+    name: "calculate_total",
+    schema: Zoi.object(%{})
+
+  @impl true
+  def run(_params, context) do
+    base_price = 100.0
+    total = base_price * (1.0 - context.state.discount)
+    {:ok, %{order_id: context.state.order_id, total: total}}
+  end
+end
+```
+
+`CalculateTotal` reads `discount` and `order_id` from `context.state`. It computes the final price and returns the result for merging.
+
+Notice the pattern: each action reads prior results from `context.state`, not from params. Params are what you pass in the `{Action, %{params}}` tuple and are validated against the action's schema.
+
+## Chain actions with cmd/2
+
+Create an agent struct and pass a list of action tuples to `cmd/2`. The runtime executes them in order, merging each result into the agent's state before running the next action.
+
+```elixir
+agent = MyApp.OrderAgent.new()
+
+{agent, directives} =
+  MyApp.OrderAgent.cmd(agent, [
+    {MyApp.ValidateOrder, %{order_id: "ord_99"}},
+    MyApp.ApplyDiscount,
+    MyApp.CalculateTotal
+  ])
+```
+
+The first tuple provides initial params. `ApplyDiscount` and `CalculateTotal` have no extra params, so you pass the module alone. Each action receives the latest agent state through `context.state`.
+
+## Inspect the result
+
+After execution, the agent struct holds the merged state from all three actions. Directives collect any side effects the actions emitted.
+
+```elixir
+IO.inspect(agent.state, label: "Final state")
+IO.inspect(directives, label: "Directives")
+```
+
+You should see state containing `order_id`, `validated`, `discount`, and `total`. The values accumulate in agent state across the chain without any glue code.
+
+## Return directives from actions
+
+Actions can return directives alongside state updates. A directive is a struct that tells the agent runtime to perform a side effect like emitting a signal.
+
+```elixir
+defmodule MyApp.ConfirmOrder do
+  use Jido.Action,
+    name: "confirm_order",
+    schema: Zoi.object(%{})
+
+  @impl true
+  def run(_params, context) do
+    signal = Jido.Signal.new!(
+      "order.confirmed",
+      %{order_id: context.state.order_id, total: context.state.total},
+      source: "/orders"
+    )
+
+    {:ok, %{status: :confirmed},
+     %Jido.Agent.Directive.Emit{signal: signal}}
+  end
+end
+```
+
+`ConfirmOrder` reads `order_id` and `total` from `context.state`, builds a signal, and returns it as an `Emit` directive. The directive appears in the second element of the `cmd/2` return tuple.
+
+## Run the full workflow
+
+Add `ConfirmOrder` to the end of the chain. Run the complete workflow from a fresh agent.
+
+```elixir
+agent = MyApp.OrderAgent.new()
+
+{agent, directives} =
+  MyApp.OrderAgent.cmd(agent, [
+    {MyApp.ValidateOrder, %{order_id: "ord_99"}},
+    MyApp.ApplyDiscount,
+    MyApp.CalculateTotal,
+    MyApp.ConfirmOrder
+  ])
+```
+
+## Inspect directives
+
+```elixir
+IO.inspect(agent.state, label: "Final state")
+IO.inspect(directives, label: "Emitted directives")
+```
+
+The state now includes `status: :confirmed`, and the directives list contains the `Emit` directive with the `order.confirmed` signal.
+
+## Next steps
+
+You now know how to compose actions into workflows with shared state and directive output. Read [Actions](/docs/concepts/actions) for the full action API, or continue to [Directives](/docs/concepts/directives) to learn how the runtime routes emitted signals.

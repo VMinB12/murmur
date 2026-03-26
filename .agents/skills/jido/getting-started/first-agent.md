@@ -1,0 +1,166 @@
+%{
+  title: "Your first agent",
+  description: "Define typed state, implement a validated action, and run your first command.",
+  category: :docs,
+  order: 30,
+  tags: [:docs, :getting_started, :tutorial, :agents, :livebook],
+  draft: false,
+  legacy_paths: ["/docs/learn/first-agent"],
+  learning_outcomes: [
+    "Define an agent module with typed state",
+    "Implement an action and execute it via cmd/2",
+    "Interpret updated state and returned directives"
+  ],
+  prerequisites: ["/docs/getting-started/installation"],
+  livebook: %{
+    runnable: true
+  }
+}
+---
+## Setup
+
+This notebook is self-contained. Install the dependency below and run the cells top to bottom. If you want the Mix-project setup afterward, the [Installation and setup](/docs/getting-started/installation) guide covers that path.
+
+```elixir
+Mix.install([
+  {{mix_dep:jido}}
+])
+```
+
+## Define the agent
+
+An agent is an immutable struct backed by a typed schema. The schema enforces types and defaults so state transitions stay consistent across runs.
+
+```elixir
+defmodule CounterAgent do
+  use Jido.Agent,
+    name: "counter_agent",
+    description: "Tracks a simple counter",
+    schema: Zoi.object(%{
+      count: Zoi.integer() |> Zoi.default(0)
+    })
+end
+```
+
+This module provides `new/1`, `set/2`, `validate/2`, and `cmd/2`. The agent is data, not a process. You do not need to start a runtime for this first example because `cmd/2` runs directly against the agent struct.
+
+## Define an action
+
+Actions are the only way to change agent state. Each action defines a schema for its inputs and implements `run/2`. The first argument is validated params. The second is the execution context, which includes `context.state`, the current agent state.
+
+```elixir
+defmodule IncrementAction do
+  use Jido.Action,
+    name: "increment",
+    description: "Increments the counter by a specified amount",
+    schema: Zoi.object(%{
+      by: Zoi.integer() |> Zoi.default(1)
+    })
+
+  @impl true
+  def run(params, context) do
+    current = Map.get(context.state, :count, 0)
+    {:ok, %{count: current + params.by}}
+  end
+end
+```
+
+Params are schema-validated before `run/2` is called, so `params.by` is always an integer. The return value is a partial state map that `cmd/2` merges into the agent.
+
+## Create an agent and run a command
+
+`cmd/2` takes the current agent and an action instruction, runs the action, and returns a two-element tuple: the updated agent and a list of directives. The original agent is unchanged.
+
+```elixir
+agent = CounterAgent.new()
+```
+
+```elixir
+{updated_agent, directives} =
+  CounterAgent.cmd(agent, {IncrementAction, %{by: 3}})
+```
+
+## Inspect the results
+
+Show the success path first, then inspect the returned data.
+
+```elixir
+updated_agent.state
+```
+
+```elixir
+directives
+```
+
+The directives list is empty because this action is pure. If an action needed to emit an event or schedule work, it would return `Jido.Agent.Directive` structs alongside the state changes.
+
+## Handle validation errors
+
+If you pass params that fail schema validation, `cmd/2` returns the original agent unchanged and a list containing a `Directive.Error` struct.
+
+```elixir
+{error_agent, error_directives} =
+  CounterAgent.cmd(agent, {IncrementAction, %{by: "not_a_number"}})
+```
+
+```elixir
+error_agent.state
+```
+
+```elixir
+error_directives
+```
+
+The agent state remains `%{count: 0}`, the same as before the failed command. The error directive wraps a `Jido.Error` with context about what went wrong.
+
+## Using this in a Mix project
+
+When you move from Livebook to a Mix project, namespace your modules and place them under `lib/my_agent_app/`.
+
+**lib/my_agent_app/counter_agent.ex**
+
+```elixir
+defmodule MyAgentApp.CounterAgent do
+  use Jido.Agent,
+    name: "counter_agent",
+    description: "Tracks a simple counter",
+    schema: Zoi.object(%{
+      count: Zoi.integer() |> Zoi.default(0)
+    })
+end
+```
+
+**lib/my_agent_app/increment_action.ex**
+
+```elixir
+defmodule MyAgentApp.IncrementAction do
+  use Jido.Action,
+    name: "increment",
+    description: "Increments the counter by a specified amount",
+    schema: Zoi.object(%{
+      by: Zoi.integer() |> Zoi.default(1)
+    })
+
+  @impl true
+  def run(params, context) do
+    current = Map.get(context.state, :count, 0)
+    {:ok, %{count: current + params.by}}
+  end
+end
+```
+
+Then in `iex -S mix`:
+
+```elixir
+alias MyAgentApp.{CounterAgent, IncrementAction}
+
+agent = CounterAgent.new()
+{updated_agent, _directives} = CounterAgent.cmd(agent, {IncrementAction, %{by: 3}})
+updated_agent.state
+```
+
+## Next steps
+
+- Continue to [Your first LLM agent](/docs/getting-started/first-llm-agent) to add a runtime and model-backed reasoning.
+- Review [Agents](/docs/concepts/agents) for the full conceptual model.
+- Review [Actions](/docs/concepts/actions) for deeper action design patterns.

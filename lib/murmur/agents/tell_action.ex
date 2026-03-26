@@ -15,6 +15,7 @@ defmodule Murmur.Agents.TellAction do
       message: [type: :string, required: true, doc: "The message to send to the target agent"]
     ]
 
+  alias Jido.Signal.ID
   alias Murmur.Agents.Runner
   alias Murmur.Workspaces
 
@@ -56,7 +57,7 @@ defmodule Murmur.Agents.TellAction do
 
       # Broadcast inter-agent message to PubSub for LiveView display
       inter_msg = %{
-        id: Ecto.UUID.generate(),
+        id: ID.generate!(),
         role: "user",
         content: message,
         sender_name: String.replace(message, ~r/^\[([^\]]+)\]:.*/, "\\1")

@@ -2,6 +2,7 @@ defmodule MurmurWeb.WorkspaceLive do
   @moduledoc false
   use MurmurWeb, :live_view
 
+  alias Jido.Signal.ID
   alias Murmur.Agents.Catalog
   alias Murmur.Agents.Runner
   alias Murmur.Agents.UITurn
@@ -64,7 +65,7 @@ defmodule MurmurWeb.WorkspaceLive do
 
       # Add user message to local display immediately
       user_msg = %{
-        id: Ecto.UUID.generate(),
+        id: ID.generate!(),
         role: "user",
         content: content,
         sender_name: "You"
@@ -214,7 +215,7 @@ defmodule MurmurWeb.WorkspaceLive do
   @impl true
   def handle_info({:request_failed, session_id, reason}, socket) do
     error_msg = %{
-      id: Ecto.UUID.generate(),
+      id: ID.generate!(),
       role: "assistant",
       content: "⚠️ Error: #{inspect(reason)}",
       sender_name: nil
@@ -380,7 +381,7 @@ defmodule MurmurWeb.WorkspaceLive do
     topic = agent_topic(workspace_id, target_session.id)
 
     user_msg = %{
-      id: Ecto.UUID.generate(),
+      id: ID.generate!(),
       role: "user",
       content: content,
       sender_name: "You"
@@ -482,7 +483,7 @@ defmodule MurmurWeb.WorkspaceLive do
     content = extract_response_content(response)
 
     assistant_msg = %{
-      id: Ecto.UUID.generate(),
+      id: ID.generate!(),
       role: "assistant",
       content: content,
       sender_name: nil

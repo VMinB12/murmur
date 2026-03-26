@@ -291,7 +291,7 @@ Not urgent now, but if workspaces grow, `Flop`/`Flop.Phoenix` gives declarative 
 |---|--------|----------|--------|----------|
 | 1.1 | LiveView streams for messages | P1 | Medium | Memory safety |
 | 1.2 | Supervise ETS tables | P1 | Low | Crash resilience |
-| 1.3 | Fix unified timeline sorting | P1 | Low | Correctness |
+| 1.3 | Fix unified timeline sorting | P1 | Low | Correctness | ✅ |
 | 1.4 | Remove deprecated `compilers` | P1 | Trivial | Hygiene | ✅ |
 | 2.1 | Oban for background jobs | P2 | Medium | Reliability |
 | 2.2 | Sobelow security analysis | P2 | Trivial | Security | ✅ |

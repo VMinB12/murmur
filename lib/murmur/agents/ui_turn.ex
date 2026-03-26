@@ -7,6 +7,8 @@ defmodule Murmur.Agents.UITurn do
   tool call/result pairs along the way.
   """
 
+  alias Jido.Signal.ID
+
   defmodule ToolCall do
     @moduledoc false
     defstruct [:id, :name, :args, :result, :status]
@@ -120,7 +122,7 @@ defmodule Murmur.Agents.UITurn do
 
     [
       %{
-        id: entry.id || Ecto.UUID.generate(),
+        id: entry.id || ID.generate!(),
         role: "user",
         content: content,
         sender_name: sender
@@ -132,7 +134,7 @@ defmodule Murmur.Agents.UITurn do
     {thinking, tool_calls, content, sender_name} =
       Enum.reduce(entries, {nil, [], "", nil}, &reduce_entry/2)
 
-    id = (hd(entries).id || Ecto.UUID.generate()) <> "-turn"
+    id = (hd(entries).id || ID.generate!()) <> "-turn"
 
     [
       %{

@@ -10,7 +10,7 @@ defmodule Murmur.Workspaces.AgentSession do
   schema "agent_sessions" do
     field :agent_profile_id, :string
     field :display_name, :string
-    field :status, :string, default: "idle"
+    field :status, Ecto.Enum, values: [:idle, :busy], default: :idle
 
     belongs_to :workspace, Murmur.Workspaces.Workspace
 
@@ -22,7 +22,6 @@ defmodule Murmur.Workspaces.AgentSession do
     |> cast(attrs, [:agent_profile_id, :display_name, :status])
     |> validate_required([:agent_profile_id, :display_name])
     |> validate_length(:display_name, max: 255)
-    |> validate_inclusion(:status, ["idle", "busy"])
     |> unique_constraint([:workspace_id, :display_name])
   end
 end

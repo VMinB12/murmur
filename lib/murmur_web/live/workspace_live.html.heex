@@ -199,13 +199,18 @@
                     <%!-- Message content --%>
                     <%= if msg.content && msg.content != "" do %>
                       <div class={[
-                        "rounded-xl px-3 py-2 text-sm max-w-[85%] whitespace-pre-wrap break-words",
+                        "rounded-xl px-3 py-2 text-sm max-w-[85%] break-words",
                         if(msg.role == "user",
-                          do: "bg-primary text-primary-content rounded-br-sm",
-                          else: "bg-base-200 text-base-content rounded-bl-sm"
+                          do: "bg-primary text-primary-content rounded-br-sm whitespace-pre-wrap",
+                          else:
+                            "bg-base-200 text-base-content rounded-bl-sm prose prose-sm max-w-none"
                         )
                       ]}>
-                        {msg.content}
+                        <%= if msg.role == "user" do %>
+                          {msg.content}
+                        <% else %>
+                          {Markdown.render(msg.content)}
+                        <% end %>
                       </div>
                     <% end %>
                   </div>
@@ -420,16 +425,20 @@
                     <%!-- Message content --%>
                     <%= if msg.content && msg.content != "" do %>
                       <div class={[
-                        "rounded-xl px-3 py-2 text-sm whitespace-pre-wrap break-words",
+                        "rounded-xl px-3 py-2 text-sm break-words",
                         if(msg.role == "user",
-                          do: "bg-primary text-primary-content rounded-br-sm",
+                          do: "bg-primary text-primary-content rounded-br-sm whitespace-pre-wrap",
                           else: [
                             colors.bg,
-                            "border border-base-300/30 text-base-content rounded-bl-sm"
+                            "border border-base-300/30 text-base-content rounded-bl-sm prose prose-sm max-w-none"
                           ]
                         )
                       ]}>
-                        {msg.content}
+                        <%= if msg.role == "user" do %>
+                          {msg.content}
+                        <% else %>
+                          {Markdown.render(msg.content)}
+                        <% end %>
                       </div>
                     <% end %>
                   </div>

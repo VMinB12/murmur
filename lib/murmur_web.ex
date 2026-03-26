@@ -86,10 +86,13 @@ defmodule MurmurWeb do
 
       # HTML escaping functionality
       import Phoenix.HTML
+
+      alias Murmur.Agents.Catalog
+      alias MurmurWeb.Layouts
+      alias MurmurWeb.Markdown
       # Core UI components
 
       # Common modules used in templates
-      alias MurmurWeb.Layouts
       alias Phoenix.LiveView.JS
 
       # Routes generation with the ~p sigil

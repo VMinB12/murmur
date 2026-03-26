@@ -1,6 +1,8 @@
 defmodule MurmurWeb.WorkspaceLive do
   use MurmurWeb, :live_view
 
+  require Logger
+
   alias Murmur.Agents.{Catalog, Runner, UITurn}
   alias Murmur.Workspaces
 
@@ -324,7 +326,12 @@ defmodule MurmurWeb.WorkspaceLive do
     adapter.delete_checkpoint(checkpoint_key, opts)
     adapter.delete_thread(session.id, opts)
   rescue
-    _ -> :ok
+    e ->
+      Logger.warning(
+        "Failed to cleanup storage for session #{session.id}: #{Exception.message(e)}"
+      )
+
+      :ok
   end
 
   # --- Agent Lifecycle ---

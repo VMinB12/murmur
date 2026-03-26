@@ -295,7 +295,7 @@ Not urgent now, but if workspaces grow, `Flop`/`Flop.Phoenix` gives declarative 
 | 1.4 | Remove deprecated `compilers` | P1 | Trivial | Hygiene | ✅ |
 | 2.1 | Oban for background jobs | P2 | Medium | Reliability |
 | 2.2 | Sobelow security analysis | P2 | Trivial | Security |
-| 2.3 | Log instead of swallowing exceptions | P2 | Trivial | Observability |
+| 2.3 | Log instead of swallowing exceptions | P2 | Trivial | Observability | ✅ |
 | 3.1 | Ecto.Enum for status | P3 | Low | Type safety |
 | 3.2 | MDEx for Markdown rendering | P3 | Low–Med | UX |
 | 3.3 | Styler formatter plugin | P3 | Trivial | Code quality |

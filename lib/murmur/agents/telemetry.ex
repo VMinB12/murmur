@@ -4,6 +4,8 @@ defmodule Murmur.Agents.Telemetry do
   Jido AI LLM delta events to a LiveView process for streaming display.
   """
 
+  require Logger
+
   @delta_event [:jido, :ai, :llm, :delta]
 
   @doc """
@@ -29,7 +31,12 @@ defmodule Murmur.Agents.Telemetry do
   def detach(session_id) do
     :telemetry.detach(handler_id(session_id))
   rescue
-    _ -> :ok
+    e ->
+      Logger.warning(
+        "Failed to detach telemetry handler for #{session_id}: #{Exception.message(e)}"
+      )
+
+      :ok
   end
 
   defp handler_id(session_id), do: "murmur_delta_#{session_id}"

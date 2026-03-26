@@ -85,7 +85,9 @@ This keeps the LiveView subscription model unchanged while eliminating hand-roll
 
 ---
 
-## 4. Catalog (agent registry) → Jido Discovery
+## 4. ~~Catalog (agent registry) → Jido Discovery~~ ❌ Skipped
+
+**Skipped**: The Catalog serves a different purpose than Discovery. It maps profile ID strings → modules, carries UI metadata (colors, descriptions), provides `list_profiles()` for the agent picker dropdown, and `agent_color/2` for name-hashed Tailwind color classes. Discovery auto-registers Jido components but doesn't carry UI concerns. Not a clean replacement.
 
 ### Current approach
 
@@ -101,7 +103,9 @@ Low priority — the static map works fine for 2 profiles. Consider switching wh
 
 ---
 
-## 5. Add `jido_live_dashboard` for agent debugging
+## 5. ~~Add `jido_live_dashboard` for agent debugging~~ ❌ Skipped
+
+**Skipped**: `jido_live_dashboard` depends on `jido ~> 2.0.0-rc.4` (pre-release) which conflicts with `jido_ai ~> 2.0` requiring `jido ~> 2.1`. The package is stale and incompatible with the current Jido ecosystem. Revisit when it's updated.
 
 ### Current state
 
@@ -136,7 +140,9 @@ This is a high-value, low-effort win — zero custom code, immediate operational
 
 ---
 
-## 7. Add `jido_memory` for persistent agent context
+## 7. ~~Add `jido_memory` for persistent agent context~~ ❌ Skipped
+
+**Skipped**: `jido_memory` is not published to Hex. The GitHub repo pins specific git refs for `jido_ai` and `jido_action` that conflict with our Hex versions. Not installable until published as a proper Hex package.
 
 ### Current state
 
@@ -164,7 +170,9 @@ use Jido.AI.Agent,
 
 ---
 
-## 8. Use Jido Signals for inter-component communication
+## 8. ~~Use Jido Signals for inter-component communication~~ ❌ Skipped
+
+**Skipped**: The current PubSub tuples work well for same-node LiveView ↔ Runner communication. Wrapping 5 simple event types in CloudEvents envelopes adds ceremony with no runtime benefit. The CloudEvents model (UUID v7, type strings, metadata) is valuable for cross-system interop and audit trails, but not for this communication path. Revisit if event types proliferate or cross-node routing is needed.
 
 ### Current approach
 

@@ -73,25 +73,13 @@ This keeps the LiveView subscription model unchanged while eliminating hand-roll
 
 ---
 
-## 3. Telemetry module — forward actual delta content
+## 3. ~~Telemetry module — forward actual delta content~~ ✅
 
-### Current approach
+**Completed**: Removed `Murmur.Agents.Telemetry` — it was dead code (never called, produced `{:streaming_active, ...}` that nothing listened to). The telemetry delta event `[:jido, :ai, :llm, :delta]` doesn't carry token text anyway — it's just a notification. Streaming token display in the LiveView template stays (it's wired up and tested), but needs a real producer as a separate feature.
 
-`Murmur.Agents.Telemetry` listens to `[:jido, :ai, :llm, :delta]` but only sends a generic `:streaming_active` message — the actual token content is discarded.
+### Original approach
 
-### Recommendation
-
-Forward the delta metadata (which contains the token text) so the LiveView can render streaming responses progressively:
-
-```elixir
-defp handle_delta(_event, _measurements, metadata, %{pid: pid, session_id: session_id}) do
-  if Process.alive?(pid) do
-    send(pid, {:streaming_token, session_id, metadata})
-  end
-end
-```
-
-Also attach to the full set of Jido telemetry events (`cmd:start`, `cmd:stop`, `cmd:exception`) to drive UI status changes (busy/idle/error) instead of relying on Runner broadcasts.
+`Murmur.Agents.Telemetry` listened to `[:jido, :ai, :llm, :delta]` but only sent a generic `:streaming_active` message — the actual token content is discarded.
 
 ---
 

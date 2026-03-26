@@ -30,6 +30,7 @@ defmodule MurmurWeb.WorkspaceLive do
       |> assign(:profiles, profiles)
       |> assign(:agent_statuses, Map.new(agent_sessions, &{&1.id, :idle}))
       |> assign(:streaming_tokens, Map.new(agent_sessions, &{&1.id, ""}))
+      |> assign(:streaming_thinking, Map.new(agent_sessions, &{&1.id, ""}))
       |> assign(:messages, messages_map)
       |> assign(:view_mode, :split)
       |> assign(:add_agent_form, to_form(%{"profile_id" => "", "display_name" => ""}, as: :agent))
@@ -107,6 +108,7 @@ defmodule MurmurWeb.WorkspaceLive do
           |> update(:messages, &Map.put(&1, session.id, []))
           |> update(:agent_statuses, &Map.put(&1, session.id, :idle))
           |> update(:streaming_tokens, &Map.put(&1, session.id, ""))
+          |> update(:streaming_thinking, &Map.put(&1, session.id, ""))
           |> assign(
             :add_agent_form,
             to_form(%{"profile_id" => "", "display_name" => ""}, as: :agent)
@@ -139,12 +141,14 @@ defmodule MurmurWeb.WorkspaceLive do
     empty_messages = Map.new(socket.assigns.agent_sessions, &{&1.id, []})
     empty_statuses = Map.new(socket.assigns.agent_sessions, &{&1.id, :idle})
     empty_tokens = Map.new(socket.assigns.agent_sessions, &{&1.id, ""})
+    empty_thinking = Map.new(socket.assigns.agent_sessions, &{&1.id, ""})
 
     {:noreply,
      socket
      |> assign(:messages, empty_messages)
      |> assign(:agent_statuses, empty_statuses)
-     |> assign(:streaming_tokens, empty_tokens)}
+     |> assign(:streaming_tokens, empty_tokens)
+     |> assign(:streaming_thinking, empty_thinking)}
   end
 
   def handle_event("toggle_view_mode", _params, socket) do
@@ -180,6 +184,7 @@ defmodule MurmurWeb.WorkspaceLive do
       |> update(:messages, &Map.delete(&1, session_id))
       |> update(:agent_statuses, &Map.delete(&1, session_id))
       |> update(:streaming_tokens, &Map.delete(&1, session_id))
+      |> update(:streaming_thinking, &Map.delete(&1, session_id))
 
     {:noreply, socket}
   end
@@ -212,6 +217,7 @@ defmodule MurmurWeb.WorkspaceLive do
       |> update(:messages, &Map.put(&1, session_id, messages))
       |> update(:agent_statuses, &Map.put(&1, session_id, :idle))
       |> update(:streaming_tokens, &Map.put(&1, session_id, ""))
+      |> update(:streaming_thinking, &Map.put(&1, session_id, ""))
 
     {:noreply, socket}
   end
@@ -251,7 +257,9 @@ defmodule MurmurWeb.WorkspaceLive do
 
     socket =
       if status == :idle do
-        update(socket, :streaming_tokens, &Map.put(&1, session_id, ""))
+        socket
+        |> update(:streaming_tokens, &Map.put(&1, session_id, ""))
+        |> update(:streaming_thinking, &Map.put(&1, session_id, ""))
       else
         socket
       end
@@ -264,6 +272,16 @@ defmodule MurmurWeb.WorkspaceLive do
     socket =
       update(socket, :streaming_tokens, fn tokens ->
         Map.update(tokens, session_id, token, &(&1 <> token))
+      end)
+
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_info({:streaming_thinking, session_id, token}, socket) do
+    socket =
+      update(socket, :streaming_thinking, fn thinking ->
+        Map.update(thinking, session_id, token, &(&1 <> token))
       end)
 
     {:noreply, socket}

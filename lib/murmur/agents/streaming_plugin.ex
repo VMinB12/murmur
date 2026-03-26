@@ -26,6 +26,9 @@ defmodule Murmur.Agents.StreamingPlugin do
       %{delta: delta, chunk_type: :content} when is_binary(delta) and delta != "" ->
         broadcast_token(session_id, delta)
 
+      %{delta: delta, chunk_type: :thinking} when is_binary(delta) and delta != "" ->
+        broadcast_thinking(session_id, delta)
+
       _ ->
         :ok
     end
@@ -36,6 +39,11 @@ defmodule Murmur.Agents.StreamingPlugin do
   defp broadcast_token(session_id, token) do
     topic = stream_topic(session_id)
     Phoenix.PubSub.broadcast(Murmur.PubSub, topic, {:streaming_token, session_id, token})
+  end
+
+  defp broadcast_thinking(session_id, token) do
+    topic = stream_topic(session_id)
+    Phoenix.PubSub.broadcast(Murmur.PubSub, topic, {:streaming_thinking, session_id, token})
   end
 
   @doc "Returns the PubSub topic for streaming tokens for the given session."

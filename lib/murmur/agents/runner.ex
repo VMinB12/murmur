@@ -120,7 +120,6 @@ defmodule Murmur.Agents.Runner do
     else
       nil -> :ok
       {:error, reason} -> log_hibernate_error(session_id, reason)
-      _ -> :ok
     end
   rescue
     e ->

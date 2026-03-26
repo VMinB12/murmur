@@ -294,7 +294,15 @@ defmodule MurmurWeb.WorkspaceLive do
       nil ->
         agent_module = Catalog.agent_module(session.agent_profile_id)
 
-        case Murmur.Jido.start_agent(agent_module, id: session.id) do
+        # Try to restore agent from storage so it retains conversation history.
+        # Falls back to a fresh agent if no checkpoint exists.
+        {agent, extra_opts} =
+          case Murmur.Jido.thaw(agent_module, session.id) do
+            {:ok, thawed_agent} -> {thawed_agent, [agent_module: agent_module]}
+            {:error, :not_found} -> {agent_module, []}
+          end
+
+        case Murmur.Jido.start_agent(agent, [id: session.id] ++ extra_opts) do
           {:ok, _pid} -> :ok
           {:error, {:already_started, _pid}} -> :ok
           {:error, {:already_registered, _pid}} -> :ok

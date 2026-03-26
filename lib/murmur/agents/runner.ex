@@ -118,18 +118,28 @@ defmodule Murmur.Agents.Runner do
   end
 
   defp do_hibernate(session_id) do
-    pid = Murmur.Jido.whereis(session_id)
-
-    if pid do
-      case Jido.AgentServer.state(pid) do
-        {:ok, %{agent: agent}} -> Murmur.Jido.hibernate(agent)
-        _ -> :ok
-      end
+    with pid when is_pid(pid) <- Murmur.Jido.whereis(session_id),
+         {:ok, %{agent: agent}} <- Jido.AgentServer.state(pid),
+         :ok <- Murmur.Jido.hibernate(agent) do
+      :ok
+    else
+      nil -> :ok
+      {:error, reason} -> log_hibernate_error(session_id, reason)
+      _ -> :ok
     end
   rescue
-    _ -> :ok
+    e ->
+      Logger.error("Exception during hibernate for agent #{session_id}: #{Exception.message(e)}")
+      :ok
   catch
-    :exit, _ -> :ok
+    :exit, reason ->
+      Logger.error("Exit during hibernate for agent #{session_id}: #{inspect(reason)}")
+      :ok
+  end
+
+  defp log_hibernate_error(session_id, reason) do
+    Logger.error("Failed to hibernate agent #{session_id}: #{inspect(reason)}")
+    {:error, reason}
   end
 
   defp agent_topic(session) do

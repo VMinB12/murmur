@@ -39,7 +39,9 @@ The PendingQueue + MessageInjector design is **correct and idiomatic** for this 
 
 ---
 
-## 2. Runner status broadcasts → Jido Telemetry events
+## 2. ~~Runner status broadcasts → Jido Telemetry events~~ ✅
+
+**Completed**: Added `Jido.Telemetry.setup()` to `application.ex`. This attaches structured logging for all agent commands (`cmd:start/stop/exception`), signal processing, directive execution, strategy ticks, and queue overflows. Runner broadcasts are kept — they serve a different purpose (LiveView ↔ Runner communication) that telemetry doesn't replace.
 
 ### Current approach
 

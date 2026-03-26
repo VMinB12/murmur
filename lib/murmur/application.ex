@@ -7,6 +7,8 @@ defmodule Murmur.Application do
 
   @impl true
   def start(_type, _args) do
+    Jido.Telemetry.setup()
+
     children = [
       MurmurWeb.Telemetry,
       Murmur.Repo,

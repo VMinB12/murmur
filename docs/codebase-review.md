@@ -4,25 +4,15 @@
 
 ### 1.1 Migrate `@messages` to LiveView streams
 
-**Impact**: Memory leak / process crash under load
-**Effort**: Medium
+**Status**: ⏭️ Skipped
 
-Every message ever sent lives in the LiveView process memory as a plain list in a map. With active agents producing long conversations, this will balloon memory and eventually crash the LiveView process.
+**Reason**: After analysis, the complexity-to-benefit ratio is poor for this codebase:
+- `message_completed` replaces the entire message list from the agent thread (thinking/tool_call data), requiring `reset: true` every time — negating incremental diff benefits
+- The unified view sorts all messages across sessions by UUIDv7, requiring full re-streams on each new message
+- Dynamic per-session streams would require creating atom-named streams when agents are added
+- Message lists are naturally bounded by LLM context windows (~50-200 per session), so memory is not a real concern
 
-**Current** (`workspace_live.ex`):
-```elixir
-|> assign(:messages, messages_map)            # map of session_id => [msg, ...]
-|> update(:messages, fn msgs ->
-  Map.update(msgs, session_id, [user_msg], &(&1 ++ [user_msg]))
-end)
-```
-
-**Target**: Use `stream/3` per agent session. Since you have multiple independent message lists (one per agent), you can use a single stream with composite DOM IDs, or manage per-session streams with dynamic stream names.
-
-Key considerations:
-- Unified timeline view will need to re-stream from DB rather than reading assigns
-- Empty state detection needs a separate `@messages_empty?` assign per session
-- The `load_messages_for_session/1` call already fetches from storage, so streaming is a natural fit
+Can be revisited if conversation history storage changes to support partial loading, or if sessions grow to thousands of messages.
 
 ---
 
@@ -289,7 +279,7 @@ Not urgent now, but if workspaces grow, `Flop`/`Flop.Phoenix` gives declarative 
 
 | # | Change | Priority | Effort | Category |
 |---|--------|----------|--------|----------|
-| 1.1 | LiveView streams for messages | P1 | Medium | Memory safety |
+| 1.1 | LiveView streams for messages | P1 | Medium | Memory safety | ⏭️ Skipped — see note |
 | 1.2 | Supervise ETS tables | P1 | Low | Crash resilience | ✅ |
 | 1.3 | Fix unified timeline sorting | P1 | Low | Correctness | ✅ |
 | 1.4 | Remove deprecated `compilers` | P1 | Trivial | Hygiene | ✅ |

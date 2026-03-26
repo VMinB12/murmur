@@ -7,7 +7,7 @@ defmodule Murmur.Agents.UITurnTest do
   describe "project_entries/1" do
     test "converts a simple user + assistant exchange" do
       entries = [
-        entry(:message, %{role: "user", content: "Hello", sender_name: "You"}),
+        entry(:ai_message, %{role: :user, content: "Hello", request_id: "r1"}),
         entry(:ai_message, %{role: :assistant, content: "Hi there!", request_id: "r1"})
       ]
 
@@ -16,6 +16,7 @@ defmodule Murmur.Agents.UITurnTest do
       assert [user, assistant] = result
       assert user.role == "user"
       assert user.content == "Hello"
+      assert user.sender_name == "You"
       assert assistant.role == "assistant"
       assert assistant.content == "Hi there!"
       assert assistant.tool_calls == []
@@ -24,7 +25,7 @@ defmodule Murmur.Agents.UITurnTest do
 
     test "groups assistant + tool entries from the same request" do
       entries = [
-        entry(:message, %{role: "user", content: "Ask Bob", sender_name: "You"}),
+        entry(:ai_message, %{role: :user, content: "Ask Bob", request_id: "r1"}),
         entry(:ai_message, %{
           role: :assistant,
           content: "",
@@ -92,9 +93,9 @@ defmodule Murmur.Agents.UITurnTest do
 
     test "handles multiple requests in sequence" do
       entries = [
-        entry(:message, %{role: "user", content: "First Q", sender_name: "You"}),
+        entry(:ai_message, %{role: :user, content: "First Q", request_id: "r1"}),
         entry(:ai_message, %{role: :assistant, content: "First A", request_id: "r1"}),
-        entry(:message, %{role: "user", content: "Second Q", sender_name: "You"}),
+        entry(:ai_message, %{role: :user, content: "Second Q", request_id: "r2"}),
         entry(:ai_message, %{role: :assistant, content: "Second A", request_id: "r2"})
       ]
 
@@ -114,12 +115,37 @@ defmodule Murmur.Agents.UITurnTest do
     test "filters out non-message entries" do
       entries = [
         %{kind: :system, id: "sys1", payload: %{content: "system msg"}},
-        entry(:message, %{role: "user", content: "Hello", sender_name: "You"})
+        entry(:ai_message, %{role: :user, content: "Hello", request_id: "r1"})
       ]
 
       result = UITurn.project_entries(entries)
       assert [user] = result
       assert user.content == "Hello"
+    end
+
+    test "infers sender name from inter-agent message prefix" do
+      entries = [
+        entry(:ai_message, %{role: :user, content: "[alice]: User says hi", request_id: "r1"})
+      ]
+
+      result = UITurn.project_entries(entries)
+      assert [user] = result
+      assert user.sender_name == "alice"
+      assert user.content == "[alice]: User says hi"
+    end
+
+    test "also supports legacy kind: :message entries" do
+      entries = [
+        entry(:message, %{role: "user", content: "Legacy", sender_name: "You"}),
+        entry(:ai_message, %{role: :assistant, content: "Reply", request_id: "r1"})
+      ]
+
+      result = UITurn.project_entries(entries)
+      assert [user, assistant] = result
+      assert user.role == "user"
+      assert user.content == "Legacy"
+      assert user.sender_name == "You"
+      assert assistant.content == "Reply"
     end
   end
 

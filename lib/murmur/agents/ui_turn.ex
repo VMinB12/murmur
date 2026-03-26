@@ -46,10 +46,19 @@ defmodule Murmur.Agents.UITurn do
     |> Enum.flat_map(&request_group_to_messages/1)
   end
 
-  # --- Private: Entry filtering ---
+  # --- Private: Entry classification ---
 
   defp relevant_entry?(%{kind: kind}) when kind in [:message, :ai_message], do: true
   defp relevant_entry?(_), do: false
+
+  defp user_entry?(%{kind: :message}), do: true
+
+  defp user_entry?(%{payload: payload}) do
+    role = payload[:role] || payload["role"]
+    to_string(role) == "user"
+  end
+
+  defp user_entry?(_), do: false
 
   # --- Private: Grouping ---
 
@@ -59,21 +68,26 @@ defmodule Murmur.Agents.UITurn do
     |> Enum.reject(&(&1 == []))
   end
 
-  defp chunk_entry(%{kind: :message} = entry, []), do: {:cont, [entry], []}
-  defp chunk_entry(%{kind: :message} = entry, acc), do: {:cont, acc, [entry]}
-
   defp chunk_entry(entry, []) do
-    {:cont, [entry]}
-  end
-
-  defp chunk_entry(entry, [%{kind: :message} | _] = acc) do
-    {:cont, acc, [entry]}
+    if user_entry?(entry),
+      do: {:cont, [entry], []},
+      else: {:cont, [entry]}
   end
 
   defp chunk_entry(entry, acc) do
-    if same_request?(hd(acc), entry),
-      do: {:cont, acc ++ [entry]},
-      else: {:cont, acc, [entry]}
+    cond do
+      user_entry?(entry) ->
+        {:cont, acc, [entry]}
+
+      user_entry?(hd(acc)) ->
+        {:cont, acc, [entry]}
+
+      same_request?(hd(acc), entry) ->
+        {:cont, acc ++ [entry]}
+
+      true ->
+        {:cont, acc, [entry]}
+    end
   end
 
   defp flush_chunk([]), do: {:cont, []}
@@ -90,18 +104,31 @@ defmodule Murmur.Agents.UITurn do
 
   # --- Private: Group → Messages ---
 
-  defp request_group_to_messages([%{kind: :message} = entry]) do
+  defp request_group_to_messages(entries) do
+    first = hd(entries)
+
+    if user_entry?(first) do
+      build_user_message(first)
+    else
+      build_assistant_turn(entries)
+    end
+  end
+
+  defp build_user_message(entry) do
+    content = get_payload(entry, :content, "")
+    sender = get_payload(entry, :sender_name) || infer_sender_name(content)
+
     [
       %{
         id: entry.id || Ecto.UUID.generate(),
         role: "user",
-        content: get_payload(entry, :content, ""),
-        sender_name: get_payload(entry, :sender_name)
+        content: content,
+        sender_name: sender
       }
     ]
   end
 
-  defp request_group_to_messages(entries) do
+  defp build_assistant_turn(entries) do
     {thinking, tool_calls, content, sender_name} =
       Enum.reduce(entries, {nil, [], "", nil}, &reduce_entry/2)
 
@@ -117,6 +144,13 @@ defmodule Murmur.Agents.UITurn do
         tool_calls: tool_calls
       }
     ]
+  end
+
+  defp infer_sender_name(content) do
+    case Regex.run(~r/^\[([^\]]+)\]:/, content) do
+      [_, name] -> name
+      _ -> "You"
+    end
   end
 
   defp reduce_entry(entry, acc) do

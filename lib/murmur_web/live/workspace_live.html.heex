@@ -1,5 +1,5 @@
-<Layouts.app flash={@flash}>
-  <div class="flex flex-col h-[calc(100vh-8rem)] -mt-16">
+<Layouts.app flash={@flash} fullscreen>
+  <div class="flex flex-col h-full">
     <%!-- Workspace Header --%>
     <div class="flex items-center justify-between px-2 py-3 border-b border-base-300">
       <div class="flex items-center gap-3">
@@ -47,12 +47,9 @@
         </div>
       </div>
     <% else %>
-      <div class="flex-1 flex gap-0.5 overflow-x-auto min-h-0">
+      <div class="flex-1 flex overflow-x-auto min-h-0">
         <%= for session <- @agent_sessions do %>
-          <div class={[
-            "flex flex-col min-w-[320px] border-r border-base-300 last:border-r-0 agent-column-enter transition-all duration-200",
-            if(length(@agent_sessions) == 1, do: "flex-1", else: "flex-1 max-w-[50%]")
-          ]}>
+          <div class="flex flex-col flex-1 min-w-[300px] border-r border-base-300/50 last:border-r-0 agent-column-enter transition-all duration-200">
             <%!-- Agent Header --%>
             <div class={[
               "flex items-center justify-between px-3 py-2 border-b",

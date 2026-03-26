@@ -5,6 +5,7 @@ defmodule Murmur.Agents.Profiles.CodeAgent do
     name: "code_agent",
     model: :fast,
     tools: [Murmur.Agents.TellAction],
+    plugins: [Murmur.Agents.StreamingPlugin],
     request_transformer: Murmur.Agents.MessageInjector,
     system_prompt: """
     You are an expert programmer. Help with code review, debugging, and writing clean, idiomatic code.

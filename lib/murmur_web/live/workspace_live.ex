@@ -5,6 +5,7 @@ defmodule MurmurWeb.WorkspaceLive do
   alias Jido.Signal.ID
   alias Murmur.Agents.Catalog
   alias Murmur.Agents.Runner
+  alias Murmur.Agents.StreamingPlugin
   alias Murmur.Agents.UITurn
   alias Murmur.Workspaces
 
@@ -38,6 +39,7 @@ defmodule MurmurWeb.WorkspaceLive do
         Enum.reduce(agent_sessions, socket, fn session, acc ->
           topic = agent_topic(workspace_id, session.id)
           Phoenix.PubSub.subscribe(Murmur.PubSub, topic)
+          Phoenix.PubSub.subscribe(Murmur.PubSub, StreamingPlugin.stream_topic(session.id))
           ensure_agent_started(session)
 
           status = get_agent_status(session.id)
@@ -96,6 +98,7 @@ defmodule MurmurWeb.WorkspaceLive do
       {:ok, session} ->
         topic = agent_topic(workspace.id, session.id)
         Phoenix.PubSub.subscribe(Murmur.PubSub, topic)
+        Phoenix.PubSub.subscribe(Murmur.PubSub, StreamingPlugin.stream_topic(session.id))
         ensure_agent_started(session)
 
         socket =
@@ -164,6 +167,7 @@ defmodule MurmurWeb.WorkspaceLive do
     session = Workspaces.get_agent_session!(session_id)
     topic = agent_topic(socket.assigns.workspace.id, session_id)
     Phoenix.PubSub.unsubscribe(Murmur.PubSub, topic)
+    Phoenix.PubSub.unsubscribe(Murmur.PubSub, StreamingPlugin.stream_topic(session_id))
     stop_agent(session_id)
     cleanup_storage(session)
     Workspaces.delete_agent_session(session)

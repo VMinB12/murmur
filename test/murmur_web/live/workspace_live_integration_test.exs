@@ -13,7 +13,6 @@ defmodule MurmurWeb.WorkspaceLiveIntegrationTest do
   """
   use MurmurWeb.ConnCase
 
-  import Mox
   import Phoenix.LiveViewTest
 
   alias Murmur.Agents.Catalog

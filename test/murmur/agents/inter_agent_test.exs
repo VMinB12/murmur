@@ -124,6 +124,9 @@ defmodule Murmur.Agents.InterAgentTest do
       bob_id = bob.id
       assert_receive {:new_message, ^bob_id, msg}, 5000
       assert msg.content =~ "[Alice]"
+
+      # Wait for the background Runner Task to finish
+      assert_receive {:message_completed, ^bob_id, _}, 5000
     end
   end
 

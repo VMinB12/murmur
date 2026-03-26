@@ -54,13 +54,17 @@ defmodule Murmur.Agents.TellActionTest do
   end
 
   describe "run/2 — successful delivery" do
-    test "delivers message to target agent by display name", %{workspace: workspace} do
+    test "delivers message to target agent by display name", %{workspace: workspace, bob: bob} do
       params = %{target_agent: "Bob", message: "Hello Bob!"}
       context = %{workspace_id: workspace.id, sender_name: "Alice", hop_count: 0}
 
       assert {:ok, result} = TellAction.run(params, context)
       assert result.delivered == true
       assert result.target == "Bob"
+
+      # Wait for the background Runner Task to finish
+      bob_id = bob.id
+      assert_receive {:message_completed, ^bob_id, _}, 5000
     end
 
     # FR-010: Messages prefixed with sender name
@@ -131,11 +135,15 @@ defmodule Murmur.Agents.TellActionTest do
       assert msg =~ "Maximum" or msg =~ "hop depth"
     end
 
-    test "allows tell at hop count 4 (below limit)", %{workspace: workspace} do
+    test "allows tell at hop count 4 (below limit)", %{workspace: workspace, bob: bob} do
       params = %{target_agent: "Bob", message: "Still ok"}
       context = %{workspace_id: workspace.id, sender_name: "Alice", hop_count: 4}
 
       assert {:ok, _} = TellAction.run(params, context)
+
+      # Wait for the background Runner Task to finish
+      bob_id = bob.id
+      assert_receive {:message_completed, ^bob_id, _}, 5000
     end
   end
 

@@ -33,19 +33,6 @@ defmodule MurmurWeb.ConnCase do
 
   setup tags do
     Murmur.DataCase.setup_sandbox(tags)
-
-    # Set global Mox stubs so any Runner Tasks spawned by
-    # LiveView form submissions use the mock LLM (no real API calls)
-    Mox.set_mox_global()
-
-    Mox.stub(Murmur.Agents.LLM.Mock, :ask, fn _mod, _pid, _content, _ctx ->
-      {:ok, make_ref()}
-    end)
-
-    Mox.stub(Murmur.Agents.LLM.Mock, :await, fn _mod, _handle, _opts ->
-      {:ok, "mock response"}
-    end)
-
     {:ok, conn: Phoenix.ConnTest.build_conn()}
   end
 end

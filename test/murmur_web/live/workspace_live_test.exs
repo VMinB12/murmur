@@ -15,11 +15,23 @@ defmodule MurmurWeb.WorkspaceLiveTest do
   """
   use MurmurWeb.ConnCase
 
+  import Mox
   import Phoenix.LiveViewTest
 
   alias Murmur.Workspaces
 
   setup do
+    # LiveView form submissions trigger Runner Tasks that call the LLM mock
+    Mox.set_mox_global()
+
+    Mox.stub(Murmur.Agents.LLM.Mock, :ask, fn _mod, _pid, _content, _ctx ->
+      {:ok, make_ref()}
+    end)
+
+    Mox.stub(Murmur.Agents.LLM.Mock, :await, fn _mod, _handle, _opts ->
+      {:ok, "mock response"}
+    end)
+
     {:ok, workspace} = Workspaces.create_workspace(%{"name" => "Test Workspace"})
     %{workspace: workspace}
   end
@@ -453,7 +465,7 @@ defmodule MurmurWeb.WorkspaceLiveTest do
 
       send(view.pid, {:message_completed, alice.id, "Alice says hi"})
 
-      html = render(view)
+      _html = render(view)
       # The message should appear in Alice's column only
       assert has_element?(view, "#messages-#{alice.id}", "Alice says hi")
       refute has_element?(view, "#messages-#{bob.id}", "Alice says hi")

@@ -99,6 +99,9 @@ defmodule Murmur.Agents.EdgeCaseTest do
       agent_module = Catalog.agent_module(bob.agent_profile_id)
       {:ok, _} = Murmur.Jido.start_agent(agent_module, id: bob.id)
 
+      topic = "workspace:#{workspace.id}:agent:#{bob.id}"
+      Phoenix.PubSub.subscribe(Murmur.PubSub, topic)
+
       stub_llm_success("loop response")
 
       on_exit(fn ->
@@ -112,18 +115,26 @@ defmodule Murmur.Agents.EdgeCaseTest do
       %{workspace: workspace, bob: bob}
     end
 
-    test "hop count of 0 succeeds", %{workspace: workspace} do
+    test "hop count of 0 succeeds", %{workspace: workspace, bob: bob} do
       params = %{target_agent: "Bob", message: "Hi"}
       context = %{workspace_id: workspace.id, sender_name: "Alice", hop_count: 0}
 
       assert {:ok, _} = TellAction.run(params, context)
+
+      # Wait for the background Runner Task to finish
+      bob_id = bob.id
+      assert_receive {:message_completed, ^bob_id, _}, 5000
     end
 
-    test "hop count of 4 succeeds (just under limit)", %{workspace: workspace} do
+    test "hop count of 4 succeeds (just under limit)", %{workspace: workspace, bob: bob} do
       params = %{target_agent: "Bob", message: "Hi"}
       context = %{workspace_id: workspace.id, sender_name: "Alice", hop_count: 4}
 
       assert {:ok, _} = TellAction.run(params, context)
+
+      # Wait for the background Runner Task to finish
+      bob_id = bob.id
+      assert_receive {:message_completed, ^bob_id, _}, 5000
     end
 
     test "hop count of 5 is rejected (at limit)", %{workspace: workspace} do

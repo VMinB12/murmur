@@ -1,7 +1,7 @@
 defmodule MurmurWeb.WorkspaceLive do
   use MurmurWeb, :live_view
 
-  alias Murmur.Agents.Catalog
+  alias Murmur.Agents.{Catalog, Runner}
   alias Murmur.Workspaces
 
   @impl true
@@ -224,35 +224,10 @@ defmodule MurmurWeb.WorkspaceLive do
 
   # --- Agent Communication ---
 
-  defp send_to_agent(session, content, topic) do
-    agent_module = Catalog.agent_module(session.agent_profile_id)
-    pid = Murmur.Jido.whereis(session.id)
+  defp send_to_agent(session, _content, _topic) when is_nil(session), do: :ok
 
-    if pid do
-      Task.Supervisor.start_child(Murmur.Jido.task_supervisor_name(), fn ->
-        try do
-          tool_ctx = %{
-            workspace_id: session.workspace_id,
-            sender_name: session.display_name
-          }
-
-          {:ok, req} = agent_module.ask(pid, content, tool_context: tool_ctx)
-          result = agent_module.await(req, timeout: 120_000)
-
-          case result do
-            {:ok, response} ->
-              hibernate_agent(session.id)
-              broadcast(topic, {:message_completed, session.id, response})
-
-            {:error, reason} ->
-              broadcast(topic, {:request_failed, session.id, reason})
-          end
-        rescue
-          e ->
-            broadcast(topic, {:request_failed, session.id, Exception.message(e)})
-        end
-      end)
-    end
+  defp send_to_agent(session, content, _topic) do
+    Runner.send_message(session, content)
   end
 
   # --- Thread / State Helpers ---
@@ -301,19 +276,6 @@ defmodule MurmurWeb.WorkspaceLive do
   defp get_in_thread(%{state: %{__thread__: thread}}) when not is_nil(thread), do: thread
   defp get_in_thread(_), do: nil
 
-  defp hibernate_agent(session_id) do
-    pid = Murmur.Jido.whereis(session_id)
-
-    if pid do
-      case Jido.AgentServer.state(pid) do
-        {:ok, %{agent: agent}} -> Murmur.Jido.hibernate(agent)
-        _ -> :ok
-      end
-    end
-  rescue
-    _ -> :ok
-  end
-
   defp cleanup_storage(session) do
     {adapter, opts} = Murmur.Jido.__jido_storage__()
     agent_module = Catalog.agent_module(session.agent_profile_id)
@@ -355,10 +317,6 @@ defmodule MurmurWeb.WorkspaceLive do
   defp extract_response_content(%{result: result}) when is_binary(result), do: result
   defp extract_response_content(%{content: content}) when is_binary(content), do: content
   defp extract_response_content(response), do: inspect(response)
-
-  defp broadcast(topic, message) do
-    Phoenix.PubSub.broadcast(Murmur.PubSub, topic, message)
-  end
 
   defp agent_header_class(profile_id) do
     case profile_id do

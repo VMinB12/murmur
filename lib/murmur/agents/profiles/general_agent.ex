@@ -5,6 +5,7 @@ defmodule Murmur.Agents.Profiles.GeneralAgent do
     name: "general_agent",
     model: :fast,
     tools: [Murmur.Agents.TellAction],
+    request_transformer: Murmur.Agents.MessageInjector,
     system_prompt: """
     You are a helpful assistant. Be concise and accurate in your responses.
     You can communicate with other agents using the 'tell' tool when collaboration is needed.

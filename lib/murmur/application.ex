@@ -7,6 +7,9 @@ defmodule Murmur.Application do
 
   @impl true
   def start(_type, _args) do
+    alias Murmur.Agents.PendingQueue
+    PendingQueue.init()
+
     children = [
       MurmurWeb.Telemetry,
       Murmur.Repo,

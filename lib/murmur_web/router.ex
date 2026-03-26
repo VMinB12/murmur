@@ -27,7 +27,7 @@ defmodule MurmurWeb.Router do
   #   pipe_through :api
   # end
 
-  # Enable LiveDashboard and Swoosh mailbox preview in development
+  # Enable LiveDashboard in development
   if Application.compile_env(:murmur, :dev_routes) do
     # If you want to use the LiveDashboard in production, you should put
     # it behind authentication and allow only admins to access it.
@@ -40,7 +40,6 @@ defmodule MurmurWeb.Router do
       pipe_through :browser
 
       live_dashboard "/dashboard", metrics: MurmurWeb.Telemetry
-      forward "/mailbox", Plug.Swoosh.MailboxPreview
     end
   end
 end

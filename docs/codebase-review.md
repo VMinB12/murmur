@@ -304,4 +304,4 @@ Not urgent now, but if workspaces grow, `Flop`/`Flop.Phoenix` gives declarative 
 | 4.1 | Phoenix.Presence | P4 | Medium | Scalability |
 | 4.2 | Req.Test | P4 | Low | Testing |
 | 4.3 | Flop pagination | P4 | Low | UX |
-| 4.4 | Remove unused Swoosh | P4 | Trivial | Hygiene |
+| 4.4 | Remove unused Swoosh | P4 | Trivial | Hygiene | ✅ |

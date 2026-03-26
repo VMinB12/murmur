@@ -44,7 +44,7 @@ defmodule Murmur.Agents.MidTurnInjectionTest do
   describe "idle agent — message starts a new loop" do
     test "Runner.send_message starts agent loop for idle agent", %{session: session} do
       result = Runner.send_message(session, "hello")
-      assert result == :started
+      assert result == :queued
 
       assert_receive {:message_completed, session_id, _response}, 30_000
       assert session_id == session.id

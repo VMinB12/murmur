@@ -2,52 +2,43 @@ defmodule Murmur.Agents.Runner do
   @moduledoc """
   Manages the ask/await lifecycle for an agent session.
 
-  Two paths exist for message delivery:
+  All incoming messages are enqueued in `PendingQueue` first. A single
+  drain-loop Task per session pulls messages off the queue, combines
+  them, and sends exactly ONE `ask()` at a time. This avoids concurrent
+  asks which corrupt the agent's `last_request_id` tracking.
 
-  1. **Idle agent** — `ask()` succeeds, starts an await loop. After the
-     loop completes, any messages that arrived mid-turn (drained by
-     `MessageInjector` already) or accumulated post-completion are
-     drained and fed into a new loop.
-
-  2. **Busy agent** — `ask()` is rejected. The message is enqueued in
-     `PendingQueue`. The `MessageInjector` (a ReAct request_transformer
-     configured on every agent profile) drains the queue before the
-     next LLM call, injecting the message into the conversation
-     mid-turn. No error is surfaced.
+  Messages arriving while the LLM is processing are either:
+  - Injected mid-turn by `MessageInjector` (before the next LLM call)
+  - Picked up by the drain loop after the current request completes
   """
 
   alias Murmur.Agents.{Catalog, PendingQueue}
 
   require Logger
 
+  @active_table :murmur_active_runners
+
+  @doc "Initialize the active-runner tracker. Call once at app start."
+  def init do
+    :ets.new(@active_table, [:set, :public, :named_table])
+    :ok
+  end
+
   @doc """
   Send a message to an agent session.
 
-  Returns `:started` if a new loop was kicked off, `:queued` if the
-  message was added to the pending queue for mid-turn injection,
-  or `:agent_not_running`.
+  The message is enqueued and a drain loop is started if one isn't
+  already running for this session.
+
+  Returns `:queued` or `:agent_not_running`.
   """
   def send_message(session, content) do
     pid = Murmur.Jido.whereis(session.id)
 
     if pid do
-      agent_module = Catalog.agent_module(session.agent_profile_id)
-      topic = agent_topic(session)
-
-      tool_ctx = %{
-        workspace_id: session.workspace_id,
-        sender_name: session.display_name
-      }
-
-      case do_ask(agent_module, pid, content, tool_ctx) do
-        {:ok, req} ->
-          start_await_loop(agent_module, pid, req, tool_ctx, session, topic, content)
-          :started
-
-        {:error, reason} ->
-          broadcast(topic, {:request_failed, session.id, reason})
-          :started
-      end
+      PendingQueue.enqueue(session.id, content)
+      maybe_start_loop(session)
+      :queued
     else
       :agent_not_running
     end
@@ -55,58 +46,62 @@ defmodule Murmur.Agents.Runner do
 
   # --- Private ---
 
-  defp start_await_loop(agent_module, pid, req, tool_ctx, session, topic, content) do
-    Task.Supervisor.start_child(Murmur.Jido.task_supervisor_name(), fn ->
-      result = await_result(agent_module, req)
-      handle_result(result, agent_module, pid, tool_ctx, session, topic, content)
-    end)
+  defp maybe_start_loop(session) do
+    if :ets.insert_new(@active_table, {session.id, true}) do
+      Task.Supervisor.start_child(Murmur.Jido.task_supervisor_name(), fn ->
+        try do
+          run_loop(session)
+        after
+          :ets.delete(@active_table, session.id)
+        end
+      end)
+    end
+
+    :ok
   end
 
-  defp handle_result({:ok, response}, agent_module, pid, tool_ctx, session, topic, _content) do
-    hibernate_agent(session.id)
-    broadcast(topic, {:message_completed, session.id, response})
-    drain_and_continue(agent_module, pid, tool_ctx, session, topic)
-  end
-
-  # Busy rejection from ReAct strategy — re-enqueue for mid-turn injection.
-  # The MessageInjector will pick it up on the next LLM call.
-  defp handle_result(
-         {:error, {:rejected, :busy, _}},
-         _agent_module,
-         _pid,
-         _tool_ctx,
-         session,
-         _topic,
-         content
-       ) do
-    PendingQueue.enqueue(session.id, content)
-  end
-
-  defp handle_result({:error, reason}, agent_module, pid, tool_ctx, session, topic, _content) do
-    broadcast(topic, {:request_failed, session.id, reason})
-    drain_and_continue(agent_module, pid, tool_ctx, session, topic)
-  end
-
-  defp drain_and_continue(agent_module, pid, tool_ctx, session, topic) do
+  defp run_loop(session) do
     case PendingQueue.drain(session.id) do
       [] ->
-        :ok
+        :done
 
-      pending ->
-        combined = Enum.join(pending, "\n\n")
-        broadcast(topic, {:status_change, session.id, :busy})
+      messages ->
+        process_batch(session, Enum.join(messages, "\n\n"))
+        run_loop(session)
+    end
+  end
 
-        case do_ask(agent_module, pid, combined, tool_ctx) do
-          {:ok, req} ->
-            result = await_result(agent_module, req)
-            handle_result(result, agent_module, pid, tool_ctx, session, topic, combined)
+  defp process_batch(session, combined) do
+    pid = Murmur.Jido.whereis(session.id)
+    if is_nil(pid), do: throw(:agent_gone)
 
-          {:error, {:rejected, :busy, _}} ->
-            PendingQueue.enqueue(session.id, combined)
+    agent_module = Catalog.agent_module(session.agent_profile_id)
+    topic = agent_topic(session)
 
-          {:error, reason} ->
-            broadcast(topic, {:request_failed, session.id, reason})
-        end
+    tool_ctx = %{
+      workspace_id: session.workspace_id,
+      sender_name: session.display_name
+    }
+
+    case do_ask(agent_module, pid, combined, tool_ctx) do
+      {:ok, req} ->
+        handle_await(agent_module, req, session, topic)
+
+      {:error, reason} ->
+        broadcast(topic, {:request_failed, session.id, reason})
+    end
+  catch
+    :agent_gone -> :ok
+  end
+
+  defp handle_await(agent_module, req, session, topic) do
+    case await_result(agent_module, req) do
+      {:ok, response} ->
+        hibernate_agent(session.id)
+        broadcast(topic, {:message_completed, session.id, response})
+
+      {:error, reason} ->
+        broadcast(topic, {:request_failed, session.id, reason})
     end
   end
 

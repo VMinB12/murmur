@@ -614,4 +614,156 @@ defmodule MurmurWeb.WorkspaceLiveTest do
       assert html =~ "emerald"
     end
   end
+
+  # --- Unified mode ---
+
+  describe "view mode toggle" do
+    test "defaults to split mode", %{conn: conn, workspace: workspace} do
+      {:ok, _} =
+        Workspaces.create_agent_session(workspace.id, %{
+          "agent_profile_id" => "general_agent",
+          "display_name" => "Alice"
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/workspaces/#{workspace.id}")
+      # Split mode shows per-agent message containers
+      assert has_element?(view, "#view-split-btn")
+      assert has_element?(view, "#view-unified-btn")
+    end
+
+    test "toggle switches to unified mode", %{conn: conn, workspace: workspace} do
+      {:ok, _} =
+        Workspaces.create_agent_session(workspace.id, %{
+          "agent_profile_id" => "general_agent",
+          "display_name" => "Alice"
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/workspaces/#{workspace.id}")
+
+      # Click toggle to switch to unified mode
+      view |> element("#view-unified-btn") |> render_click()
+
+      # Unified mode shows the unified form and message container
+      assert has_element?(view, "#unified-msg-form")
+      assert has_element?(view, "#unified-messages")
+    end
+
+    test "toggle back returns to split mode", %{conn: conn, workspace: workspace} do
+      {:ok, session} =
+        Workspaces.create_agent_session(workspace.id, %{
+          "agent_profile_id" => "general_agent",
+          "display_name" => "Alice"
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/workspaces/#{workspace.id}")
+
+      # Switch to unified then back
+      view |> element("#view-unified-btn") |> render_click()
+      view |> element("#view-split-btn") |> render_click()
+
+      # Split mode has per-agent message containers
+      assert has_element?(view, "#messages-#{session.id}")
+      refute has_element?(view, "#unified-messages")
+    end
+  end
+
+  describe "unified mode messaging" do
+    setup %{workspace: workspace} do
+      {:ok, alice} =
+        Workspaces.create_agent_session(workspace.id, %{
+          "agent_profile_id" => "general_agent",
+          "display_name" => "Alice"
+        })
+
+      {:ok, bob} =
+        Workspaces.create_agent_session(workspace.id, %{
+          "agent_profile_id" => "code_agent",
+          "display_name" => "Bob"
+        })
+
+      %{alice: alice, bob: bob}
+    end
+
+    test "message without @mention routes to first agent", %{
+      conn: conn,
+      workspace: workspace,
+      alice: alice
+    } do
+      {:ok, view, _html} = live(conn, ~p"/workspaces/#{workspace.id}")
+      view |> element("#view-unified-btn") |> render_click()
+
+      view
+      |> form("#unified-msg-form", message: %{content: "Hello!"})
+      |> render_submit()
+
+      html = render(view)
+      assert html =~ "Hello!"
+
+      # Message was routed to Alice (first agent), so it should be in her messages
+      send(view.pid, {:message_completed, alice.id, "Hi from Alice"})
+      html = render(view)
+      assert html =~ "Hi from Alice"
+    end
+
+    test "@mention routes to the named agent", %{
+      conn: conn,
+      workspace: workspace,
+      bob: bob
+    } do
+      {:ok, view, _html} = live(conn, ~p"/workspaces/#{workspace.id}")
+      view |> element("#view-unified-btn") |> render_click()
+
+      view
+      |> form("#unified-msg-form", message: %{content: "@Bob Write tests"})
+      |> render_submit()
+
+      # The actual content sent should be "Write tests" (stripped @mention)
+      # Bob should get the message
+      send(view.pid, {:message_completed, bob.id, "Tests written!"})
+      html = render(view)
+      assert html =~ "Tests written!"
+    end
+
+    test "unified timeline shows messages from all agents", %{
+      conn: conn,
+      workspace: workspace,
+      alice: alice,
+      bob: bob
+    } do
+      {:ok, view, _html} = live(conn, ~p"/workspaces/#{workspace.id}")
+      view |> element("#view-unified-btn") |> render_click()
+
+      send(view.pid, {:message_completed, alice.id, "Hello from Alice"})
+      send(view.pid, {:message_completed, bob.id, "Hello from Bob"})
+
+      html = render(view)
+      assert html =~ "Hello from Alice"
+      assert html =~ "Hello from Bob"
+    end
+
+    test "agent sidebar shows agent names", %{
+      conn: conn,
+      workspace: workspace
+    } do
+      {:ok, view, _html} = live(conn, ~p"/workspaces/#{workspace.id}")
+      view |> element("#view-unified-btn") |> render_click()
+
+      html = render(view)
+      assert html =~ "Alice"
+      assert html =~ "Bob"
+    end
+
+    test "empty unified message is not sent", %{conn: conn, workspace: workspace} do
+      {:ok, view, _html} = live(conn, ~p"/workspaces/#{workspace.id}")
+      view |> element("#view-unified-btn") |> render_click()
+
+      view
+      |> form("#unified-msg-form", message: %{content: ""})
+      |> render_submit()
+
+      html = render(view)
+      # Only the placeholder text should be visible, no user message bubble
+      refute html =~ ~r/bg-primary.*text-primary-content/
+    end
+  end
 end

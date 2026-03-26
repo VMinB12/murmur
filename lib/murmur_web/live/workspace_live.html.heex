@@ -11,6 +11,30 @@
       </div>
       <div class="flex items-center gap-2">
         <%= if @agent_sessions != [] do %>
+          <div class="flex items-center border border-base-300 rounded-lg overflow-hidden">
+            <button
+              id="view-split-btn"
+              phx-click="toggle_view_mode"
+              class={[
+                "btn btn-ghost btn-xs rounded-none border-0",
+                if(@view_mode == :split, do: "bg-base-300", else: "opacity-50")
+              ]}
+              title="Split view"
+            >
+              <.icon name="hero-view-columns" class="w-4 h-4" />
+            </button>
+            <button
+              id="view-unified-btn"
+              phx-click="toggle_view_mode"
+              class={[
+                "btn btn-ghost btn-xs rounded-none border-0",
+                if(@view_mode == :unified, do: "bg-base-300", else: "opacity-50")
+              ]}
+              title="Unified view"
+            >
+              <.icon name="hero-chat-bubble-left-right" class="w-4 h-4" />
+            </button>
+          </div>
           <button
             id="clear-team-btn"
             phx-click="clear_team"
@@ -47,184 +71,430 @@
         </div>
       </div>
     <% else %>
-      <div class="flex-1 flex overflow-x-auto min-h-0">
-        <%= for session <- @agent_sessions do %>
-          <div class="flex flex-col flex-1 min-w-[300px] border-r border-base-300/50 last:border-r-0 agent-column-enter transition-all duration-200">
-            <%!-- Agent Header --%>
-            <div class={[
-              "flex items-center justify-between px-3 py-2 border-b",
-              agent_header_class(session.agent_profile_id)
-            ]}>
-              <div class="flex items-center gap-2 min-w-0">
-                <div class={[
-                  "w-2 h-2 rounded-full shrink-0",
-                  agent_dot_class(session.agent_profile_id)
-                ]}>
+      <%!-- ============================================= --%>
+      <%!-- SPLIT MODE                                    --%>
+      <%!-- ============================================= --%>
+      <%= if @view_mode == :split do %>
+        <div class="flex-1 flex overflow-x-auto min-h-0">
+          <%= for session <- @agent_sessions do %>
+            <div class="flex flex-col flex-1 min-w-[300px] border-r border-base-300/50 last:border-r-0 agent-column-enter transition-all duration-200">
+              <%!-- Agent Header --%>
+              <div class={[
+                "flex items-center justify-between px-3 py-2 border-b",
+                agent_header_class(session.agent_profile_id)
+              ]}>
+                <div class="flex items-center gap-2 min-w-0">
+                  <div class={[
+                    "w-2 h-2 rounded-full shrink-0",
+                    agent_dot_class(session.agent_profile_id)
+                  ]}>
+                  </div>
+                  <span class="font-medium text-sm truncate">{session.display_name}</span>
+                  <span class="text-xs opacity-60 shrink-0">{session.agent_profile_id}</span>
                 </div>
-                <span class="font-medium text-sm truncate">{session.display_name}</span>
-                <span class="text-xs opacity-60 shrink-0">{session.agent_profile_id}</span>
+                <div class="flex items-center gap-1 shrink-0">
+                  <%= if Map.get(@agent_statuses, session.id) == :busy do %>
+                    <span class="loading loading-dots loading-xs text-warning"></span>
+                  <% end %>
+                  <button
+                    phx-click="remove_agent"
+                    phx-value-session-id={session.id}
+                    data-confirm="Remove this agent? Chat history will be preserved."
+                    class="btn btn-ghost btn-xs opacity-40 hover:opacity-100"
+                  >
+                    <.icon name="hero-x-mark" class="w-3 h-3" />
+                  </button>
+                </div>
               </div>
-              <div class="flex items-center gap-1 shrink-0">
-                <%= if Map.get(@agent_statuses, session.id) == :busy do %>
-                  <span class="loading loading-dots loading-xs text-warning"></span>
+
+              <%!-- Messages --%>
+              <div
+                id={"messages-#{session.id}"}
+                phx-hook=".AutoScroll"
+                class="flex-1 overflow-y-auto px-3 py-2 space-y-3"
+              >
+                <%= if Map.get(@messages, session.id, []) == [] and Map.get(@streaming_tokens, session.id, "") == "" do %>
+                  <div class="flex items-center justify-center h-full text-base-content/40 text-sm">
+                    Send a message to start chatting
+                  </div>
                 <% end %>
-                <button
-                  phx-click="remove_agent"
-                  phx-value-session-id={session.id}
-                  data-confirm="Remove this agent? Chat history will be preserved."
-                  class="btn btn-ghost btn-xs opacity-40 hover:opacity-100"
+                <%= for msg <- Map.get(@messages, session.id, []) do %>
+                  <div
+                    id={"msg-#{msg.id}"}
+                    class={[
+                      "flex flex-col gap-0.5",
+                      if(msg.role == "user", do: "items-end", else: "items-start")
+                    ]}
+                  >
+                    <span class="text-[10px] uppercase tracking-wider text-base-content/40 px-1">
+                      {msg.sender_name || msg.role}
+                    </span>
+
+                    <%!-- Thinking trace (collapsible) --%>
+                    <%= if Map.get(msg, :thinking) do %>
+                      <details class="w-full max-w-[85%] group">
+                        <summary class="flex items-center gap-1.5 cursor-pointer text-xs text-base-content/50 hover:text-base-content/70 px-1 py-0.5 transition-colors">
+                          <.icon name="hero-light-bulb" class="w-3 h-3" />
+                          <span>Thinking...</span>
+                          <.icon
+                            name="hero-chevron-right"
+                            class="w-3 h-3 transition-transform group-open:rotate-90"
+                          />
+                        </summary>
+                        <div class="mt-1 rounded-lg bg-base-200/50 border border-base-300/50 px-3 py-2 text-xs text-base-content/60 whitespace-pre-wrap break-words">
+                          {msg.thinking}
+                        </div>
+                      </details>
+                    <% end %>
+
+                    <%!-- Tool calls (collapsible) --%>
+                    <%= for tc <- Map.get(msg, :tool_calls, []) do %>
+                      <details class="w-full max-w-[85%] group">
+                        <summary class="flex items-center gap-1.5 cursor-pointer text-xs px-1 py-0.5 transition-colors hover:text-base-content/70">
+                          <.icon
+                            name="hero-wrench-screwdriver"
+                            class="w-3 h-3 text-base-content/50"
+                          />
+                          <span class="font-medium">{tc.name}</span>
+                          <%= cond do %>
+                            <% tc.status == :completed -> %>
+                              <span class="text-success/70 text-[10px]">Completed</span>
+                            <% tc.status == :error -> %>
+                              <span class="text-error/70 text-[10px]">Error</span>
+                            <% true -> %>
+                              <span class="loading loading-spinner loading-xs text-warning">
+                              </span>
+                          <% end %>
+                          <.icon
+                            name="hero-chevron-right"
+                            class="w-3 h-3 text-base-content/40 transition-transform group-open:rotate-90"
+                          />
+                        </summary>
+                        <div class="mt-1 rounded-lg border border-base-300/50 text-xs overflow-hidden">
+                          <%= if tc.args && tc.args != %{} do %>
+                            <div class="bg-base-200/30 px-3 py-1.5 border-b border-base-300/50">
+                              <span class="text-[10px] uppercase tracking-wider text-base-content/40">
+                                Arguments
+                              </span>
+                              <pre
+                                class="mt-0.5 text-base-content/70 whitespace-pre-wrap break-words"
+                                phx-no-curly-interpolation
+                              >{Jason.encode!(tc.args, pretty: true)}</pre>
+                            </div>
+                          <% end %>
+                          <%= if tc.result do %>
+                            <div class="bg-base-200/20 px-3 py-1.5">
+                              <span class="text-[10px] uppercase tracking-wider text-base-content/40">
+                                Result
+                              </span>
+                              <div class="mt-0.5 text-base-content/70 whitespace-pre-wrap break-words">
+                                {tc.result}
+                              </div>
+                            </div>
+                          <% end %>
+                        </div>
+                      </details>
+                    <% end %>
+
+                    <%!-- Message content --%>
+                    <%= if msg.content && msg.content != "" do %>
+                      <div class={[
+                        "rounded-xl px-3 py-2 text-sm max-w-[85%] whitespace-pre-wrap break-words",
+                        if(msg.role == "user",
+                          do: "bg-primary text-primary-content rounded-br-sm",
+                          else: "bg-base-200 text-base-content rounded-bl-sm"
+                        )
+                      ]}>
+                        {msg.content}
+                      </div>
+                    <% end %>
+                  </div>
+                <% end %>
+
+                <%!-- Streaming tokens --%>
+                <%= if Map.get(@streaming_tokens, session.id, "") != "" do %>
+                  <div class="flex flex-col gap-0.5 items-start">
+                    <span class="text-[10px] uppercase tracking-wider text-base-content/40 px-1">
+                      assistant
+                    </span>
+                    <div class="bg-base-200 text-base-content rounded-xl rounded-bl-sm px-3 py-2 text-sm max-w-[85%] whitespace-pre-wrap break-words">
+                      {Map.get(@streaming_tokens, session.id, "")}
+                      <span class="inline-block w-1 h-4 bg-primary animate-pulse ml-0.5 align-text-bottom">
+                      </span>
+                    </div>
+                  </div>
+                <% end %>
+              </div>
+
+              <%!-- Input --%>
+              <div class="px-3 py-2 border-t border-base-300">
+                <.form
+                  for={%{}}
+                  id={"msg-form-#{session.id}"}
+                  phx-submit="send_message"
+                  class="flex gap-2"
                 >
-                  <.icon name="hero-x-mark" class="w-3 h-3" />
-                </button>
+                  <input type="hidden" name="message[session_id]" value={session.id} />
+                  <input
+                    type="text"
+                    name="message[content]"
+                    placeholder="Type a message..."
+                    autocomplete="off"
+                    class="input input-bordered input-sm flex-1"
+                    phx-debounce="100"
+                  />
+                  <button type="submit" class="btn btn-primary btn-sm">
+                    <.icon name="hero-paper-airplane" class="w-4 h-4" />
+                  </button>
+                </.form>
               </div>
             </div>
+          <% end %>
+        </div>
 
-            <%!-- Messages --%>
-            <div
-              id={"messages-#{session.id}"}
-              phx-hook=".AutoScroll"
-              class="flex-1 overflow-y-auto px-3 py-2 space-y-3"
-            >
-              <%= if Map.get(@messages, session.id, []) == [] and Map.get(@streaming_tokens, session.id, "") == "" do %>
-                <div class="flex items-center justify-center h-full text-base-content/40 text-sm">
-                  Send a message to start chatting
-                </div>
-              <% end %>
-              <%= for msg <- Map.get(@messages, session.id, []) do %>
-                <div
-                  id={"msg-#{msg.id}"}
-                  class={[
-                    "flex flex-col gap-0.5",
-                    if(msg.role == "user", do: "items-end", else: "items-start")
-                  ]}
-                >
-                  <span class="text-[10px] uppercase tracking-wider text-base-content/40 px-1">
-                    {msg.sender_name || msg.role}
-                  </span>
-
-                  <%!-- Thinking trace (collapsible) --%>
-                  <%= if Map.get(msg, :thinking) do %>
-                    <details class="w-full max-w-[85%] group">
-                      <summary class="flex items-center gap-1.5 cursor-pointer text-xs text-base-content/50 hover:text-base-content/70 px-1 py-0.5 transition-colors">
-                        <.icon name="hero-light-bulb" class="w-3 h-3" />
-                        <span>Thinking...</span>
-                        <.icon
-                          name="hero-chevron-right"
-                          class="w-3 h-3 transition-transform group-open:rotate-90"
-                        />
-                      </summary>
-                      <div class="mt-1 rounded-lg bg-base-200/50 border border-base-300/50 px-3 py-2 text-xs text-base-content/60 whitespace-pre-wrap break-words">
-                        {msg.thinking}
-                      </div>
-                    </details>
-                  <% end %>
-
-                  <%!-- Tool calls (collapsible) --%>
-                  <%= for tc <- Map.get(msg, :tool_calls, []) do %>
-                    <details class="w-full max-w-[85%] group">
-                      <summary class="flex items-center gap-1.5 cursor-pointer text-xs px-1 py-0.5 transition-colors hover:text-base-content/70">
-                        <.icon
-                          name="hero-wrench-screwdriver"
-                          class="w-3 h-3 text-base-content/50"
-                        />
-                        <span class="font-medium">{tc.name}</span>
-                        <%= cond do %>
-                          <% tc.status == :completed -> %>
-                            <span class="text-success/70 text-[10px]">Completed</span>
-                          <% tc.status == :error -> %>
-                            <span class="text-error/70 text-[10px]">Error</span>
-                          <% true -> %>
-                            <span class="loading loading-spinner loading-xs text-warning"></span>
-                        <% end %>
-                        <.icon
-                          name="hero-chevron-right"
-                          class="w-3 h-3 text-base-content/40 transition-transform group-open:rotate-90"
-                        />
-                      </summary>
-                      <div class="mt-1 rounded-lg border border-base-300/50 text-xs overflow-hidden">
-                        <%= if tc.args && tc.args != %{} do %>
-                          <div class="bg-base-200/30 px-3 py-1.5 border-b border-base-300/50">
-                            <span class="text-[10px] uppercase tracking-wider text-base-content/40">
-                              Arguments
-                            </span>
-                            <pre
-                              class="mt-0.5 text-base-content/70 whitespace-pre-wrap break-words"
-                              phx-no-curly-interpolation
-                            >{Jason.encode!(tc.args, pretty: true)}</pre>
-                          </div>
-                        <% end %>
-                        <%= if tc.result do %>
-                          <div class="bg-base-200/20 px-3 py-1.5">
-                            <span class="text-[10px] uppercase tracking-wider text-base-content/40">
-                              Result
-                            </span>
-                            <div class="mt-0.5 text-base-content/70 whitespace-pre-wrap break-words">
-                              {tc.result}
-                            </div>
-                          </div>
-                        <% end %>
-                      </div>
-                    </details>
-                  <% end %>
-
-                  <%!-- Message content --%>
-                  <%= if msg.content && msg.content != "" do %>
-                    <div class={[
-                      "rounded-xl px-3 py-2 text-sm max-w-[85%] whitespace-pre-wrap break-words",
-                      if(msg.role == "user",
-                        do: "bg-primary text-primary-content rounded-br-sm",
-                        else: "bg-base-200 text-base-content rounded-bl-sm"
-                      )
-                    ]}>
-                      {msg.content}
-                    </div>
-                  <% end %>
-                </div>
-              <% end %>
-
-              <%!-- Streaming tokens --%>
-              <%= if Map.get(@streaming_tokens, session.id, "") != "" do %>
-                <div class="flex flex-col gap-0.5 items-start">
-                  <span class="text-[10px] uppercase tracking-wider text-base-content/40 px-1">
-                    assistant
-                  </span>
-                  <div class="bg-base-200 text-base-content rounded-xl rounded-bl-sm px-3 py-2 text-sm max-w-[85%] whitespace-pre-wrap break-words">
-                    {Map.get(@streaming_tokens, session.id, "")}
-                    <span class="inline-block w-1 h-4 bg-primary animate-pulse ml-0.5 align-text-bottom">
+        <%!-- ============================================= --%>
+        <%!-- UNIFIED MODE                                  --%>
+        <%!-- ============================================= --%>
+      <% else %>
+        <div class="flex-1 flex min-h-0">
+          <%!-- Agent Sidebar --%>
+          <div class="w-48 shrink-0 border-r border-base-300/50 flex flex-col">
+            <div class="px-3 py-2 border-b border-base-300/50">
+              <span class="text-[10px] uppercase tracking-wider text-base-content/40">
+                Agents
+              </span>
+            </div>
+            <div class="flex-1 overflow-y-auto py-1">
+              <%= for session <- @agent_sessions do %>
+                <% colors =
+                  MurmurWeb.WorkspaceLive.agent_color(
+                    session.agent_profile_id,
+                    session.display_name
+                  ) %>
+                <div class="flex items-center justify-between px-3 py-1.5 group">
+                  <div class="flex items-center gap-2 min-w-0">
+                    <div class={["w-2 h-2 rounded-full shrink-0", colors.dot]}></div>
+                    <span class={["text-sm font-medium truncate", colors.text]}>
+                      {session.display_name}
                     </span>
+                  </div>
+                  <div class="flex items-center gap-1 shrink-0">
+                    <%= if Map.get(@agent_statuses, session.id) == :busy do %>
+                      <span class="loading loading-dots loading-xs text-warning"></span>
+                    <% end %>
+                    <button
+                      phx-click="remove_agent"
+                      phx-value-session-id={session.id}
+                      data-confirm="Remove this agent?"
+                      class="btn btn-ghost btn-xs opacity-0 group-hover:opacity-60 hover:!opacity-100"
+                    >
+                      <.icon name="hero-x-mark" class="w-3 h-3" />
+                    </button>
                   </div>
                 </div>
               <% end %>
             </div>
+          </div>
 
-            <%!-- Input --%>
-            <div class="px-3 py-2 border-t border-base-300">
+          <%!-- Unified Message Stream --%>
+          <div class="flex-1 flex flex-col min-w-0">
+            <div
+              id="unified-messages"
+              phx-hook=".AutoScroll"
+              class="flex-1 overflow-y-auto px-4 py-3 space-y-3"
+            >
+              <% timeline = MurmurWeb.WorkspaceLive.unified_timeline(@messages, @agent_sessions) %>
+              <%= if timeline == [] and Enum.all?(@streaming_tokens, fn {_, v} -> v == "" end) do %>
+                <div class="flex items-center justify-center h-full text-base-content/40 text-sm">
+                  Send a message to start chatting. Use @name to target a specific agent.
+                </div>
+              <% end %>
+
+              <%= for msg <- timeline do %>
+                <% colors =
+                  Map.get(msg, :agent_color, %{
+                    dot: "bg-gray-500",
+                    text: "text-base-content",
+                    bg: "bg-base-200/50"
+                  }) %>
+                <div
+                  id={"unified-msg-#{msg.id}"}
+                  class={[
+                    "flex gap-3",
+                    if(msg.role == "user", do: "justify-end", else: "justify-start")
+                  ]}
+                >
+                  <%!-- Agent avatar (left side for non-user messages) --%>
+                  <%= unless msg.role == "user" do %>
+                    <div class="flex flex-col items-center gap-0.5 pt-4 shrink-0">
+                      <div class={[
+                        "w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold",
+                        colors.dot
+                      ]}>
+                        {String.first(msg.agent_name || "?")}
+                      </div>
+                    </div>
+                  <% end %>
+
+                  <div class={[
+                    "flex flex-col gap-0.5 max-w-[70%] min-w-0",
+                    if(msg.role == "user", do: "items-end", else: "items-start")
+                  ]}>
+                    <span class={[
+                      "text-[10px] uppercase tracking-wider px-1",
+                      if(msg.role == "user", do: "text-base-content/40", else: colors.text)
+                    ]}>
+                      <%= if msg.role == "user" do %>
+                        {msg.sender_name || "You"}
+                      <% else %>
+                        {msg.agent_name || msg.sender_name || "assistant"}
+                      <% end %>
+                    </span>
+
+                    <%!-- Thinking trace --%>
+                    <%= if Map.get(msg, :thinking) do %>
+                      <details class="w-full group">
+                        <summary class="flex items-center gap-1.5 cursor-pointer text-xs text-base-content/50 hover:text-base-content/70 px-1 py-0.5 transition-colors">
+                          <.icon name="hero-light-bulb" class="w-3 h-3" />
+                          <span>Thinking...</span>
+                          <.icon
+                            name="hero-chevron-right"
+                            class="w-3 h-3 transition-transform group-open:rotate-90"
+                          />
+                        </summary>
+                        <div class="mt-1 rounded-lg bg-base-200/50 border border-base-300/50 px-3 py-2 text-xs text-base-content/60 whitespace-pre-wrap break-words">
+                          {msg.thinking}
+                        </div>
+                      </details>
+                    <% end %>
+
+                    <%!-- Tool calls --%>
+                    <%= for tc <- Map.get(msg, :tool_calls, []) do %>
+                      <details class="w-full group">
+                        <summary class="flex items-center gap-1.5 cursor-pointer text-xs px-1 py-0.5 transition-colors hover:text-base-content/70">
+                          <.icon
+                            name="hero-wrench-screwdriver"
+                            class="w-3 h-3 text-base-content/50"
+                          />
+                          <span class="font-medium">{tc.name}</span>
+                          <%= cond do %>
+                            <% tc.status == :completed -> %>
+                              <span class="text-success/70 text-[10px]">Completed</span>
+                            <% tc.status == :error -> %>
+                              <span class="text-error/70 text-[10px]">Error</span>
+                            <% true -> %>
+                              <span class="loading loading-spinner loading-xs text-warning">
+                              </span>
+                          <% end %>
+                          <.icon
+                            name="hero-chevron-right"
+                            class="w-3 h-3 text-base-content/40 transition-transform group-open:rotate-90"
+                          />
+                        </summary>
+                        <div class="mt-1 rounded-lg border border-base-300/50 text-xs overflow-hidden">
+                          <%= if tc.args && tc.args != %{} do %>
+                            <div class="bg-base-200/30 px-3 py-1.5 border-b border-base-300/50">
+                              <span class="text-[10px] uppercase tracking-wider text-base-content/40">
+                                Arguments
+                              </span>
+                              <pre
+                                class="mt-0.5 text-base-content/70 whitespace-pre-wrap break-words"
+                                phx-no-curly-interpolation
+                              >{Jason.encode!(tc.args, pretty: true)}</pre>
+                            </div>
+                          <% end %>
+                          <%= if tc.result do %>
+                            <div class="bg-base-200/20 px-3 py-1.5">
+                              <span class="text-[10px] uppercase tracking-wider text-base-content/40">
+                                Result
+                              </span>
+                              <div class="mt-0.5 text-base-content/70 whitespace-pre-wrap break-words">
+                                {tc.result}
+                              </div>
+                            </div>
+                          <% end %>
+                        </div>
+                      </details>
+                    <% end %>
+
+                    <%!-- Message content --%>
+                    <%= if msg.content && msg.content != "" do %>
+                      <div class={[
+                        "rounded-xl px-3 py-2 text-sm whitespace-pre-wrap break-words",
+                        if(msg.role == "user",
+                          do: "bg-primary text-primary-content rounded-br-sm",
+                          else: [
+                            colors.bg,
+                            "border border-base-300/30 text-base-content rounded-bl-sm"
+                          ]
+                        )
+                      ]}>
+                        {msg.content}
+                      </div>
+                    <% end %>
+                  </div>
+                </div>
+              <% end %>
+
+              <%!-- Streaming tokens for all agents --%>
+              <%= for session <- @agent_sessions do %>
+                <%= if Map.get(@streaming_tokens, session.id, "") != "" do %>
+                  <% colors =
+                    MurmurWeb.WorkspaceLive.agent_color(
+                      session.agent_profile_id,
+                      session.display_name
+                    ) %>
+                  <div class="flex gap-3 justify-start">
+                    <div class="flex flex-col items-center gap-0.5 pt-4 shrink-0">
+                      <div class={[
+                        "w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold",
+                        colors.dot
+                      ]}>
+                        {String.first(session.display_name)}
+                      </div>
+                    </div>
+                    <div class="flex flex-col gap-0.5 max-w-[70%] min-w-0 items-start">
+                      <span class={["text-[10px] uppercase tracking-wider px-1", colors.text]}>
+                        {session.display_name}
+                      </span>
+                      <div class={[
+                        "rounded-xl rounded-bl-sm px-3 py-2 text-sm whitespace-pre-wrap break-words border border-base-300/30",
+                        colors.bg
+                      ]}>
+                        {Map.get(@streaming_tokens, session.id, "")}
+                        <span class="inline-block w-1 h-4 bg-primary animate-pulse ml-0.5 align-text-bottom">
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                <% end %>
+              <% end %>
+            </div>
+
+            <%!-- Unified Input --%>
+            <div class="px-4 py-3 border-t border-base-300">
               <.form
                 for={%{}}
-                id={"msg-form-#{session.id}"}
-                phx-submit="send_message"
+                id="unified-msg-form"
+                phx-submit="send_unified_message"
                 class="flex gap-2"
               >
-                <input type="hidden" name="message[session_id]" value={session.id} />
                 <input
                   type="text"
                   name="message[content]"
-                  placeholder="Type a message..."
+                  placeholder={"@#{if(hd_session = List.first(@agent_sessions), do: hd_session.display_name, else: "agent")} message... or just type to send to first agent"}
                   autocomplete="off"
                   class="input input-bordered input-sm flex-1"
                   phx-debounce="100"
                 />
-                <button
-                  type="submit"
-                  class="btn btn-primary btn-sm"
-                >
+                <button type="submit" class="btn btn-primary btn-sm">
                   <.icon name="hero-paper-airplane" class="w-4 h-4" />
                 </button>
               </.form>
             </div>
           </div>
-        <% end %>
-      </div>
+        </div>
+      <% end %>
     <% end %>
   </div>
 

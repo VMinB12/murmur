@@ -24,6 +24,7 @@ defmodule MurmurWeb.WorkspaceLive do
       |> assign(:agent_statuses, Map.new(agent_sessions, &{&1.id, :idle}))
       |> assign(:streaming_tokens, Map.new(agent_sessions, &{&1.id, ""}))
       |> assign(:messages, messages_map)
+      |> assign(:view_mode, :split)
       |> assign(:add_agent_form, to_form(%{"profile_id" => "", "display_name" => ""}, as: :agent))
 
     socket =
@@ -143,6 +144,22 @@ defmodule MurmurWeb.WorkspaceLive do
      |> assign(:messages, empty_messages)
      |> assign(:agent_statuses, empty_statuses)
      |> assign(:streaming_tokens, empty_tokens)}
+  end
+
+  def handle_event("toggle_view_mode", _params, socket) do
+    new_mode = if socket.assigns.view_mode == :split, do: :unified, else: :split
+    {:noreply, assign(socket, :view_mode, new_mode)}
+  end
+
+  def handle_event("send_unified_message", %{"message" => %{"content" => content}}, socket) do
+    content = String.trim(content)
+
+    if content == "" do
+      {:noreply, socket}
+    else
+      {target_session, actual_content} = resolve_target_agent(content, socket.assigns)
+      send_to_target(socket, target_session, actual_content)
+    end
   end
 
   def handle_event("remove_agent", %{"session-id" => session_id}, socket) do
@@ -352,6 +369,113 @@ defmodule MurmurWeb.WorkspaceLive do
 
   defp find_session(socket, session_id) do
     Enum.find(socket.assigns.agent_sessions, &(&1.id == session_id))
+  end
+
+  defp send_to_target(socket, nil, _content) do
+    {:noreply, put_flash(socket, :error, "No agents available. Add an agent first.")}
+  end
+
+  defp send_to_target(socket, target_session, content) do
+    workspace_id = socket.assigns.workspace.id
+    topic = agent_topic(workspace_id, target_session.id)
+
+    user_msg = %{
+      id: Ecto.UUID.generate(),
+      role: "user",
+      content: content,
+      sender_name: "You"
+    }
+
+    socket =
+      socket
+      |> update(:messages, fn msgs ->
+        Map.update(msgs, target_session.id, [user_msg], &(&1 ++ [user_msg]))
+      end)
+      |> update(:agent_statuses, &Map.put(&1, target_session.id, :busy))
+
+    send_to_agent(target_session, content, topic)
+    {:noreply, socket}
+  end
+
+  defp resolve_target_agent(content, assigns) do
+    sessions = assigns.agent_sessions
+
+    case Regex.run(~r/^@(\S+)\s+(.*)$/s, content) do
+      [_, mention, rest] ->
+        target =
+          Enum.find(sessions, fn s ->
+            String.downcase(s.display_name) == String.downcase(mention)
+          end)
+
+        if target, do: {target, String.trim(rest)}, else: {List.first(sessions), content}
+
+      _ ->
+        {List.first(sessions), content}
+    end
+  end
+
+  def unified_timeline(messages_map, agent_sessions) do
+    session_index = Map.new(agent_sessions, &{&1.id, &1})
+
+    messages_map
+    |> Enum.flat_map(fn {session_id, msgs} ->
+      session = Map.get(session_index, session_id)
+      agent_name = if session, do: session.display_name, else: "unknown"
+      profile_id = if session, do: session.agent_profile_id, else: nil
+
+      Enum.map(msgs, fn msg ->
+        Map.merge(msg, %{
+          session_id: session_id,
+          agent_name: agent_name,
+          agent_color: agent_color(profile_id, agent_name)
+        })
+      end)
+    end)
+    |> Enum.sort_by(& &1.id)
+  end
+
+  @agent_colors [
+    "bg-blue-500",
+    "bg-emerald-500",
+    "bg-violet-500",
+    "bg-amber-500",
+    "bg-rose-500",
+    "bg-cyan-500",
+    "bg-fuchsia-500",
+    "bg-lime-500"
+  ]
+
+  @agent_text_colors [
+    "text-blue-500",
+    "text-emerald-500",
+    "text-violet-500",
+    "text-amber-500",
+    "text-rose-500",
+    "text-cyan-500",
+    "text-fuchsia-500",
+    "text-lime-500"
+  ]
+
+  @agent_bg_colors [
+    "bg-blue-500/10",
+    "bg-emerald-500/10",
+    "bg-violet-500/10",
+    "bg-amber-500/10",
+    "bg-rose-500/10",
+    "bg-cyan-500/10",
+    "bg-fuchsia-500/10",
+    "bg-lime-500/10"
+  ]
+
+  @doc false
+  def agent_color(_profile_id, agent_name) do
+    idx = :erlang.phash2(agent_name, length(@agent_colors))
+
+    %{
+      dot: Enum.at(@agent_colors, idx),
+      text: Enum.at(@agent_text_colors, idx),
+      bg: Enum.at(@agent_bg_colors, idx)
+    }
   end
 
   defp append_assistant_message(messages, response) do

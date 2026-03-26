@@ -7,17 +7,12 @@ defmodule Murmur.Application do
 
   @impl true
   def start(_type, _args) do
-    alias Murmur.Agents.PendingQueue
-    alias Murmur.Agents.Runner
-
-    PendingQueue.init()
-    Runner.init()
-
     children = [
       MurmurWeb.Telemetry,
       Murmur.Repo,
       {DNSCluster, query: Application.get_env(:murmur, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: Murmur.PubSub},
+      Murmur.Agents.TableOwner,
       MurmurWeb.Endpoint,
       Murmur.Jido
     ]

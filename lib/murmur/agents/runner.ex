@@ -19,12 +19,6 @@ defmodule Murmur.Agents.Runner do
 
   @active_table :murmur_active_runners
 
-  @doc "Initialize the active-runner tracker. Call once at app start."
-  def init do
-    :ets.new(@active_table, [:set, :public, :named_table])
-    :ok
-  end
-
   @doc """
   Send a message to an agent session.
 

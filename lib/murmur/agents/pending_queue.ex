@@ -9,11 +9,6 @@ defmodule Murmur.Agents.PendingQueue do
 
   @table :murmur_pending_messages
 
-  def init do
-    :ets.new(@table, [:named_table, :public, :duplicate_bag])
-    :ok
-  end
-
   @doc "Enqueue a message for a busy agent session."
   def enqueue(session_id, message) when is_binary(message) do
     :ets.insert(@table, {session_id, message, System.monotonic_time(:nanosecond)})

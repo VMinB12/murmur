@@ -1,18 +1,35 @@
 # Murmur
 
-To start your Phoenix server:
+A real-time multi-agent chat interface built with Phoenix LiveView and the [Jido](https://github.com/agentjido/jido) agent framework. Create workspaces, add AI agents, and watch them collaborate — with persistent conversations and agent-to-agent communication.
 
-* Run `mix setup` to install and setup dependencies
-* Start Phoenix endpoint with `mix phx.server` or inside IEx with `iex -S mix phx.server`
+## Features
 
-Now you can visit [`localhost:4000`](http://localhost:4000) from your browser.
+- **Multi-agent workspaces** — Add multiple AI agents, each with independent chat history
+- **Agent-to-agent messaging** — Agents communicate via the "tell" tool, with message queuing when busy
+- **Real-time streaming** — Token-by-token responses over WebSocket
+- **Persistent conversations** — History survives server restarts via hibernate/thaw
+- **Autonomous execution** — Agents continue processing server-side during disconnects
 
-Ready to run in production? Please [check our deployment guides](https://hexdocs.pm/phoenix/deployment.html).
+## Getting Started
 
-## Learn more
+**Prerequisites:** Elixir, Erlang/OTP, PostgreSQL (or Docker), and an `OPENAI_API_KEY`.
 
-* Official website: https://www.phoenixframework.org/
-* Guides: https://hexdocs.pm/phoenix/overview.html
-* Docs: https://hexdocs.pm/phoenix
-* Forum: https://elixirforum.com/c/phoenix-forum
-* Source: https://github.com/phoenixframework/phoenix
+```bash
+# Start PostgreSQL via Docker
+docker compose up -d
+
+# Install deps, create DB, run migrations
+mix setup
+
+# Start the server
+mix phx.server
+```
+
+Visit [localhost:4000](http://localhost:4000), create a workspace, add agents, and start chatting.
+
+## Development
+
+```bash
+mix test            # Run tests
+mix precommit       # Format + compile + lint + dialyzer + test
+```

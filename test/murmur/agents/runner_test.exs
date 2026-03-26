@@ -47,6 +47,10 @@ defmodule Murmur.Agents.RunnerTest do
     test "returns :queued when agent is running", %{session: session} do
       stub_llm_success()
       assert Runner.send_message(session, "hello") == :queued
+
+      # Wait for the background Runner Task to finish
+      session_id = session.id
+      assert_receive {:message_completed, ^session_id, _}, 5000
     end
 
     test "returns :agent_not_running when agent process is dead" do

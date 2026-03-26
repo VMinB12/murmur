@@ -15,7 +15,6 @@ defmodule MurmurWeb.WorkspaceLiveTest do
   """
   use MurmurWeb.ConnCase
 
-  import Mox
   import Phoenix.LiveViewTest
 
   alias Murmur.Workspaces

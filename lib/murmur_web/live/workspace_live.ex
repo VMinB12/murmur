@@ -290,13 +290,19 @@ defmodule MurmurWeb.WorkspaceLive do
   # --- Agent Lifecycle ---
 
   defp ensure_agent_started(session) do
-    agent_module = Catalog.agent_module(session.agent_profile_id)
+    case Murmur.Jido.whereis(session.id) do
+      nil ->
+        agent_module = Catalog.agent_module(session.agent_profile_id)
 
-    case Murmur.Jido.start_agent(agent_module, id: session.id) do
-      {:ok, _pid} -> :ok
-      {:error, {:already_started, _pid}} -> :ok
-      {:error, {:already_registered, _pid}} -> :ok
-      _ -> :ok
+        case Murmur.Jido.start_agent(agent_module, id: session.id) do
+          {:ok, _pid} -> :ok
+          {:error, {:already_started, _pid}} -> :ok
+          {:error, {:already_registered, _pid}} -> :ok
+          _ -> :ok
+        end
+
+      _pid ->
+        :ok
     end
   end
 

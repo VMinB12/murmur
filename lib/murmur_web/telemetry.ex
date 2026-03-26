@@ -81,7 +81,7 @@ defmodule MurmurWeb.Telemetry do
       summary("vm.total_run_queue_lengths.total"),
       summary("vm.total_run_queue_lengths.cpu"),
       summary("vm.total_run_queue_lengths.io")
-    ]
+    ] ++ Jido.Telemetry.metrics()
   end
 
   defp periodic_measurements do

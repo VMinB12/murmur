@@ -47,6 +47,7 @@ defmodule Murmur.MixProject do
       {:git_hooks, "~> 0.8", only: [:dev]},
       {:dialyxir, "~> 1.0", only: [:dev, :test], runtime: false},
       {:credo, "~> 1.0", only: [:dev, :test]},
+      {:sobelow, "~> 0.13", only: [:dev, :test], runtime: false},
       {:jido, "~> 2.0"},
       {:phoenix, "~> 1.8.5"},
       {:phoenix_ecto, "~> 4.5"},
@@ -100,7 +101,8 @@ defmodule Murmur.MixProject do
         "deps.unlock --unused",
         "format",
         "test",
-        "credo --strict"
+        "credo --strict",
+        "sobelow --config"
       ]
     ]
   end

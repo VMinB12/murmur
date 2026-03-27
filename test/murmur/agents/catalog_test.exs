@@ -89,6 +89,8 @@ defmodule Murmur.Agents.CatalogTest do
 
     test "all profile modules export catalog_meta/0 with required fields" do
       for mod <- [GeneralAgent, ArxivAgent] do
+        Code.ensure_loaded!(mod)
+
         assert function_exported?(mod, :catalog_meta, 0),
                "#{inspect(mod)} must export catalog_meta/0"
 

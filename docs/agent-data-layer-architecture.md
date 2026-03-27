@@ -480,14 +480,14 @@ This is fighting the framework rather than working with it. Jido's Memory primit
 - Useful for long-running operations where you want to show intermediate state
 - Can be added without disrupting the artifact layer
 
-### Key Design Decisions to Make
+### Key Design Decisions
 
-1. **Memory space naming convention**: All artifact spaces should be prefixed consistently (e.g., `:artifact_papers`, `:artifact_queries`) to distinguish from cognitive memory spaces.
+1. **Artifact naming convention**: Artifact names use snake_case identifiers scoped to the tool domain (e.g., `"papers"`, `"query_results"`, `"document"`). No prefix is needed since artifacts live in their own assign (`@artifacts`) separate from Memory spaces.
 
-2. **Artifact signal payload**: Should artifact signals carry the full current state of the artifact (snapshot) or just the delta (incremental update)? Recommendation: **snapshot for initial load, deltas for updates**, with the LiveView caching the full state.
+2. **Artifact signal payload**: Snapshot for initial load, deltas for updates. Signals carry `mode: :replace | :append` — the LiveView maintains the full accumulated state and applies the mode. On page refresh, artifacts are currently lost (they live only in the LiveView process). Future: reload from agent Memory on mount.
 
-3. **Large artifact handling**: SQL results with 10k rows shouldn't sit entirely in agent process memory. Consider a reference-based approach: store large results in ETS or an LRU cache, and pass a reference in the artifact signal. The LiveView can fetch the full data on demand.
+3. **Large artifact handling**: **TODO (future)** — For now we assume artifacts fit comfortably in process memory. When SQL results or document collections grow large, implement a reference-based approach: store large results in ETS or an LRU cache and pass a reference in the artifact signal.
 
-4. **Frontend component architecture**: Should artifact renderers be LiveView function components, LiveComponents, or JS hooks? **Function components** for static display, **JS hooks** for interactive elements (PDF viewer, table with sorting, collaborative editor).
+4. **Frontend component architecture**: Function components for static display (lists, tables, JSON). JS hooks (via `phx-hook`) for interactive elements (PDF viewer, sortable tables, collaborative editor). Phase 1 provides a generic artifact renderer; Phase 2 will add type-specific components.
 
-5. **Artifact lifecycle**: When does an artifact get cleared? Options: on agent reset, on explicit clear action, TTL-based, or never (accumulate forever and let the user manage).
+5. **Artifact lifecycle**: **TODO (future)** — For now, artifacts accumulate indefinitely for the lifetime of the LiveView process. They are cleared when the user clears the team or removes an agent. Future options: explicit clear action, TTL-based expiry, or user-managed cleanup.

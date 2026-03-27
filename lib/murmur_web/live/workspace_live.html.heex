@@ -333,6 +333,68 @@
                 <% end %>
               </div>
 
+              <%!-- Artifacts Pane --%>
+              <% session_artifacts = Map.get(@artifacts, session.id, %{}) %>
+              <%= if session_artifacts != %{} do %>
+                <div class="border-t border-base-300/50">
+                  <details open class="group">
+                    <summary class="flex items-center gap-1.5 cursor-pointer px-3 py-1.5 text-xs font-medium text-base-content/60 hover:text-base-content/80 transition-colors bg-base-200/30">
+                      <.icon name="hero-square-3-stack-3d" class="w-3.5 h-3.5" />
+                      <span>Artifacts</span>
+                      <span class="text-[10px] text-base-content/40">
+                        ({map_size(session_artifacts)})
+                      </span>
+                      <.icon
+                        name="hero-chevron-right"
+                        class="w-3 h-3 ml-auto transition-transform group-open:rotate-90"
+                      />
+                    </summary>
+                    <div class="max-h-48 overflow-y-auto px-3 py-2 space-y-2">
+                      <%= for {name, data} <- session_artifacts do %>
+                        <div class="rounded-lg border border-base-300/50 overflow-hidden">
+                          <div class="flex items-center justify-between px-2.5 py-1.5 bg-base-200/40">
+                            <span class="text-[10px] uppercase tracking-wider font-semibold text-base-content/50">
+                              {name}
+                            </span>
+                            <%= if is_list(data) do %>
+                              <span class="text-[10px] text-base-content/40">
+                                {length(data)} items
+                              </span>
+                            <% end %>
+                          </div>
+                          <div class="px-2.5 py-2 text-xs text-base-content/70 max-h-32 overflow-y-auto">
+                            <%= cond do %>
+                              <% is_list(data) -> %>
+                                <div class="space-y-1">
+                                  <%= for {item, idx} <- Enum.with_index(data) do %>
+                                    <div class="flex gap-2 py-0.5 border-b border-base-300/30 last:border-b-0">
+                                      <span class="text-base-content/30 shrink-0">
+                                        {idx + 1}.
+                                      </span>
+                                      <span class="break-words min-w-0">
+                                        {artifact_item_label(item)}
+                                      </span>
+                                    </div>
+                                  <% end %>
+                                </div>
+                              <% is_map(data) -> %>
+                                <pre
+                                  class="whitespace-pre-wrap break-words text-[11px]"
+                                  phx-no-curly-interpolation
+                                >{Jason.encode!(data, pretty: true)}</pre>
+                              <% true -> %>
+                                <span class="whitespace-pre-wrap break-words">
+                                  {inspect(data)}
+                                </span>
+                            <% end %>
+                          </div>
+                        </div>
+                      <% end %>
+                    </div>
+                  </details>
+                </div>
+              <% end %>
+
               <%!-- Input --%>
               <div class="px-3 py-2 border-t border-base-300">
                 <.form

@@ -3,6 +3,7 @@ defmodule MurmurWeb.WorkspaceLive do
   use MurmurWeb, :live_view
 
   alias Jido.Signal.ID
+  alias Murmur.Agents.Artifact
   alias Murmur.Agents.Catalog
   alias Murmur.Agents.Runner
   alias Murmur.Agents.StreamingPlugin
@@ -33,6 +34,7 @@ defmodule MurmurWeb.WorkspaceLive do
       |> assign(:agent_statuses, Map.new(agent_sessions, &{&1.id, :idle}))
       |> assign(:streaming, Map.new(agent_sessions, &{&1.id, @empty_stream}))
       |> assign(:messages, messages_map)
+      |> assign(:artifacts, Map.new(agent_sessions, &{&1.id, %{}}))
       |> assign(:view_mode, :split)
       |> assign(:add_agent_form, to_form(%{"profile_id" => "", "display_name" => ""}, as: :agent))
 
@@ -42,6 +44,7 @@ defmodule MurmurWeb.WorkspaceLive do
           topic = agent_topic(workspace_id, session.id)
           Phoenix.PubSub.subscribe(Murmur.PubSub, topic)
           Phoenix.PubSub.subscribe(Murmur.PubSub, StreamingPlugin.stream_topic(session.id))
+          Phoenix.PubSub.subscribe(Murmur.PubSub, Artifact.artifact_topic(session.id))
           ensure_agent_started(session)
 
           status = get_agent_status(session.id)
@@ -101,6 +104,7 @@ defmodule MurmurWeb.WorkspaceLive do
         topic = agent_topic(workspace.id, session.id)
         Phoenix.PubSub.subscribe(Murmur.PubSub, topic)
         Phoenix.PubSub.subscribe(Murmur.PubSub, StreamingPlugin.stream_topic(session.id))
+        Phoenix.PubSub.subscribe(Murmur.PubSub, Artifact.artifact_topic(session.id))
         ensure_agent_started(session)
 
         socket =
@@ -109,6 +113,7 @@ defmodule MurmurWeb.WorkspaceLive do
           |> update(:messages, &Map.put(&1, session.id, []))
           |> update(:agent_statuses, &Map.put(&1, session.id, :idle))
           |> update(:streaming, &Map.put(&1, session.id, @empty_stream))
+          |> update(:artifacts, &Map.put(&1, session.id, %{}))
           |> assign(
             :add_agent_form,
             to_form(%{"profile_id" => "", "display_name" => ""}, as: :agent)
@@ -141,12 +146,14 @@ defmodule MurmurWeb.WorkspaceLive do
     empty_messages = Map.new(socket.assigns.agent_sessions, &{&1.id, []})
     empty_statuses = Map.new(socket.assigns.agent_sessions, &{&1.id, :idle})
     empty_streaming = Map.new(socket.assigns.agent_sessions, &{&1.id, @empty_stream})
+    empty_artifacts = Map.new(socket.assigns.agent_sessions, &{&1.id, %{}})
 
     {:noreply,
      socket
      |> assign(:messages, empty_messages)
      |> assign(:agent_statuses, empty_statuses)
-     |> assign(:streaming, empty_streaming)}
+     |> assign(:streaming, empty_streaming)
+     |> assign(:artifacts, empty_artifacts)}
   end
 
   def handle_event("toggle_view_mode", _params, socket) do
@@ -170,6 +177,7 @@ defmodule MurmurWeb.WorkspaceLive do
     topic = agent_topic(socket.assigns.workspace.id, session_id)
     Phoenix.PubSub.unsubscribe(Murmur.PubSub, topic)
     Phoenix.PubSub.unsubscribe(Murmur.PubSub, StreamingPlugin.stream_topic(session_id))
+    Phoenix.PubSub.unsubscribe(Murmur.PubSub, Artifact.artifact_topic(session_id))
     stop_agent(session_id)
     cleanup_storage(session)
     Workspaces.delete_agent_session(session)
@@ -182,6 +190,7 @@ defmodule MurmurWeb.WorkspaceLive do
       |> update(:messages, &Map.delete(&1, session_id))
       |> update(:agent_statuses, &Map.delete(&1, session_id))
       |> update(:streaming, &Map.delete(&1, session_id))
+      |> update(:artifacts, &Map.delete(&1, session_id))
 
     {:noreply, socket}
   end
@@ -329,6 +338,28 @@ defmodule MurmurWeb.WorkspaceLive do
 
   @impl true
   def handle_info({:agent_signal, _session_id, _signal}, socket) do
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_info({:artifact_update, session_id, name, data, mode}, socket) do
+    socket =
+      update(socket, :artifacts, fn artifacts ->
+        session_artifacts = Map.get(artifacts, session_id, %{})
+
+        updated =
+          case mode do
+            :append ->
+              existing = Map.get(session_artifacts, name, [])
+              Map.put(session_artifacts, name, existing ++ List.wrap(data))
+
+            _replace ->
+              Map.put(session_artifacts, name, data)
+          end
+
+        Map.put(artifacts, session_id, updated)
+      end)
+
     {:noreply, socket}
   end
 
@@ -582,4 +613,19 @@ defmodule MurmurWeb.WorkspaceLive do
       _ -> :idle
     end
   end
+
+  # --- Artifact Helpers ---
+
+  @doc false
+  def artifact_item_label(item) when is_map(item) do
+    # Try common label fields in priority order
+    item[:title] || item["title"] ||
+      item[:name] || item["name"] ||
+      item[:label] || item["label"] ||
+      item[:summary] || item["summary"] ||
+      inspect(item, limit: 80)
+  end
+
+  def artifact_item_label(item) when is_binary(item), do: item
+  def artifact_item_label(item), do: inspect(item, limit: 80)
 end

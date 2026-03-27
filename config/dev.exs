@@ -70,6 +70,9 @@ config :murmur, MurmurWeb.Endpoint,
     ]
   ]
 
+# Drop log messages longer than 500 chars (Jido state dumps, large Ecto payloads)
+config :murmur, :log_filter, true
+
 # Enable dev routes for dashboard and mailbox
 config :murmur, dev_routes: true
 

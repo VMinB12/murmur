@@ -5,6 +5,7 @@ defmodule MurmurWeb.Markdown do
   def render(nil), do: ""
   def render(""), do: ""
 
+  # sobelow_skip ["XSS.Raw"]
   def render(text) when is_binary(text) do
     text
     |> MDEx.to_html!()

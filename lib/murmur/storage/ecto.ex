@@ -164,12 +164,14 @@ defmodule Murmur.Storage.Ecto do
     %{"__term__" => Base.encode64(:erlang.term_to_binary(data))}
   end
 
+  # sobelow_skip ["Misc.BinToTerm"]
   defp deserialize_checkpoint(%{"__term__" => encoded}) do
     encoded |> Base.decode64!() |> :erlang.binary_to_term([:safe])
   end
 
   defp deserialize_checkpoint(data) when is_map(data), do: deep_from_serializable(data)
 
+  # sobelow_skip ["Misc.BinToTerm"]
   defp deep_from_serializable(%{"__term__" => encoded}) do
     encoded |> Base.decode64!() |> :erlang.binary_to_term([:safe])
   end

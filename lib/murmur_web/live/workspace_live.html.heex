@@ -36,6 +36,17 @@
             </button>
           </div>
           <button
+            id="toggle-task-board-btn"
+            phx-click="toggle_task_board"
+            class={[
+              "btn btn-ghost btn-sm",
+              if(@show_task_board, do: "text-primary", else: "text-base-content/60")
+            ]}
+            title="Task Board"
+          >
+            <.icon name="hero-clipboard-document-check" class="w-4 h-4" /> Tasks
+          </button>
+          <button
             id="clear-team-btn"
             phx-click="clear_team"
             data-confirm="Clear all conversations? This cannot be undone."
@@ -378,13 +389,21 @@
             <% end %>
           </div>
 
-          <%!-- Artifact Side Panel (split mode) --%>
+          <%!-- Artifact Side Panel / Task Board (split mode) --%>
           <div class="w-[480px] shrink-0">
-            <.artifact_panel
-              artifacts={@artifacts}
-              active_artifact={@active_artifact}
-              agent_sessions={@agent_sessions}
-            />
+            <%= if @show_task_board do %>
+              <TaskBoard.board
+                tasks={@tasks}
+                agent_sessions={@agent_sessions}
+                task_form={@task_form}
+              />
+            <% else %>
+              <.artifact_panel
+                artifacts={@artifacts}
+                active_artifact={@active_artifact}
+                agent_sessions={@agent_sessions}
+              />
+            <% end %>
           </div>
         </div>
 
@@ -745,13 +764,21 @@
             </div>
           </div>
 
-          <%!-- Artifact Side Panel (unified mode) --%>
+          <%!-- Artifact Side Panel / Task Board (unified mode) --%>
           <div class="w-[480px] shrink-0">
-            <.artifact_panel
-              artifacts={@artifacts}
-              active_artifact={@active_artifact}
-              agent_sessions={@agent_sessions}
-            />
+            <%= if @show_task_board do %>
+              <TaskBoard.board
+                tasks={@tasks}
+                agent_sessions={@agent_sessions}
+                task_form={@task_form}
+              />
+            <% else %>
+              <.artifact_panel
+                artifacts={@artifacts}
+                active_artifact={@active_artifact}
+                agent_sessions={@agent_sessions}
+              />
+            <% end %>
           </div>
         </div>
       <% end %>

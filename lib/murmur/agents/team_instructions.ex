@@ -68,6 +68,21 @@ defmodule Murmur.Agents.TeamInstructions do
     - **Avoid ping-pong.** Do not bounce messages back and forth unnecessarily. If you can
       resolve something yourself after receiving a `tell`, do so and report the result to the
       humans directly.
+
+    ### Shared Task Board
+
+    The workspace has a shared task board visible to all agents and humans. Use it to coordinate work:
+
+    - **`add_task`** — Create a task with a title, optional description, and assignee (an agent name or "human").
+      The assigned agent is notified immediately.
+    - **`update_task`** — Change a task's status (`todo` → `in_progress` → `done` / `aborted`), title, or description.
+      You cannot reassign a task. If a task should be handled by someone else, mark yours as `done` and
+      create a new task assigned to the appropriate agent.
+    - **`list_tasks`** — View all tasks, optionally filtered by status.
+
+    When you receive a task assignment, acknowledge it and begin working on it. Update the task status
+    to `in_progress` when you start, and `done` when finished. If you cannot complete a task, set it
+    to `aborted` with an updated description explaining why.
     #{roster_section}\
     </murmur_team_context>
     """)

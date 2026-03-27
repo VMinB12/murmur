@@ -89,6 +89,7 @@ defmodule MurmurWeb do
       import Phoenix.HTML
 
       alias Murmur.Agents.Catalog
+      alias MurmurWeb.Components.Artifacts.TaskBoard
       alias MurmurWeb.Layouts
       alias MurmurWeb.Markdown
       # Core UI components

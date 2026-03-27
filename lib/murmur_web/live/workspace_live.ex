@@ -11,7 +11,7 @@ defmodule MurmurWeb.WorkspaceLive do
 
   require Logger
 
-  @empty_stream %{content: "", thinking: ""}
+  @empty_stream %{content: "", thinking: "", tool_calls: [], usage: nil}
 
   @impl true
   def mount(%{"id" => workspace_id}, _session, socket) do
@@ -209,6 +209,16 @@ defmodule MurmurWeb.WorkspaceLive do
         append_assistant_message(current_messages, response)
       end
 
+    # Transfer accumulated usage from streaming state to the last assistant message
+    stream_state = Map.get(socket.assigns.streaming, session_id, @empty_stream)
+
+    messages =
+      if stream_state.usage do
+        attach_usage_to_last_assistant(messages, stream_state.usage)
+      else
+        messages
+      end
+
     socket =
       socket
       |> update(:messages, &Map.put(&1, session_id, messages))
@@ -276,8 +286,49 @@ defmodule MurmurWeb.WorkspaceLive do
   end
 
   @impl true
+  def handle_info({:agent_signal, session_id, %{type: "ai.tool.result", data: data}}, socket) do
+    tool_call = %{
+      name: data[:tool_name] || data["tool_name"] || "tool",
+      result: format_tool_result(data[:result] || data["result"]),
+      status: tool_result_status(data[:result] || data["result"])
+    }
+
+    socket =
+      update(socket, :streaming, fn streams ->
+        Map.update(streams, session_id, Map.put(@empty_stream, :tool_calls, [tool_call]), fn s ->
+          Map.update(s, :tool_calls, [tool_call], &(&1 ++ [tool_call]))
+        end)
+      end)
+
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_info({:agent_signal, session_id, %{type: "ai.usage", data: data}}, socket) do
+    usage = %{
+      input_tokens: data[:input_tokens] || data["input_tokens"] || 0,
+      output_tokens: data[:output_tokens] || data["output_tokens"] || 0,
+      total_tokens: data[:total_tokens] || data["total_tokens"] || 0,
+      model: data[:model] || data["model"],
+      duration_ms: data[:duration_ms] || data["duration_ms"]
+    }
+
+    # Accumulate usage across multiple LLM calls in a ReAct loop
+    socket =
+      update(socket, :streaming, fn streams ->
+        Map.update(streams, session_id, Map.put(@empty_stream, :usage, usage), fn s ->
+          Map.update(s, :usage, usage, fn
+            nil -> usage
+            prev -> merge_usage(prev, usage)
+          end)
+        end)
+      end)
+
+    {:noreply, socket}
+  end
+
+  @impl true
   def handle_info({:agent_signal, _session_id, _signal}, socket) do
-    # Future: handle ai.tool.result, ai.request.started, ai.usage, etc.
     {:noreply, socket}
   end
 
@@ -302,6 +353,49 @@ defmodule MurmurWeb.WorkspaceLive do
       end)
     end)
   end
+
+  defp format_tool_result({:ok, result, _effects}), do: truncate_result(inspect(result))
+  defp format_tool_result({:error, reason, _effects}), do: truncate_result("Error: #{inspect(reason)}")
+  defp format_tool_result({:ok, result}), do: truncate_result(inspect(result))
+  defp format_tool_result({:error, reason}), do: truncate_result("Error: #{inspect(reason)}")
+  defp format_tool_result(other), do: truncate_result(inspect(other))
+
+  defp truncate_result(str) when byte_size(str) > 500, do: String.slice(str, 0, 500) <> "…"
+  defp truncate_result(str), do: str
+
+  defp tool_result_status({:ok, _, _}), do: :completed
+  defp tool_result_status({:ok, _}), do: :completed
+  defp tool_result_status({:error, _, _}), do: :error
+  defp tool_result_status({:error, _}), do: :error
+  defp tool_result_status(_), do: :completed
+
+  defp merge_usage(prev, new) do
+    %{
+      input_tokens: (prev.input_tokens || 0) + (new.input_tokens || 0),
+      output_tokens: (prev.output_tokens || 0) + (new.output_tokens || 0),
+      total_tokens: (prev.total_tokens || 0) + (new.total_tokens || 0),
+      model: new.model || prev.model,
+      duration_ms: sum_duration(prev.duration_ms, new.duration_ms)
+    }
+  end
+
+  defp sum_duration(nil, nil), do: nil
+  defp sum_duration(a, nil), do: a
+  defp sum_duration(nil, b), do: b
+  defp sum_duration(a, b), do: a + b
+
+  defp attach_usage_to_last_assistant(messages, usage) do
+    messages
+    |> Enum.reverse()
+    |> do_attach_usage(usage)
+    |> Enum.reverse()
+  end
+
+  defp do_attach_usage([%{role: "assistant"} = msg | rest], usage) do
+    [Map.put(msg, :usage, usage) | rest]
+  end
+
+  defp do_attach_usage(other, _usage), do: other
 
   defp load_messages_for_session(session) do
     pid = Murmur.Jido.whereis(session.id)

@@ -454,6 +454,81 @@ defmodule MurmurWeb.WorkspaceLiveTest do
       # Streaming area should be cleared, full message shown
       assert html =~ "Full response"
     end
+
+    test "tool result signal shows tool call in streaming area", %{
+      conn: conn,
+      workspace: workspace,
+      session: session
+    } do
+      {:ok, view, _html} = live(conn, ~p"/workspaces/#{workspace.id}")
+
+      send(
+        view.pid,
+        {:agent_signal, session.id,
+         %{type: "ai.tool.result", data: %{tool_name: "search_web", result: {:ok, "3 results", []}}}}
+      )
+
+      html = render(view)
+      assert html =~ "search_web"
+      assert html =~ "Completed"
+    end
+
+    test "usage signal attaches to completed message", %{
+      conn: conn,
+      workspace: workspace,
+      session: session
+    } do
+      {:ok, view, _html} = live(conn, ~p"/workspaces/#{workspace.id}")
+
+      send(
+        view.pid,
+        {:agent_signal, session.id,
+         %{
+           type: "ai.usage",
+           data: %{input_tokens: 100, output_tokens: 50, total_tokens: 150, model: "gpt-5-mini", duration_ms: 1200}
+         }}
+      )
+
+      send(view.pid, {:message_completed, session.id, "Done"})
+
+      html = render(view)
+      assert html =~ "100 in"
+      assert html =~ "50 out"
+      assert html =~ "150 total"
+    end
+
+    test "usage accumulates across multiple LLM calls", %{
+      conn: conn,
+      workspace: workspace,
+      session: session
+    } do
+      {:ok, view, _html} = live(conn, ~p"/workspaces/#{workspace.id}")
+
+      send(
+        view.pid,
+        {:agent_signal, session.id,
+         %{
+           type: "ai.usage",
+           data: %{input_tokens: 100, output_tokens: 50, total_tokens: 150, model: "gpt-5-mini", duration_ms: 500}
+         }}
+      )
+
+      send(
+        view.pid,
+        {:agent_signal, session.id,
+         %{
+           type: "ai.usage",
+           data: %{input_tokens: 200, output_tokens: 80, total_tokens: 280, model: "gpt-5-mini", duration_ms: 700}
+         }}
+      )
+
+      send(view.pid, {:message_completed, session.id, "Final answer"})
+
+      html = render(view)
+      assert html =~ "300 in"
+      assert html =~ "130 out"
+      assert html =~ "430 total"
+    end
   end
 
   # --- Inter-agent messages visible in UI ---

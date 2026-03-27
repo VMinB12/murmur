@@ -357,18 +357,19 @@
                     for={%{}}
                     id={"msg-form-#{session.id}"}
                     phx-submit="send_message"
-                    class="flex gap-2"
+                    class="chat-input-wrap"
                   >
                     <input type="hidden" name="message[session_id]" value={session.id} />
-                    <input
-                      type="text"
+                    <textarea
+                      id={"chat-input-#{session.id}"}
                       name="message[content]"
-                      placeholder="Type a message..."
+                      placeholder="Type a message…"
                       autocomplete="off"
-                      class="input input-bordered input-sm flex-1"
-                      phx-debounce="100"
+                      rows="1"
+                      class="chat-input"
+                      phx-hook=".ChatInput"
                     />
-                    <button type="submit" class="btn btn-primary btn-sm">
+                    <button type="submit" class="chat-send-btn" aria-label="Send message">
                       <.icon name="hero-paper-airplane" class="w-4 h-4" />
                     </button>
                   </.form>
@@ -726,17 +727,18 @@
                 for={%{}}
                 id="unified-msg-form"
                 phx-submit="send_unified_message"
-                class="flex gap-2"
+                class="chat-input-wrap"
               >
-                <input
-                  type="text"
+                <textarea
+                  id="unified-chat-input"
                   name="message[content]"
-                  placeholder={"@#{if(hd_session = List.first(@agent_sessions), do: hd_session.display_name, else: "agent")} message... or just type to send to first agent"}
+                  placeholder={"@#{if(hd_session = List.first(@agent_sessions), do: hd_session.display_name, else: "agent")} message… or just type to send to first agent"}
                   autocomplete="off"
-                  class="input input-bordered input-sm flex-1"
-                  phx-debounce="100"
+                  rows="1"
+                  class="chat-input"
+                  phx-hook=".ChatInput"
                 />
-                <button type="submit" class="btn btn-primary btn-sm">
+                <button type="submit" class="chat-send-btn" aria-label="Send message">
                   <.icon name="hero-paper-airplane" class="w-4 h-4" />
                 </button>
               </.form>
@@ -807,6 +809,37 @@
       <button>close</button>
     </form>
   </dialog>
+
+  <%!-- ChatInput colocated JS hook: auto-resize, Enter to submit, Shift+Enter for newline, clear on submit --%>
+  <script :type={Phoenix.LiveView.ColocatedHook} name=".ChatInput">
+    export default {
+      mounted() {
+        this.form = this.el.closest("form")
+
+        this.el.addEventListener("input", () => this.resize())
+        this.el.addEventListener("keydown", (e) => {
+          if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault()
+            if (this.el.value.trim() !== "") {
+              this.form.requestSubmit()
+            }
+          }
+        })
+
+        this.form.addEventListener("submit", () => {
+          requestAnimationFrame(() => {
+            this.form.reset()
+            this.resize()
+          })
+        })
+      },
+      resize() {
+        this.el.style.height = "auto"
+        const max = 6 * parseFloat(getComputedStyle(this.el).lineHeight || 20)
+        this.el.style.height = Math.min(this.el.scrollHeight, max) + "px"
+      }
+    }
+  </script>
 
   <%!-- AutoScroll colocated JS hook --%>
   <script :type={Phoenix.LiveView.ColocatedHook} name=".AutoScroll">

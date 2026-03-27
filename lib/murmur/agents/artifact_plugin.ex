@@ -1,18 +1,21 @@
 defmodule Murmur.Agents.ArtifactPlugin do
   @moduledoc """
-  Jido Plugin that intercepts `artifact.*` signals emitted by tool actions
-  and broadcasts them to the LiveView via PubSub.
+  Jido Plugin that intercepts `artifact.*` signals emitted by tool actions,
+  persists artifact data in agent state, and broadcasts updates to the
+  LiveView via PubSub.
 
   Tool actions emit artifact signals through `Murmur.Agents.Artifact.emit/4`,
   which returns an `Emit` directive. When the AgentServer drains that directive,
   the signal flows through this plugin's `handle_signal/2` before reaching the
   router.
 
-  The plugin re-broadcasts the artifact payload as:
-
-      {:artifact_update, session_id, artifact_name, data, mode}
-
-  on the PubSub topic `"agent_artifacts:<session_id>"`.
+  The plugin:
+  1. Broadcasts the artifact payload as
+     `{:artifact_update, session_id, artifact_name, data, mode}`
+     on the PubSub topic `"agent_artifacts:<session_id>"`.
+  2. Overrides routing to the `StoreArtifact` action which merges the
+     artifact data into `agent.state.artifacts`, ensuring it survives
+     hibernate/thaw and page refresh.
 
   ## Signal contract
 
@@ -30,6 +33,7 @@ defmodule Murmur.Agents.ArtifactPlugin do
     actions: [],
     signal_patterns: ["artifact.*"]
 
+  alias Murmur.Agents.Actions.StoreArtifact
   alias Murmur.Agents.Artifact
 
   @impl Jido.Plugin
@@ -47,7 +51,8 @@ defmodule Murmur.Agents.ArtifactPlugin do
       {:artifact_update, session_id, artifact_name, artifact_data, mode}
     )
 
-    # Override routing — no action for artifact signals; Noop prevents routing errors
-    {:ok, {:override, Jido.Actions.Control.Noop}}
+    # Override routing to StoreArtifact so the data is persisted in agent state
+    {:ok,
+     {:override, {StoreArtifact, %{artifact_name: artifact_name, artifact_data: artifact_data, artifact_mode: mode}}}}
   end
 end

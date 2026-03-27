@@ -20,10 +20,15 @@ defmodule MurmurWeb.WorkspaceLive do
     agent_sessions = Workspaces.list_agent_sessions(workspace_id)
     profiles = Catalog.list_profiles()
 
-    # Build initial messages map from agent threads or persisted storage
+    # Build initial messages and artifacts from agent state or persisted storage
     messages_map =
       Map.new(agent_sessions, fn session ->
         {session.id, load_messages_for_session(session)}
+      end)
+
+    artifacts_map =
+      Map.new(agent_sessions, fn session ->
+        {session.id, load_artifacts_for_session(session)}
       end)
 
     socket =
@@ -34,7 +39,7 @@ defmodule MurmurWeb.WorkspaceLive do
       |> assign(:agent_statuses, Map.new(agent_sessions, &{&1.id, :idle}))
       |> assign(:streaming, Map.new(agent_sessions, &{&1.id, @empty_stream}))
       |> assign(:messages, messages_map)
-      |> assign(:artifacts, Map.new(agent_sessions, &{&1.id, %{}}))
+      |> assign(:artifacts, artifacts_map)
       |> assign(:active_artifact, nil)
       |> assign(:view_mode, :split)
       |> assign(:add_agent_form, to_form(%{"profile_id" => "", "display_name" => ""}, as: :agent))
@@ -486,6 +491,31 @@ defmodule MurmurWeb.WorkspaceLive do
 
   defp get_in_thread(%{state: %{__thread__: thread}}) when not is_nil(thread), do: thread
   defp get_in_thread(_), do: nil
+
+  defp load_artifacts_for_session(session) do
+    pid = Murmur.Jido.whereis(session.id)
+
+    if pid do
+      case Jido.AgentServer.state(pid) do
+        {:ok, %{agent: agent}} -> extract_artifacts(agent)
+        _ -> load_artifacts_from_storage(session)
+      end
+    else
+      load_artifacts_from_storage(session)
+    end
+  end
+
+  defp load_artifacts_from_storage(session) do
+    agent_module = Catalog.agent_module(session.agent_profile_id)
+
+    case Murmur.Jido.thaw(agent_module, session.id) do
+      {:ok, agent} -> extract_artifacts(agent)
+      {:error, :not_found} -> %{}
+    end
+  end
+
+  defp extract_artifacts(%{state: %{artifacts: artifacts}}) when is_map(artifacts), do: artifacts
+  defp extract_artifacts(_), do: %{}
 
   defp cleanup_storage(session) do
     {adapter, opts} = Murmur.Jido.__jido_storage__()

@@ -3,6 +3,7 @@ defmodule Murmur.Agents.Profiles.GeneralAgent do
 
   use Jido.AI.Agent,
     name: "general_agent",
+    description: "A helpful general-purpose assistant",
     model: :fast,
     tools: [Murmur.Agents.TellAction],
     plugins: [Murmur.Agents.StreamingPlugin, Murmur.Agents.ArtifactPlugin],
@@ -10,4 +11,6 @@ defmodule Murmur.Agents.Profiles.GeneralAgent do
     system_prompt: """
     You are a helpful assistant. Be concise and accurate in your responses.
     """
+
+  def catalog_meta, do: %{color: "blue"}
 end

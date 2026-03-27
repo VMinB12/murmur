@@ -1,16 +1,10 @@
 defmodule Murmur.Agents.Catalog do
-  @moduledoc "Maps agent profile IDs to their module and display metadata."
+  @moduledoc "Discovers agent profiles from registered modules under Murmur.Agents.Profiles."
 
-  @profiles %{
-    "general_agent" => {
-      Murmur.Agents.Profiles.GeneralAgent,
-      %{description: "A helpful general-purpose assistant", color: "blue"}
-    },
-    "arxiv_agent" => {
-      Murmur.Agents.Profiles.ArxivAgent,
-      %{description: "Research assistant with arXiv paper search and display", color: "violet"}
-    }
-  }
+  @profile_modules [
+    Murmur.Agents.Profiles.GeneralAgent,
+    Murmur.Agents.Profiles.ArxivAgent
+  ]
 
   @color_palette ~w(blue emerald violet amber rose cyan fuchsia lime)
 
@@ -66,26 +60,32 @@ defmodule Murmur.Agents.Catalog do
   }
 
   def list_profiles do
-    Enum.map(@profiles, fn {id, {_module, meta}} ->
-      Map.put(meta, :id, id)
+    Enum.map(@profile_modules, fn mod ->
+      meta = mod.catalog_meta()
+      %{id: mod.name(), description: mod.description(), color: meta.color}
     end)
   end
 
   def get_profile!(id) do
-    case Map.fetch(@profiles, id) do
-      {:ok, {module, meta}} ->
-        %{id: id, agent_module: module, description: meta.description, color: meta.color}
-
-      :error ->
+    case find_module(id) do
+      nil ->
         raise "Unknown agent profile: #{id}"
+
+      mod ->
+        meta = mod.catalog_meta()
+        %{id: id, agent_module: mod, description: mod.description(), color: meta.color}
     end
   end
 
   def agent_module(profile_id) do
-    case Map.fetch(@profiles, profile_id) do
-      {:ok, {module, _meta}} -> module
-      :error -> raise "Unknown agent profile: #{profile_id}"
+    case find_module(profile_id) do
+      nil -> raise "Unknown agent profile: #{profile_id}"
+      mod -> mod
     end
+  end
+
+  defp find_module(profile_id) do
+    Enum.find(@profile_modules, fn mod -> mod.name() == profile_id end)
   end
 
   @doc "Returns Tailwind CSS classes for a given color name."

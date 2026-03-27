@@ -87,6 +87,16 @@ defmodule Murmur.Agents.CatalogTest do
       assert function_exported?(ArxivAgent, :await, 2)
     end
 
+    test "all profile modules export catalog_meta/0 with required fields" do
+      for mod <- [GeneralAgent, ArxivAgent] do
+        assert function_exported?(mod, :catalog_meta, 0),
+               "#{inspect(mod)} must export catalog_meta/0"
+
+        meta = mod.catalog_meta()
+        assert is_binary(meta.color), "#{inspect(mod)}.catalog_meta().color must be a string"
+      end
+    end
+
     test "MessageInjector exports transform_request/4" do
       Code.ensure_loaded!(MessageInjector)
       assert function_exported?(MessageInjector, :transform_request, 4)

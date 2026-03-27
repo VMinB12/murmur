@@ -3,6 +3,7 @@ defmodule Murmur.Agents.Profiles.ArxivAgent do
 
   use Jido.AI.Agent,
     name: "arxiv_agent",
+    description: "Research assistant with arXiv paper search and display",
     model: :fast,
     tools: [
       Murmur.Agents.TellAction,
@@ -17,4 +18,6 @@ defmodule Murmur.Agents.Profiles.ArxivAgent do
     Be proactive in suggesting to display papers that might be relevant.
     When presenting search results, briefly summarize each paper's key contribution.
     """
+
+  def catalog_meta, do: %{color: "violet"}
 end

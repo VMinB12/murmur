@@ -500,9 +500,13 @@ It _could_ also inject a custom system prompt by replacing the first `:system` m
 
 A cleaner path: keep `MessageInjector` focused on its two current per-turn jobs (team instructions + pending messages). Handle system prompt via Option 3.
 
-#### Option 3: `ai.react.set_system_prompt` signal — RECOMMENDED
+#### Option 3: `ai.react.set_system_prompt` signal — DECIDED ✓
+
+**Decision (2026-03-27):** Option 3 is the chosen approach for user-defined agent system prompts.
 
 Jido's ReAct strategy has a built-in action `ai.react.set_system_prompt` that **persistently updates** the agent's system prompt at runtime. It modifies `config.system_prompt`, the base `context.system_prompt`, and the active `run_context.system_prompt` all at once.
+
+The `MessageInjector` stays focused on its two per-turn responsibilities (team roster + pending messages). System prompt is a one-time identity concern handled at agent startup via signal — not re-evaluated every turn.
 
 The flow for a user-defined agent would be:
 

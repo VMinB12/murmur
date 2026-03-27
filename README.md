@@ -4,11 +4,15 @@ A real-time multi-agent chat interface built with Phoenix LiveView and the [Jido
 
 ## Features
 
+![Murmur multi-agent workspace with three agents collaborating](example.png)
+
 - **Multi-agent workspaces** — Add multiple AI agents, each with independent chat history
 - **Agent-to-agent messaging** — Agents communicate via the "tell" tool, with message queuing when busy
 - **Real-time streaming** — Token-by-token responses over WebSocket
 - **Persistent conversations** — History survives server restarts via hibernate/thaw
 - **Autonomous execution** — Agents continue processing server-side during disconnects
+- **Agents produce artifacts** - Agents can produce artifacts that affect the UI, e.g. the Arxiv agent can display papers.
+- **Tasks** - Agents manage a task board to track their work, allowing long-running agents to converge on complex goals over multiple interactions.
 
 ## Getting Started
 

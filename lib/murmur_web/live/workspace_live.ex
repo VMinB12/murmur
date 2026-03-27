@@ -35,6 +35,7 @@ defmodule MurmurWeb.WorkspaceLive do
       |> assign(:streaming, Map.new(agent_sessions, &{&1.id, @empty_stream}))
       |> assign(:messages, messages_map)
       |> assign(:artifacts, Map.new(agent_sessions, &{&1.id, %{}}))
+      |> assign(:active_artifact, nil)
       |> assign(:view_mode, :split)
       |> assign(:add_agent_form, to_form(%{"profile_id" => "", "display_name" => ""}, as: :agent))
 
@@ -153,12 +154,21 @@ defmodule MurmurWeb.WorkspaceLive do
      |> assign(:messages, empty_messages)
      |> assign(:agent_statuses, empty_statuses)
      |> assign(:streaming, empty_streaming)
-     |> assign(:artifacts, empty_artifacts)}
+     |> assign(:artifacts, empty_artifacts)
+     |> assign(:active_artifact, nil)}
   end
 
   def handle_event("toggle_view_mode", _params, socket) do
     new_mode = if socket.assigns.view_mode == :split, do: :unified, else: :split
     {:noreply, assign(socket, :view_mode, new_mode)}
+  end
+
+  def handle_event("open_artifact", %{"session-id" => session_id, "name" => name}, socket) do
+    {:noreply, assign(socket, :active_artifact, %{session_id: session_id, name: name})}
+  end
+
+  def handle_event("close_artifact", _params, socket) do
+    {:noreply, assign(socket, :active_artifact, nil)}
   end
 
   def handle_event("send_unified_message", %{"message" => %{"content" => content}}, socket) do
@@ -191,6 +201,13 @@ defmodule MurmurWeb.WorkspaceLive do
       |> update(:agent_statuses, &Map.delete(&1, session_id))
       |> update(:streaming, &Map.delete(&1, session_id))
       |> update(:artifacts, &Map.delete(&1, session_id))
+      |> then(fn s ->
+        if s.assigns.active_artifact && s.assigns.active_artifact.session_id == session_id do
+          assign(s, :active_artifact, nil)
+        else
+          s
+        end
+      end)
 
     {:noreply, socket}
   end
@@ -326,10 +343,7 @@ defmodule MurmurWeb.WorkspaceLive do
     socket =
       update(socket, :streaming, fn streams ->
         Map.update(streams, session_id, Map.put(@empty_stream, :usage, usage), fn s ->
-          Map.update(s, :usage, usage, fn
-            nil -> usage
-            prev -> merge_usage(prev, usage)
-          end)
+          Map.update(s, :usage, usage, &merge_usage_or_set(&1, usage))
         end)
       end)
 
@@ -359,6 +373,13 @@ defmodule MurmurWeb.WorkspaceLive do
 
         Map.put(artifacts, session_id, updated)
       end)
+
+    socket =
+      if is_nil(socket.assigns.active_artifact) do
+        assign(socket, :active_artifact, %{session_id: session_id, name: name})
+      else
+        socket
+      end
 
     {:noreply, socket}
   end
@@ -399,6 +420,9 @@ defmodule MurmurWeb.WorkspaceLive do
   defp tool_result_status({:error, _, _}), do: :error
   defp tool_result_status({:error, _}), do: :error
   defp tool_result_status(_), do: :completed
+
+  defp merge_usage_or_set(nil, usage), do: usage
+  defp merge_usage_or_set(prev, usage), do: merge_usage(prev, usage)
 
   defp merge_usage(prev, new) do
     %{
@@ -613,19 +637,4 @@ defmodule MurmurWeb.WorkspaceLive do
       _ -> :idle
     end
   end
-
-  # --- Artifact Helpers ---
-
-  @doc false
-  def artifact_item_label(item) when is_map(item) do
-    # Try common label fields in priority order
-    item[:title] || item["title"] ||
-      item[:name] || item["name"] ||
-      item[:label] || item["label"] ||
-      item[:summary] || item["summary"] ||
-      inspect(item, limit: 80)
-  end
-
-  def artifact_item_label(item) when is_binary(item), do: item
-  def artifact_item_label(item), do: inspect(item, limit: 80)
 end

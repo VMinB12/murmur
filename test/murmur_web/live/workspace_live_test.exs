@@ -74,11 +74,11 @@ defmodule MurmurWeb.WorkspaceLiveTest do
 
       view
       |> form("#add-agent-form",
-        agent: %{profile_id: "code_agent", display_name: "Coder"}
+        agent: %{profile_id: "arxiv_agent", display_name: "Coder"}
       )
       |> render_submit()
 
-      assert has_element?(view, "span", "code_agent")
+      assert has_element?(view, "span", "arxiv_agent")
     end
 
     test "adding two agents shows two columns", %{conn: conn, workspace: workspace} do
@@ -92,7 +92,7 @@ defmodule MurmurWeb.WorkspaceLiveTest do
 
       view
       |> form("#add-agent-form",
-        agent: %{profile_id: "code_agent", display_name: "Bob"}
+        agent: %{profile_id: "arxiv_agent", display_name: "Bob"}
       )
       |> render_submit()
 
@@ -113,7 +113,7 @@ defmodule MurmurWeb.WorkspaceLiveTest do
       html =
         view
         |> form("#add-agent-form",
-          agent: %{profile_id: "code_agent", display_name: "Alice"}
+          agent: %{profile_id: "arxiv_agent", display_name: "Alice"}
         )
         |> render_submit()
 
@@ -578,7 +578,7 @@ defmodule MurmurWeb.WorkspaceLiveTest do
 
       {:ok, bob} =
         Workspaces.create_agent_session(workspace.id, %{
-          "agent_profile_id" => "code_agent",
+          "agent_profile_id" => "arxiv_agent",
           "display_name" => "Bob"
         })
 
@@ -683,18 +683,18 @@ defmodule MurmurWeb.WorkspaceLiveTest do
       assert html =~ expected_color
     end
 
-    test "agent header shows colored indicator for code_agent", %{
+    test "agent header shows colored indicator for arxiv_agent", %{
       conn: conn,
       workspace: workspace
     } do
       {:ok, _} =
         Workspaces.create_agent_session(workspace.id, %{
-          "agent_profile_id" => "code_agent",
+          "agent_profile_id" => "arxiv_agent",
           "display_name" => "Coder"
         })
 
       {:ok, _view, html} = live(conn, ~p"/workspaces/#{workspace.id}")
-      expected_color = Catalog.agent_color("code_agent", "Coder").dot
+      expected_color = Catalog.agent_color("arxiv_agent", "Coder").dot
       assert html =~ expected_color
     end
   end
@@ -761,7 +761,7 @@ defmodule MurmurWeb.WorkspaceLiveTest do
 
       {:ok, bob} =
         Workspaces.create_agent_session(workspace.id, %{
-          "agent_profile_id" => "code_agent",
+          "agent_profile_id" => "arxiv_agent",
           "display_name" => "Bob"
         })
 

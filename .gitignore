@@ -38,3 +38,16 @@ npm-debug.log
 data/
 
 .agents/
+
+# Environment files
+.env
+.env.*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor directories
+.idea/
+*.swp
+*.tmp

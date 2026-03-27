@@ -125,7 +125,7 @@ defmodule Murmur.WorkspacesTest do
 
       assert {:error, changeset} =
                Workspaces.create_agent_session(workspace.id, %{
-                 "agent_profile_id" => "code_agent",
+                 "agent_profile_id" => "arxiv_agent",
                  "display_name" => "Alice"
                })
 
@@ -197,7 +197,7 @@ defmodule Murmur.WorkspacesTest do
 
       {:ok, s2} =
         Workspaces.create_agent_session(workspace.id, %{
-          "agent_profile_id" => "code_agent",
+          "agent_profile_id" => "arxiv_agent",
           "display_name" => "Second"
         })
 

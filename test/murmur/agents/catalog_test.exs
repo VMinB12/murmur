@@ -9,7 +9,7 @@ defmodule Murmur.Agents.CatalogTest do
 
   alias Murmur.Agents.Catalog
   alias Murmur.Agents.MessageInjector
-  alias Murmur.Agents.Profiles.CodeAgent
+  alias Murmur.Agents.Profiles.ArxivAgent
   alias Murmur.Agents.Profiles.GeneralAgent
   alias Murmur.Agents.TellAction
 
@@ -35,10 +35,10 @@ defmodule Murmur.Agents.CatalogTest do
       assert "general_agent" in ids
     end
 
-    test "includes code_agent profile" do
+    test "includes arxiv_agent profile" do
       profiles = Catalog.list_profiles()
       ids = Enum.map(profiles, & &1.id)
-      assert "code_agent" in ids
+      assert "arxiv_agent" in ids
     end
   end
 
@@ -63,8 +63,8 @@ defmodule Murmur.Agents.CatalogTest do
       assert Catalog.agent_module("general_agent") == GeneralAgent
     end
 
-    test "returns the module for code_agent" do
-      assert Catalog.agent_module("code_agent") == CodeAgent
+    test "returns the module for arxiv_agent" do
+      assert Catalog.agent_module("arxiv_agent") == ArxivAgent
     end
 
     test "raises for unknown profile id" do
@@ -81,10 +81,10 @@ defmodule Murmur.Agents.CatalogTest do
       assert function_exported?(GeneralAgent, :await, 2)
     end
 
-    test "CodeAgent module is a valid Jido.AI.Agent" do
-      Code.ensure_loaded!(CodeAgent)
-      assert function_exported?(CodeAgent, :ask, 3)
-      assert function_exported?(CodeAgent, :await, 2)
+    test "ArxivAgent module is a valid Jido.AI.Agent" do
+      Code.ensure_loaded!(ArxivAgent)
+      assert function_exported?(ArxivAgent, :ask, 3)
+      assert function_exported?(ArxivAgent, :await, 2)
     end
 
     test "MessageInjector exports transform_request/4" do

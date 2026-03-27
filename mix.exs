@@ -69,6 +69,7 @@ defmodule Murmur.MixProject do
       {:gettext, "~> 1.0"},
       {:jason, "~> 1.2"},
       {:mdex, "~> 0.4"},
+      {:sweet_xml, "~> 0.7"},
       {:dns_cluster, "~> 0.2.0"},
       {:bandit, "~> 1.5"}
     ]

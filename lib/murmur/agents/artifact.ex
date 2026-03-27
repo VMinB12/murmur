@@ -45,9 +45,8 @@ defmodule Murmur.Agents.Artifact do
 
   """
   @spec emit(map(), String.t(), term(), keyword()) :: Directive.Emit.t()
-  def emit(ctx, name, data, opts \\ []) do
+  def emit(_ctx, name, data, opts \\ []) do
     mode = Keyword.get(opts, :mode, :replace)
-    session_id = get_session_id(ctx)
 
     signal =
       Jido.Signal.new!(
@@ -56,18 +55,9 @@ defmodule Murmur.Agents.Artifact do
         source: "/artifact/#{name}"
       )
 
-    %Directive.Emit{
-      signal: signal,
-      dispatch: {:pubsub, target: Murmur.PubSub, topic: artifact_topic(session_id)}
-    }
+    %Directive.Emit{signal: signal}
   end
 
   @doc "PubSub topic for artifact updates for the given session."
   def artifact_topic(session_id), do: "agent_artifacts:#{session_id}"
-
-  defp get_session_id(%{agent: %{id: id}}), do: id
-  defp get_session_id(%{"agent" => %{id: id}}), do: id
-  defp get_session_id(%{agent_id: id}), do: id
-  defp get_session_id(%{"agent_id" => id}), do: id
-  defp get_session_id(_), do: "unknown"
 end

@@ -6,9 +6,9 @@ defmodule Murmur.Agents.Catalog do
       Murmur.Agents.Profiles.GeneralAgent,
       %{description: "A helpful general-purpose assistant", color: "blue"}
     },
-    "code_agent" => {
-      Murmur.Agents.Profiles.CodeAgent,
-      %{description: "An expert programmer for code review and debugging", color: "emerald"}
+    "arxiv_agent" => {
+      Murmur.Agents.Profiles.ArxivAgent,
+      %{description: "Research assistant with arXiv paper search and display", color: "violet"}
     }
   }
 

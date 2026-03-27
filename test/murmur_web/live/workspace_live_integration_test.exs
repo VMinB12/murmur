@@ -140,7 +140,7 @@ defmodule MurmurWeb.WorkspaceLiveIntegrationTest do
     } do
       {:ok, bob_session} =
         Workspaces.create_agent_session(workspace.id, %{
-          "agent_profile_id" => "code_agent",
+          "agent_profile_id" => "arxiv_agent",
           "display_name" => "Bob"
         })
 

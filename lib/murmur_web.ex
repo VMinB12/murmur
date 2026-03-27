@@ -82,6 +82,7 @@ defmodule MurmurWeb do
       # Translation
       use Gettext, backend: MurmurWeb.Gettext
 
+      import MurmurWeb.Components.Artifacts
       import MurmurWeb.CoreComponents
 
       # HTML escaping functionality

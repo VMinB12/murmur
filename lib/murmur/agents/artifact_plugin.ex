@@ -47,6 +47,7 @@ defmodule Murmur.Agents.ArtifactPlugin do
       {:artifact_update, session_id, artifact_name, artifact_data, mode}
     )
 
-    {:ok, :continue}
+    # Override routing — no action for artifact signals; Noop prevents routing errors
+    {:ok, {:override, Jido.Actions.Control.Noop}}
   end
 end

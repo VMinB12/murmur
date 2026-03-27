@@ -31,7 +31,7 @@ defmodule MurmurWeb.WorkspaceLiveReconnectTest do
 
       {:ok, _} =
         Workspaces.create_agent_session(workspace.id, %{
-          "agent_profile_id" => "code_agent",
+          "agent_profile_id" => "arxiv_agent",
           "display_name" => "Bob"
         })
 
@@ -58,7 +58,7 @@ defmodule MurmurWeb.WorkspaceLiveReconnectTest do
 
       {:ok, _} =
         Workspaces.create_agent_session(workspace.id, %{
-          "agent_profile_id" => "code_agent",
+          "agent_profile_id" => "arxiv_agent",
           "display_name" => "Coder"
         })
 
@@ -66,7 +66,7 @@ defmodule MurmurWeb.WorkspaceLiveReconnectTest do
 
       # Profile types should be visible
       assert has_element?(view, "span", "general_agent")
-      assert has_element?(view, "span", "code_agent")
+      assert has_element?(view, "span", "arxiv_agent")
     end
 
     test "each agent column has its own message form after reconnect", %{
@@ -81,7 +81,7 @@ defmodule MurmurWeb.WorkspaceLiveReconnectTest do
 
       {:ok, bob} =
         Workspaces.create_agent_session(workspace.id, %{
-          "agent_profile_id" => "code_agent",
+          "agent_profile_id" => "arxiv_agent",
           "display_name" => "Bob"
         })
 

@@ -8,6 +8,7 @@ defmodule MurmurWeb.WorkspaceLive do
   alias Murmur.Agents.Runner
   alias Murmur.Agents.StreamingPlugin
   alias Murmur.Agents.UITurn
+  alias Murmur.Tasks
   alias Murmur.Workspaces
 
   require Logger
@@ -20,10 +21,15 @@ defmodule MurmurWeb.WorkspaceLive do
     agent_sessions = Workspaces.list_agent_sessions(workspace_id)
     profiles = Catalog.list_profiles()
 
-    # Build initial messages map from agent threads or persisted storage
+    # Build initial messages and artifacts from agent state or persisted storage
     messages_map =
       Map.new(agent_sessions, fn session ->
         {session.id, load_messages_for_session(session)}
+      end)
+
+    artifacts_map =
+      Map.new(agent_sessions, fn session ->
+        {session.id, load_artifacts_for_session(session)}
       end)
 
     socket =
@@ -34,13 +40,19 @@ defmodule MurmurWeb.WorkspaceLive do
       |> assign(:agent_statuses, Map.new(agent_sessions, &{&1.id, :idle}))
       |> assign(:streaming, Map.new(agent_sessions, &{&1.id, @empty_stream}))
       |> assign(:messages, messages_map)
-      |> assign(:artifacts, Map.new(agent_sessions, &{&1.id, %{}}))
+      |> assign(:artifacts, artifacts_map)
       |> assign(:active_artifact, nil)
       |> assign(:view_mode, :split)
+      |> assign(:show_task_board, false)
+      |> assign(:tasks, Tasks.list_tasks(workspace_id))
+      |> assign(:task_form, to_form(%{"title" => "", "description" => "", "assignee" => ""}, as: :task))
+      |> assign(:editing_task, nil)
       |> assign(:add_agent_form, to_form(%{"profile_id" => "", "display_name" => ""}, as: :agent))
 
     socket =
       if connected?(socket) do
+        Phoenix.PubSub.subscribe(Murmur.PubSub, Tasks.tasks_topic(workspace_id))
+
         Enum.reduce(agent_sessions, socket, fn session, acc ->
           topic = agent_topic(workspace_id, session.id)
           Phoenix.PubSub.subscribe(Murmur.PubSub, topic)
@@ -137,6 +149,8 @@ defmodule MurmurWeb.WorkspaceLive do
       cleanup_storage(session)
     end)
 
+    Tasks.delete_tasks_for_workspace(socket.assigns.workspace.id)
+
     # Restart agents fresh (no history)
     Enum.each(socket.assigns.agent_sessions, fn session ->
       agent_module = Catalog.agent_module(session.agent_profile_id)
@@ -155,7 +169,8 @@ defmodule MurmurWeb.WorkspaceLive do
      |> assign(:agent_statuses, empty_statuses)
      |> assign(:streaming, empty_streaming)
      |> assign(:artifacts, empty_artifacts)
-     |> assign(:active_artifact, nil)}
+     |> assign(:active_artifact, nil)
+     |> assign(:tasks, [])}
   end
 
   def handle_event("toggle_view_mode", _params, socket) do
@@ -169,6 +184,57 @@ defmodule MurmurWeb.WorkspaceLive do
 
   def handle_event("close_artifact", _params, socket) do
     {:noreply, assign(socket, :active_artifact, nil)}
+  end
+
+  def handle_event("toggle_task_board", _params, socket) do
+    {:noreply, assign(socket, :show_task_board, !socket.assigns.show_task_board)}
+  end
+
+  def handle_event("create_task", %{"task" => params}, socket) do
+    workspace_id = socket.assigns.workspace.id
+
+    attrs = %{
+      title: params["title"],
+      description: params["description"],
+      assignee: params["assignee"],
+      status: :todo
+    }
+
+    case Tasks.create_task(workspace_id, attrs, "human") do
+      {:ok, task} ->
+        Phoenix.PubSub.broadcast(
+          Murmur.PubSub,
+          Tasks.tasks_topic(workspace_id),
+          {:task_created, task}
+        )
+
+        notify_task_assignee(workspace_id, task, "You (human)")
+
+        {:noreply,
+         assign(socket, :task_form, to_form(%{"title" => "", "description" => "", "assignee" => ""}, as: :task))}
+
+      {:error, _changeset} ->
+        {:noreply, put_flash(socket, :error, "Failed to create task.")}
+    end
+  end
+
+  def handle_event("update_task_status", %{"task-id" => id, "status" => status}, socket) do
+    task = Tasks.get_task!(id)
+    status_atom = String.to_existing_atom(status)
+
+    case Tasks.update_task(task, %{status: status_atom}) do
+      {:ok, updated} ->
+        Phoenix.PubSub.broadcast(
+          Murmur.PubSub,
+          Tasks.tasks_topic(socket.assigns.workspace.id),
+          {:task_updated, updated}
+        )
+
+        {:noreply, socket}
+
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, "Failed to update task.")}
+    end
   end
 
   def handle_event("send_unified_message", %{"message" => %{"content" => content}}, socket) do
@@ -384,6 +450,19 @@ defmodule MurmurWeb.WorkspaceLive do
     {:noreply, socket}
   end
 
+  @impl true
+  def handle_info({:task_created, task}, socket) do
+    {:noreply, update(socket, :tasks, &(&1 ++ [task]))}
+  end
+
+  @impl true
+  def handle_info({:task_updated, task}, socket) do
+    {:noreply,
+     update(socket, :tasks, fn tasks ->
+       Enum.map(tasks, fn t -> if t.id == task.id, do: task, else: t end)
+     end)}
+  end
+
   # Catch-all for other messages
   @impl true
   def handle_info(_msg, socket), do: {:noreply, socket}
@@ -394,6 +473,45 @@ defmodule MurmurWeb.WorkspaceLive do
 
   defp send_to_agent(session, content, _topic) do
     Runner.send_message(session, content)
+  end
+
+  defp notify_task_assignee(workspace_id, task, sender_name) do
+    if task.assignee == "human" or task.assignee == sender_name do
+      :ok
+    else
+      do_notify_task_assignee(workspace_id, task, sender_name)
+    end
+  end
+
+  defp do_notify_task_assignee(workspace_id, task, sender_name) do
+    case Workspaces.find_agent_session_by_name(workspace_id, task.assignee) do
+      nil ->
+        :ok
+
+      target_session ->
+        message = build_task_notification(task, sender_name)
+        topic = "workspace:#{workspace_id}:agent:#{target_session.id}"
+
+        inter_msg = %{
+          id: ID.generate!(),
+          role: "user",
+          content: message,
+          sender_name: sender_name
+        }
+
+        Phoenix.PubSub.broadcast(Murmur.PubSub, topic, {:new_message, target_session.id, inter_msg})
+        Runner.send_message(target_session, message)
+    end
+  end
+
+  defp build_task_notification(task, sender_name) do
+    "[#{sender_name}] assigned you a task: \"#{task.title}\"" <>
+      if(task.description && task.description != "",
+        do: "\nDescription: #{task.description}",
+        else: ""
+      ) <>
+      "\nTask ID: #{task.id}" <>
+      "\nUse update_task to change its status when you start or complete it."
   end
 
   # --- Thread / State Helpers ---
@@ -486,6 +604,31 @@ defmodule MurmurWeb.WorkspaceLive do
 
   defp get_in_thread(%{state: %{__thread__: thread}}) when not is_nil(thread), do: thread
   defp get_in_thread(_), do: nil
+
+  defp load_artifacts_for_session(session) do
+    pid = Murmur.Jido.whereis(session.id)
+
+    if pid do
+      case Jido.AgentServer.state(pid) do
+        {:ok, %{agent: agent}} -> extract_artifacts(agent)
+        _ -> load_artifacts_from_storage(session)
+      end
+    else
+      load_artifacts_from_storage(session)
+    end
+  end
+
+  defp load_artifacts_from_storage(session) do
+    agent_module = Catalog.agent_module(session.agent_profile_id)
+
+    case Murmur.Jido.thaw(agent_module, session.id) do
+      {:ok, agent} -> extract_artifacts(agent)
+      {:error, :not_found} -> %{}
+    end
+  end
+
+  defp extract_artifacts(%{state: %{artifacts: artifacts}}) when is_map(artifacts), do: artifacts
+  defp extract_artifacts(_), do: %{}
 
   defp cleanup_storage(session) do
     {adapter, opts} = Murmur.Jido.__jido_storage__()

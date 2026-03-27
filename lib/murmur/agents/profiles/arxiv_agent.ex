@@ -8,7 +8,10 @@ defmodule Murmur.Agents.Profiles.ArxivAgent do
     tools: [
       Murmur.Agents.TellAction,
       Murmur.Agents.Tools.ArxivSearch,
-      Murmur.Agents.Tools.DisplayPaper
+      Murmur.Agents.Tools.DisplayPaper,
+      Murmur.Agents.Tools.AddTask,
+      Murmur.Agents.Tools.UpdateTask,
+      Murmur.Agents.Tools.ListTasks
     ],
     plugins: [Murmur.Agents.StreamingPlugin, Murmur.Agents.ArtifactPlugin],
     request_transformer: Murmur.Agents.MessageInjector,

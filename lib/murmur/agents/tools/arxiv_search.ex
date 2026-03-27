@@ -49,9 +49,12 @@ defmodule Murmur.Agents.Tools.ArxivSearch do
           "sortOrder" => "descending"
         })
 
-    case Req.get(url, receive_timeout: 20_000, redirect: true) do
+    case Req.get(url, pool_timeout: 10_000, receive_timeout: 20_000) do
       {:ok, %Req.Response{status: 200, body: body}} ->
         {:ok, parse_atom_feed(body)}
+
+      {:ok, %Req.Response{status: 429}} ->
+        {:error, "arXiv rate limit hit — please wait a moment and try again"}
 
       {:ok, %Req.Response{status: status}} ->
         {:error, "HTTP #{status}"}

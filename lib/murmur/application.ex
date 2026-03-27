@@ -7,6 +7,10 @@ defmodule Murmur.Application do
 
   @impl true
   def start(_type, _args) do
+    if Application.get_env(:murmur, :log_filter, false) do
+      :logger.add_handler_filter(:default, :drop_verbose, {&Murmur.LogFilter.filter/2, []})
+    end
+
     Jido.Telemetry.setup()
 
     children = [

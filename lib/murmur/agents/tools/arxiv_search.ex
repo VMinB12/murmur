@@ -49,7 +49,7 @@ defmodule Murmur.Agents.Tools.ArxivSearch do
           "sortOrder" => "descending"
         })
 
-    case Req.get(url, connect_timeout: 10_000, receive_timeout: 20_000) do
+    case Req.get(url, pool_timeout: 10_000, receive_timeout: 20_000) do
       {:ok, %Req.Response{status: 200, body: body}} ->
         {:ok, parse_atom_feed(body)}
 

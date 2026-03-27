@@ -11,8 +11,9 @@ A real-time multi-agent chat interface built with Phoenix LiveView and the [Jido
 - **Real-time streaming** — Token-by-token responses over WebSocket
 - **Persistent conversations** — History survives server restarts via hibernate/thaw
 - **Autonomous execution** — Agents continue processing server-side during disconnects
-- **Agents produce artifacts** - Agents can produce artifacts that affect the UI, e.g. the Arxiv agent can display papers.
-- **Tasks** - Agents manage a task board to track their work, allowing long-running agents to converge on complex goals over multiple interactions.
+- **Artifacts** — Agents produce rich artifacts that affect the UI (e.g. the arXiv agent can display papers)
+- **Shared task board** — Agents manage tasks collaboratively, allowing long-running convergence on complex goals
+- **Split & unified views** — Side-by-side agent columns, or a merged timeline with `@mention` routing
 
 ## Getting Started
 
@@ -31,41 +32,42 @@ mix phx.server
 
 Visit [localhost:4000](http://localhost:4000), create a workspace, add agents, and start chatting.
 
+## Architecture
+
+```mermaid
+flowchart LR
+    UI[LiveView] --> Runner --> Agent --> LLM
+    Agent -->|tell, tasks, artifacts| PubSub
+    Runner -->|completion| PubSub
+    PubSub -.->|stream to UI| UI
+    Runner <-->|persist| DB[(PostgreSQL)]
+```
+
 ## How It Works
 
-When a user sends a message, the Runner queues it and calls the LLM. If the agent decides to collaborate, it invokes the **tell** tool — which queues a message on the target agent's Runner, kicking off a parallel conversation. Both responses stream back to the UI via PubSub.
+When a user sends a message, the Runner queues it and calls the LLM. Tokens stream back in real-time via PubSub. If the agent decides to collaborate, it uses the **tell** tool to queue a message on another agent's Runner — kicking off a parallel conversation.
 
 ```mermaid
 sequenceDiagram
     actor User
     participant UI as LiveView
-    participant RA as Runner (Alice)
-    participant LLM as LLM
-    participant Tell as TellAction
-    participant RB as Runner (Bob)
+    participant RA as Alice
+    participant RB as Bob
     participant PS as PubSub
 
     User->>UI: send message
-    UI->>RA: send_message(alice_session, text)
-    RA->>LLM: ask → await
+    UI->>RA: queue + call LLM
+    RA-->>PS: stream tokens
+    PS-->>UI: render live
 
-    Note over LLM: Alice decides to<br/>consult Bob
+    Note over RA: Alice tells Bob
+    RA->>RB: tell("Bob", question)
+    RB-->>PS: stream tokens
+    PS-->>UI: render Bob live
 
-    LLM->>Tell: tool call: tell("Bob", question)
-    Tell->>PS: broadcast :new_message to Bob's UI
-    Tell->>RB: send_message(bob_session, "[Alice]: question")
-
-    RB->>LLM: ask → await (Bob's turn)
-    LLM-->>RB: Bob's response
-    RB->>RB: hibernate (persist state)
-    RB->>PS: broadcast :message_completed
-
-    Tell-->>LLM: {:ok, delivered}
-    LLM-->>RA: Alice's final response
-    RA->>RA: hibernate (persist state)
-    RA->>PS: broadcast :message_completed
-
-    PS-->>UI: update both chat columns
+    RA->>PS: done
+    RB->>PS: done
+    PS-->>UI: finalize
 ```
 
 ## Development

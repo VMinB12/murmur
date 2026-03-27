@@ -11,6 +11,8 @@ defmodule MurmurWeb.WorkspaceLive do
 
   require Logger
 
+  @empty_stream %{content: "", thinking: ""}
+
   @impl true
   def mount(%{"id" => workspace_id}, _session, socket) do
     workspace = Workspaces.get_workspace!(workspace_id)
@@ -29,8 +31,7 @@ defmodule MurmurWeb.WorkspaceLive do
       |> assign(:agent_sessions, agent_sessions)
       |> assign(:profiles, profiles)
       |> assign(:agent_statuses, Map.new(agent_sessions, &{&1.id, :idle}))
-      |> assign(:streaming_tokens, Map.new(agent_sessions, &{&1.id, ""}))
-      |> assign(:streaming_thinking, Map.new(agent_sessions, &{&1.id, ""}))
+      |> assign(:streaming, Map.new(agent_sessions, &{&1.id, @empty_stream}))
       |> assign(:messages, messages_map)
       |> assign(:view_mode, :split)
       |> assign(:add_agent_form, to_form(%{"profile_id" => "", "display_name" => ""}, as: :agent))
@@ -107,8 +108,7 @@ defmodule MurmurWeb.WorkspaceLive do
           |> update(:agent_sessions, &(&1 ++ [session]))
           |> update(:messages, &Map.put(&1, session.id, []))
           |> update(:agent_statuses, &Map.put(&1, session.id, :idle))
-          |> update(:streaming_tokens, &Map.put(&1, session.id, ""))
-          |> update(:streaming_thinking, &Map.put(&1, session.id, ""))
+          |> update(:streaming, &Map.put(&1, session.id, @empty_stream))
           |> assign(
             :add_agent_form,
             to_form(%{"profile_id" => "", "display_name" => ""}, as: :agent)
@@ -140,15 +140,13 @@ defmodule MurmurWeb.WorkspaceLive do
 
     empty_messages = Map.new(socket.assigns.agent_sessions, &{&1.id, []})
     empty_statuses = Map.new(socket.assigns.agent_sessions, &{&1.id, :idle})
-    empty_tokens = Map.new(socket.assigns.agent_sessions, &{&1.id, ""})
-    empty_thinking = Map.new(socket.assigns.agent_sessions, &{&1.id, ""})
+    empty_streaming = Map.new(socket.assigns.agent_sessions, &{&1.id, @empty_stream})
 
     {:noreply,
      socket
      |> assign(:messages, empty_messages)
      |> assign(:agent_statuses, empty_statuses)
-     |> assign(:streaming_tokens, empty_tokens)
-     |> assign(:streaming_thinking, empty_thinking)}
+     |> assign(:streaming, empty_streaming)}
   end
 
   def handle_event("toggle_view_mode", _params, socket) do
@@ -183,8 +181,7 @@ defmodule MurmurWeb.WorkspaceLive do
       end)
       |> update(:messages, &Map.delete(&1, session_id))
       |> update(:agent_statuses, &Map.delete(&1, session_id))
-      |> update(:streaming_tokens, &Map.delete(&1, session_id))
-      |> update(:streaming_thinking, &Map.delete(&1, session_id))
+      |> update(:streaming, &Map.delete(&1, session_id))
 
     {:noreply, socket}
   end
@@ -216,8 +213,7 @@ defmodule MurmurWeb.WorkspaceLive do
       socket
       |> update(:messages, &Map.put(&1, session_id, messages))
       |> update(:agent_statuses, &Map.put(&1, session_id, :idle))
-      |> update(:streaming_tokens, &Map.put(&1, session_id, ""))
-      |> update(:streaming_thinking, &Map.put(&1, session_id, ""))
+      |> update(:streaming, &Map.put(&1, session_id, @empty_stream))
 
     {:noreply, socket}
   end
@@ -257,9 +253,7 @@ defmodule MurmurWeb.WorkspaceLive do
 
     socket =
       if status == :idle do
-        socket
-        |> update(:streaming_tokens, &Map.put(&1, session_id, ""))
-        |> update(:streaming_thinking, &Map.put(&1, session_id, ""))
+        update(socket, :streaming, &Map.put(&1, session_id, @empty_stream))
       else
         socket
       end
@@ -268,22 +262,22 @@ defmodule MurmurWeb.WorkspaceLive do
   end
 
   @impl true
-  def handle_info({:streaming_token, session_id, token}, socket) do
-    socket =
-      update(socket, :streaming_tokens, fn tokens ->
-        Map.update(tokens, session_id, token, &(&1 <> token))
-      end)
+  def handle_info({:agent_signal, session_id, %{type: "ai.llm.delta", data: data}}, socket) do
+    case data do
+      %{delta: delta, chunk_type: :content} when is_binary(delta) and delta != "" ->
+        {:noreply, update_streaming(socket, session_id, :content, delta)}
 
-    {:noreply, socket}
+      %{delta: delta, chunk_type: :thinking} when is_binary(delta) and delta != "" ->
+        {:noreply, update_streaming(socket, session_id, :thinking, delta)}
+
+      _ ->
+        {:noreply, socket}
+    end
   end
 
   @impl true
-  def handle_info({:streaming_thinking, session_id, token}, socket) do
-    socket =
-      update(socket, :streaming_thinking, fn thinking ->
-        Map.update(thinking, session_id, token, &(&1 <> token))
-      end)
-
+  def handle_info({:agent_signal, _session_id, _signal}, socket) do
+    # Future: handle ai.tool.result, ai.request.started, ai.usage, etc.
     {:noreply, socket}
   end
 
@@ -300,6 +294,14 @@ defmodule MurmurWeb.WorkspaceLive do
   end
 
   # --- Thread / State Helpers ---
+
+  defp update_streaming(socket, session_id, field, delta) do
+    update(socket, :streaming, fn streams ->
+      Map.update(streams, session_id, Map.put(@empty_stream, field, delta), fn s ->
+        Map.update(s, field, delta, &(&1 <> delta))
+      end)
+    end)
+  end
 
   defp load_messages_for_session(session) do
     pid = Murmur.Jido.whereis(session.id)

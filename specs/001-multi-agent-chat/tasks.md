@@ -171,7 +171,7 @@
 - [X] T057 Create thread projection helper in WorkspaceLive — `project_thread/1` converts `Jido.Thread.Entry` structs to display maps `%{id, role, content, sender_name}`, filtering for `:message` kind entries
 - [X] T058 Update `handle_info({:message_completed, ...})` — creates display maps instead of `Chat.Message` records; no more DB writes on completion
 - [X] T059 Telemetry module created with attach/detach helpers scoped to session_id for `[:jido, :ai, :llm, :delta]` events
-- [X] T060 PubSub handlers streamlined — receive `{:message_completed, ...}`, `{:request_failed, ...}`, `{:new_message, ...}`, `{:status_change, ...}`, and `{:streaming_token, ...}` tuples via direct PubSub broadcast
+- [X] T060 PubSub handlers streamlined — receive `{:message_completed, ...}`, `{:request_failed, ...}`, `{:new_message, ...}`, `{:status_change, ...}` tuples via agent topic PubSub; streaming signals unified under `{:agent_signal, session_id, signal}` via stream topic
 
 ### Phase 8d: Hibernate/Thaw for Persistence and Reconnect
 

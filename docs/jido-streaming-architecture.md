@@ -1,12 +1,12 @@
-# Jido Streaming Architecture — How LLM Tokens Reach the LiveView
+# Jido Streaming Architecture — How Agent Signals Reach the LiveView
 
 ## Problem
 
-When a user sends a message, the LLM response arrives token-by-token via server-sent events. Without streaming, the UI is blank until the full response completes (which can take 10–30 seconds). The LiveView template already had `@streaming_tokens` rendering wired up, but nothing was producing the `{:streaming_token, session_id, token}` messages.
+When a user sends a message, the LLM response arrives token-by-token via server-sent events. Without streaming, the UI is blank until the full response completes (which can take 10–30 seconds). The question is how to bridge Jido's internal signal system to Phoenix LiveView for real-time rendering.
 
 ## Solution
 
-A Jido Plugin (`Murmur.Agents.StreamingPlugin`) that intercepts `ai.llm.delta` signals before they reach the Noop route and broadcasts tokens via PubSub.
+A Jido Plugin (`Murmur.Agents.StreamingPlugin`) that intercepts **all 7 lifecycle signal types** emitted by the ReAct strategy and broadcasts them as a unified event stream via PubSub. The LiveView pattern-matches on signal type to decide what to render.
 
 ## Signal Flow: From LLM to LiveView
 
@@ -81,16 +81,19 @@ Understanding this flow is critical. It has four layers of indirection.
 │    lib/murmur_web/live/workspace_live.ex                             │
 │                                                                     │
 │    Subscribes to "agent_stream:#{session_id}" topic.                │
-│    handle_info({:streaming_token, session_id, token}) appends       │
-│    the token to @streaming_tokens[session_id].                      │
+│    handle_info({:agent_signal, session_id, signal}) pattern-matches │
+│    on signal.type:                                                  │
+│      "ai.llm.delta" → appends delta to @streaming[session_id]      │
+│                        (.content or .thinking based on chunk_type)  │
+│      other types    → catch-all, currently no-op (future use)       │
 │    Template renders the accumulated text.                           │
-│    On {:message_completed, ...}, streaming_tokens are cleared.      │
+│    On {:message_completed, ...}, @streaming is cleared.             │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
 ## Key Insight: Why a Plugin
 
-Jido Plugins define `handle_signal/2` which runs **before** signal routing. This is the framework's designed interception point. The alternatives are all worse:
+Jido Plugins define `handle_signal/2` which runs **before** signal routing. This is the framework's designed interception point. All 7 signal types in the ReAct strategy are Noop-routed, making plugins the only clean place to observe them. The alternatives are all worse:
 
 | Approach | Problem |
 |---|---|
@@ -108,10 +111,30 @@ We use a **separate topic** for streaming rather than reusing the agent topic:
 
 This avoids flooding the agent topic with hundreds of tiny messages per response.
 
+## Signal Types Forwarded
+
+The plugin intercepts all 7 ReAct strategy signal types:
+
+| Signal Type | Purpose |
+|---|---|
+| `ai.llm.delta` | Streaming content/thinking tokens |
+| `ai.llm.response` | Complete LLM response |
+| `ai.tool.result` | Tool call results |
+| `ai.request.started` | Request lifecycle start |
+| `ai.request.completed` | Request lifecycle end |
+| `ai.request.failed` | Request errors |
+| `ai.usage` | Token usage metrics |
+
+All are broadcast as a single unified event:
+
+```elixir
+{:agent_signal, session_id, signal}
+```
+
 ## Signal Data Structure
 
 ```elixir
-# The signal received in handle_signal/2:
+# The signal received in handle_signal/2 (example: ai.llm.delta):
 %Jido.Signal{
   type: "ai.llm.delta",
   data: %{
@@ -132,6 +155,18 @@ This avoids flooding the agent topic with hundreds of tiny messages per response
 
 The `agent.id` equals the session ID (set via `Murmur.Jido.start_agent(module, id: session.id)`).
 
+## LiveView Assign Structure
+
+The LiveView maintains a single `@streaming` assign — a map of session_id to streaming state:
+
+```elixir
+@streaming = %{
+  "session-uuid" => %{content: "Hello world", thinking: "Let me think..."}
+}
+```
+
+On `{:message_completed, ...}`, the streaming state for that session is reset to `%{content: "", thinking: ""}`.
+
 ## Configuration
 
 Streaming is enabled per-agent via the `plugins` option:
@@ -147,11 +182,11 @@ The `capture_deltas?` config option on the ReAct strategy controls whether the r
 
 ## Files
 
-- `lib/murmur/agents/streaming_plugin.ex` — Plugin definition
+- `lib/murmur/agents/streaming_plugin.ex` — Plugin definition; broadcasts `{:agent_signal, session_id, signal}`
 - `lib/murmur/agents/profiles/general_agent.ex` — Plugin registered
 - `lib/murmur/agents/profiles/code_agent.ex` — Plugin registered
-- `lib/murmur_web/live/workspace_live.ex` — Subscribes to stream topic
-- `lib/murmur_web/live/workspace_live.html.heex` — Renders `@streaming_tokens` (pre-existing)
+- `lib/murmur_web/live/workspace_live.ex` — Subscribes to stream topic; pattern-matches on signal type
+- `lib/murmur_web/live/workspace_live.html.heex` — Renders `@streaming[session_id]` content and thinking
 
 ## Relevant Source Files in Dependencies
 

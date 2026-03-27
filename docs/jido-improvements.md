@@ -176,14 +176,19 @@ use Jido.AI.Agent,
 
 ### Current approach
 
-LiveView ↔ Runner communication uses raw PubSub tuples:
+LiveView ↔ Runner communication uses raw PubSub tuples for lifecycle events and a unified signal stream for agent signals:
 
 ```elixir
+# Lifecycle events (agent topic)
 {:message_completed, session_id, response}
 {:request_failed, session_id, reason}
-{:streaming_token, session_id, token}
 {:status_change, session_id, status}
+
+# Unified signal stream (stream topic)
+{:agent_signal, session_id, signal}  # signal.type determines handling
 ```
+
+The `{:agent_signal, ...}` format replaced the former `{:streaming_token, ...}` and `{:streaming_thinking, ...}` tuples, unifying all 7 Jido signal types under a single broadcast shape.
 
 ### What Jido provides
 

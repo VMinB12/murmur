@@ -420,15 +420,15 @@ defmodule MurmurWeb.WorkspaceLiveTest do
       %{session: session}
     end
 
-    test "streaming_token appends to streaming display", %{
+    test "agent_signal delta appends to streaming display", %{
       conn: conn,
       workspace: workspace,
       session: session
     } do
       {:ok, view, _html} = live(conn, ~p"/workspaces/#{workspace.id}")
 
-      send(view.pid, {:streaming_token, session.id, "Hello"})
-      send(view.pid, {:streaming_token, session.id, " world"})
+      send(view.pid, {:agent_signal, session.id, %{type: "ai.llm.delta", data: %{delta: "Hello", chunk_type: :content}}})
+      send(view.pid, {:agent_signal, session.id, %{type: "ai.llm.delta", data: %{delta: " world", chunk_type: :content}}})
 
       html = render(view)
       assert html =~ "Hello world"
@@ -441,7 +441,11 @@ defmodule MurmurWeb.WorkspaceLiveTest do
     } do
       {:ok, view, _html} = live(conn, ~p"/workspaces/#{workspace.id}")
 
-      send(view.pid, {:streaming_token, session.id, "partial..."})
+      send(
+        view.pid,
+        {:agent_signal, session.id, %{type: "ai.llm.delta", data: %{delta: "partial...", chunk_type: :content}}}
+      )
+
       assert render(view) =~ "partial..."
 
       send(view.pid, {:message_completed, session.id, "Full response"})

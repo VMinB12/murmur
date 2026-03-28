@@ -26,6 +26,9 @@ config :murmur, MurmurWeb.Endpoint,
 # Use mock LLM adapter in tests (no real API calls)
 config :murmur, :llm_adapter, Murmur.Agents.LLM.Mock
 
+# jido_murmur package — use mock LLM adapter in tests
+config :jido_murmur, :llm_adapter, JidoMurmur.LLM.Mock
+
 # Skip hibernate (checkpoint persistence) in test — sandbox teardown causes noise
 config :murmur, :skip_hibernate, true
 

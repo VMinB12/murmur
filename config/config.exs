@@ -19,6 +19,16 @@ config :esbuild,
 
 config :jido_action, default_timeout: 30_000, default_max_retries: 1, default_backoff: 250
 
+# Configure jido_murmur package to use the demo app's modules
+config :jido_murmur,
+  repo: Murmur.Repo,
+  pubsub: Murmur.PubSub,
+  jido_mod: Murmur.Jido,
+  otp_app: :murmur,
+  profiles: [],
+  authorize: nil,
+  artifact_renderers: %{}
+
 config :jido_ai,
   model_aliases: %{
     capable: "openai:gpt-5-mini",

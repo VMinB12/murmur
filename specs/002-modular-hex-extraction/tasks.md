@@ -45,22 +45,22 @@
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T009 Implement JidoMurmur root config module with repo/pubsub/jido_mod/otp_app accessors at apps/jido_murmur/lib/jido_murmur.ex
-- [ ] T010 [P] Extract and rename Workspace schema (Murmur.Workspaces.Workspace → JidoMurmur.Workspaces.Workspace) with owner_id and metadata fields at apps/jido_murmur/lib/jido_murmur/workspaces/workspace.ex
-- [ ] T011 [P] Extract and rename AgentSession schema (Murmur.Workspaces.AgentSession → JidoMurmur.Workspaces.AgentSession) with owner_id, metadata fields, and removed max-agents constraint at apps/jido_murmur/lib/jido_murmur/workspaces/agent_session.ex
-- [ ] T012 [P] Extract and rename Checkpoint schema (Murmur.Storage.Checkpoint → JidoMurmur.Storage.Checkpoint) at apps/jido_murmur/lib/jido_murmur/storage/checkpoint.ex
-- [ ] T013 [P] Extract and rename ThreadEntry schema (Murmur.Storage.ThreadEntry → JidoMurmur.Storage.ThreadEntry) at apps/jido_murmur/lib/jido_murmur/storage/thread_entry.ex
-- [ ] T014 Create migration templates for all 4 tables (jido_murmur_workspaces, jido_murmur_agent_sessions, jido_murmur_checkpoints, jido_murmur_thread_entries) at apps/jido_murmur/priv/templates/
-- [ ] T015 Implement Mix.Tasks.JidoMurmur.Install migration generator with duplicate detection at apps/jido_murmur/lib/mix/tasks/jido_murmur.install.ex
-- [ ] T016 Extract and rename TableOwner GenServer (Murmur.Agents.TableOwner → JidoMurmur.TableOwner) with jido_murmur_ ETS name prefixes at apps/jido_murmur/lib/jido_murmur/table_owner.ex
-- [ ] T017 [P] Extract and rename PendingQueue (Murmur.Agents.PendingQueue → JidoMurmur.PendingQueue) with namespaced ETS table references at apps/jido_murmur/lib/jido_murmur/pending_queue.ex
-- [ ] T018 Extract and rename Storage.Ecto adapter (Murmur.Storage.Ecto → JidoMurmur.Storage.Ecto) using JidoMurmur.repo() config at apps/jido_murmur/lib/jido_murmur/storage/ecto.ex
-- [ ] T019 Implement JidoMurmur.Supervisor managing TableOwner at apps/jido_murmur/lib/jido_murmur/supervisor.ex
-- [ ] T020 [P] Define LLM behaviour with ask/4 and await/3 callbacks at apps/jido_murmur/lib/jido_murmur/llm.ex
-- [ ] T021 [P] Extract LLM.Real production adapter (Murmur.Agents.LLM.Real → JidoMurmur.LLM.Real) at apps/jido_murmur/lib/jido_murmur/llm/real.ex
-- [ ] T022 [P] Create LLM.Mock test adapter with configurable canned responses at apps/jido_murmur/lib/jido_murmur/llm/mock.ex
-- [ ] T023 Extract and rename Workspaces context (Murmur.Workspaces → JidoMurmur.Workspaces) with pluggable authorization hook at apps/jido_murmur/lib/jido_murmur/workspaces.ex
-- [ ] T024 Create per-package test infrastructure: test_helper.exs and JidoMurmur.Case module with Ecto sandbox at apps/jido_murmur/test/support/case.ex
+- [x] T009 Implement JidoMurmur root config module with repo/pubsub/jido_mod/otp_app accessors at apps/jido_murmur/lib/jido_murmur.ex
+- [x] T010 [P] Extract and rename Workspace schema (Murmur.Workspaces.Workspace → JidoMurmur.Workspaces.Workspace) with owner_id and metadata fields at apps/jido_murmur/lib/jido_murmur/workspaces/workspace.ex
+- [x] T011 [P] Extract and rename AgentSession schema (Murmur.Workspaces.AgentSession → JidoMurmur.Workspaces.AgentSession) with owner_id, metadata fields, and removed max-agents constraint at apps/jido_murmur/lib/jido_murmur/workspaces/agent_session.ex
+- [x] T012 [P] Extract and rename Checkpoint schema (Murmur.Storage.Checkpoint → JidoMurmur.Storage.Checkpoint) at apps/jido_murmur/lib/jido_murmur/storage/checkpoint.ex
+- [x] T013 [P] Extract and rename ThreadEntry schema (Murmur.Storage.ThreadEntry → JidoMurmur.Storage.ThreadEntry) at apps/jido_murmur/lib/jido_murmur/storage/thread_entry.ex
+- [x] T014 Create migration templates for all 4 tables (jido_murmur_workspaces, jido_murmur_agent_sessions, jido_murmur_checkpoints, jido_murmur_thread_entries) at apps/jido_murmur/priv/templates/
+- [x] T015 Implement Mix.Tasks.JidoMurmur.Install migration generator with duplicate detection at apps/jido_murmur/lib/mix/tasks/jido_murmur.install.ex
+- [x] T016 Extract and rename TableOwner GenServer (Murmur.Agents.TableOwner → JidoMurmur.TableOwner) with jido_murmur_ ETS name prefixes at apps/jido_murmur/lib/jido_murmur/table_owner.ex
+- [x] T017 [P] Extract and rename PendingQueue (Murmur.Agents.PendingQueue → JidoMurmur.PendingQueue) with namespaced ETS table references at apps/jido_murmur/lib/jido_murmur/pending_queue.ex
+- [x] T018 Extract and rename Storage.Ecto adapter (Murmur.Storage.Ecto → JidoMurmur.Storage.Ecto) using JidoMurmur.repo() config at apps/jido_murmur/lib/jido_murmur/storage/ecto.ex
+- [x] T019 Implement JidoMurmur.Supervisor managing TableOwner at apps/jido_murmur/lib/jido_murmur/supervisor.ex
+- [x] T020 [P] Define LLM behaviour with ask/4 and await/3 callbacks at apps/jido_murmur/lib/jido_murmur/llm.ex
+- [x] T021 [P] Extract LLM.Real production adapter (Murmur.Agents.LLM.Real → JidoMurmur.LLM.Real) at apps/jido_murmur/lib/jido_murmur/llm/real.ex
+- [x] T022 [P] Create LLM.Mock test adapter with configurable canned responses at apps/jido_murmur/lib/jido_murmur/llm/mock.ex
+- [x] T023 Extract and rename Workspaces context (Murmur.Workspaces → JidoMurmur.Workspaces) with pluggable authorization hook at apps/jido_murmur/lib/jido_murmur/workspaces.ex
+- [x] T024 Create per-package test infrastructure: test_helper.exs and JidoMurmur.Case module with Ecto sandbox at apps/jido_murmur/test/support/case.ex
 
 **Checkpoint**: Foundation ready — user story implementation can now begin
 

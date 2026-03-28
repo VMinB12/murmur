@@ -1,0 +1,259 @@
+# Data Model: Modular Hex Package Extraction
+
+**Feature**: 002-modular-hex-extraction  
+**Date**: 2026-03-28  
+**Status**: Complete
+
+## Entity Overview
+
+The data model spans three packages with database dependencies: `jido_murmur` (core schemas), `jido_tasks` (task schema), and `murmur_demo` (no new schemas — uses package schemas). `jido_murmur_web` and `jido_arxiv` have no database schemas.
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  jido_murmur package                                        │
+│                                                             │
+│  ┌──────────────┐  1──*  ┌────────────────┐                │
+│  │  Workspace   │───────→│ AgentSession   │                │
+│  │              │        │                │                │
+│  └──────┬───────┘        └────────────────┘                │
+│         │                                                   │
+│         │ (shared workspace_id FK used by jido_tasks)       │
+│         │                                                   │
+│  ┌──────────────┐        ┌────────────────┐                │
+│  │  Checkpoint  │        │  ThreadEntry   │                │
+│  │  (Jido.      │        │  (Jido.Thread  │                │
+│  │   Storage)   │        │   append-log)  │                │
+│  └──────────────┘        └────────────────┘                │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│  jido_tasks package                                         │
+│                                                             │
+│  ┌──────────────┐                                           │
+│  │    Task      │──→ workspace_id FK (references            │
+│  │              │    jido_murmur_workspaces)                 │
+│  └──────────────┘                                           │
+└─────────────────────────────────────────────────────────────┘
+```
+
+## Entities
+
+### 1. Workspace (`jido_murmur_workspaces`)
+
+**Package**: `jido_murmur`  
+**Module**: `JidoMurmur.Workspaces.Workspace`
+
+A collaboration space containing one or more agent sessions.
+
+| Field | Type | Constraints | Notes |
+|-------|------|-------------|-------|
+| `id` | `binary_id` | PK, autogenerate | UUID v4 |
+| `name` | `string` | required, max 255 | Display name |
+| `owner_id` | `string` | nullable | Auth-ready: populated when auth is added (SC-008) |
+| `metadata` | `map` | default `%{}` | JSONB escape hatch for lightweight extensions |
+| `inserted_at` | `utc_datetime_usec` | auto | Creation timestamp |
+| `updated_at` | `utc_datetime_usec` | auto | Last update timestamp |
+
+**Changes from current schema**:
+- Table renamed: `workspaces` → `jido_murmur_workspaces` (namespace to prevent collisions)
+- Added `owner_id` (nullable string) — auth-ready per FR-012
+- Added `metadata` (JSONB map, default `%{}`) — per FR-012
+
+**Relationships**:
+- `has_many :agent_sessions, JidoMurmur.Workspaces.AgentSession`
+
+**Indexes**:
+- `jido_murmur_workspaces_pkey` (id)
+- `jido_murmur_workspaces_owner_id_index` (owner_id) — for future auth queries
+
+---
+
+### 2. AgentSession (`jido_murmur_agent_sessions`)
+
+**Package**: `jido_murmur`  
+**Module**: `JidoMurmur.Workspaces.AgentSession`
+
+A running agent instance within a workspace. Links a workspace to a specific agent profile.
+
+| Field | Type | Constraints | Notes |
+|-------|------|-------------|-------|
+| `id` | `binary_id` | PK, autogenerate | UUID v4 |
+| `workspace_id` | `binary_id` | FK → workspaces, required | Parent workspace |
+| `agent_profile_id` | `string` | required | Module name atom as string |
+| `display_name` | `string` | required, max 255 | Human-readable agent name |
+| `status` | `enum` | `:idle \| :busy`, default `:idle` | Current activity state |
+| `owner_id` | `string` | nullable | Auth-ready, mirrors workspace owner |
+| `metadata` | `map` | default `%{}` | JSONB for lightweight extensions |
+| `inserted_at` | `utc_datetime_usec` | auto | |
+| `updated_at` | `utc_datetime_usec` | auto | |
+
+**Changes from current schema**:
+- Table renamed: `agent_sessions` → `jido_murmur_agent_sessions`
+- Added `owner_id` (nullable) — per FR-012
+- Added `metadata` (JSONB) — per FR-012
+- Removed `@max_agents_per_workspace` constraint — per FR-015, consumers decide limits
+
+**Relationships**:
+- `belongs_to :workspace, JidoMurmur.Workspaces.Workspace`
+
+**Indexes**:
+- `jido_murmur_agent_sessions_pkey` (id)
+- `jido_murmur_agent_sessions_workspace_id_index` (workspace_id)
+- `jido_murmur_agent_sessions_workspace_id_display_name_index` (workspace_id, display_name) UNIQUE
+
+---
+
+### 3. Checkpoint (`jido_murmur_checkpoints`)
+
+**Package**: `jido_murmur`  
+**Module**: `JidoMurmur.Storage.Checkpoint`
+
+Jido agent state snapshots (one key per agent). Used by `Jido.Storage` adapter.
+
+| Field | Type | Constraints | Notes |
+|-------|------|-------------|-------|
+| `key` | `string` | PK | Agent identifier (not autogenerated) |
+| `data` | `map` | required | JSONB — serialized agent state |
+| `inserted_at` | `utc_datetime_usec` | auto | |
+| `updated_at` | `utc_datetime_usec` | auto | |
+
+**Changes from current schema**:
+- Table renamed: `jido_checkpoints` → `jido_murmur_checkpoints`
+
+**No relationships** — standalone key-value store.
+
+---
+
+### 4. ThreadEntry (`jido_murmur_thread_entries`)
+
+**Package**: `jido_murmur`  
+**Module**: `JidoMurmur.Storage.ThreadEntry`
+
+Append-only log of Jido thread entries (messages, tool calls, results). Used by `Jido.Storage` adapter.
+
+| Field | Type | Constraints | Notes |
+|-------|------|-------------|-------|
+| `id` | `binary_id` | PK, autogenerate | UUID v4 |
+| `thread_id` | `string` | required | Groups entries by conversation thread |
+| `seq` | `integer` | required | Monotonic sequence within thread |
+| `kind` | `string` | required | Entry type: `"user"`, `"assistant"`, `"tool_call"`, `"tool_result"` |
+| `payload` | `map` | default `%{}` | JSONB — entry content |
+| `refs` | `map` | default `%{}` | JSONB — cross-references (request_id, tool_call_id) |
+| `at` | `integer` | required | Monotonic timestamp (System.monotonic_time) |
+| `inserted_at` | `utc_datetime_usec` | auto, no update | Immutable creation timestamp |
+
+**Changes from current schema**:
+- Table renamed: `jido_thread_entries` → `jido_murmur_thread_entries`
+
+**Indexes**:
+- `jido_murmur_thread_entries_pkey` (id)
+- `jido_murmur_thread_entries_thread_id_seq_index` (thread_id, seq) UNIQUE
+- `jido_murmur_thread_entries_thread_id_index` (thread_id) — for `load_thread/2` queries
+
+---
+
+### 5. Task (`jido_tasks`)
+
+**Package**: `jido_tasks`  
+**Module**: `JidoTasks.Task`
+
+Kanban-style task for multi-agent collaboration within a workspace.
+
+| Field | Type | Constraints | Notes |
+|-------|------|-------------|-------|
+| `id` | `binary_id` | PK, autogenerate | UUID v4 |
+| `workspace_id` | `binary_id` | FK → jido_murmur_workspaces, required | Parent workspace |
+| `title` | `string` | required, max 200 | Task title |
+| `description` | `string` | nullable, max 2000 | Detailed description |
+| `assignee` | `string` | required | Agent display name |
+| `status` | `enum` | `:todo \| :in_progress \| :done \| :aborted`, default `:todo` | Current state |
+| `created_by` | `string` | required | Agent that created the task (set programmatically) |
+| `owner_id` | `string` | nullable | Auth-ready per FR-012 |
+| `metadata` | `map` | default `%{}` | JSONB per FR-012 |
+| `inserted_at` | `utc_datetime_usec` | auto | |
+| `updated_at` | `utc_datetime_usec` | auto | |
+
+**Changes from current schema**:
+- Table renamed: `tasks` → `jido_tasks` (package namespace)
+- Added `owner_id` (nullable) — per FR-012
+- Added `metadata` (JSONB) — per FR-012
+- `workspace_id` FK references `jido_murmur_workspaces` (cross-package reference)
+
+**Relationships**:
+- `belongs_to :workspace` — references `jido_murmur_workspaces` table
+- Note: The `belongs_to` references the table, but the Ecto schema type depends on config (consumer's workspace schema or `JidoMurmur.Workspaces.Workspace`)
+
+**Indexes**:
+- `jido_tasks_pkey` (id)
+- `jido_tasks_workspace_id_index` (workspace_id)
+- `jido_tasks_workspace_id_status_index` (workspace_id, status) — for filtered listing
+
+**State transitions**:
+```
+:todo ──→ :in_progress ──→ :done
+  │           │
+  └───────────┴──→ :aborted
+```
+
+---
+
+## ETS Tables (In-Memory, Non-Persistent)
+
+### PendingQueue Table
+
+**Package**: `jido_murmur`  
+**Name**: `:jido_murmur_pending_messages`  
+**Type**: `:bag` (multiple entries per key)
+
+| Key | Value | Notes |
+|-----|-------|-------|
+| `session_id` (binary_id) | `{session_id, timestamp, message}` | Ordered by monotonic timestamp on drain |
+
+**Lifecycle**: Created by `JidoMurmur.TableOwner` on supervisor start. Survives process crashes via heir mechanism.
+
+### Active Runners Table
+
+**Package**: `jido_murmur`  
+**Name**: `:jido_murmur_active_runners`  
+**Type**: `:set` (one entry per key)
+
+| Key | Value | Notes |
+|-----|-------|-------|
+| `session_id` (binary_id) | `true` | Prevents concurrent drain-loops per session |
+
+**Lifecycle**: Same as PendingQueue — owned by `TableOwner`.
+
+---
+
+## Migration Ordering
+
+Migrations must be installed in this order to satisfy foreign key constraints:
+
+1. `jido_murmur.install` (run first):
+   - `create_jido_murmur_workspaces` — no dependencies
+   - `create_jido_murmur_agent_sessions` — FK → workspaces
+   - `create_jido_murmur_checkpoints` — no dependencies
+   - `create_jido_murmur_thread_entries` — no dependencies
+
+2. `jido_tasks.install` (run after jido_murmur):
+   - `create_jido_tasks` — FK → jido_murmur_workspaces
+
+**Enforcement**: Documentation + generator output messages. The `jido_tasks.install` generator checks for `jido_murmur_workspaces` table existence and warns if not found.
+
+---
+
+## Validation Rules Summary
+
+| Entity | Field | Rule |
+|--------|-------|------|
+| Workspace | name | required, max 255 chars |
+| AgentSession | agent_profile_id | required |
+| AgentSession | display_name | required, max 255, unique per workspace |
+| Checkpoint | key | required (PK) |
+| Checkpoint | data | required (must be a map) |
+| ThreadEntry | thread_id, seq, kind, at | all required |
+| ThreadEntry | thread_id + seq | unique constraint |
+| Task | title | required, max 200 chars |
+| Task | assignee | required |
+| Task | description | optional, max 2000 chars |
+| Task | status | must be one of [:todo, :in_progress, :done, :aborted] |

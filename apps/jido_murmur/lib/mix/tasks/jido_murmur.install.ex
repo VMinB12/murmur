@@ -41,7 +41,7 @@ defmodule Mix.Tasks.JidoMurmur.Install do
         source = template_path(name)
         target = Path.join(migrations_path, "#{timestamp}_#{name}.exs")
 
-        content = EEx.eval_file(source, migration_module: migration_module)
+        content = EEx.eval_file(source, assigns: %{migration_module: migration_module})
         create_file(target, content)
       end
     end

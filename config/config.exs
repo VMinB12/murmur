@@ -19,6 +19,12 @@ config :esbuild,
 
 config :jido_action, default_timeout: 30_000, default_max_retries: 1, default_backoff: 250
 
+config :jido_ai,
+  model_aliases: %{
+    capable: "openai:gpt-5-mini",
+    fast: "openai:gpt-5-mini"
+  }
+
 # Configure jido_murmur package to use the demo app's modules
 config :jido_murmur,
   repo: Murmur.Repo,
@@ -28,12 +34,6 @@ config :jido_murmur,
   profiles: [],
   authorize: nil,
   artifact_renderers: %{}
-
-config :jido_ai,
-  model_aliases: %{
-    capable: "openai:gpt-5-mini",
-    fast: "openai:gpt-5-mini"
-  }
 
 # Configure Elixir's Logger
 config :logger, :default_formatter,
@@ -55,6 +55,10 @@ config :murmur, MurmurWeb.Endpoint,
 config :murmur,
   ecto_repos: [Murmur.Repo],
   generators: [timestamp_type: :utc_datetime]
+
+# Configure murmur_demo ecto_repos (for umbrella migration commands)
+config :murmur_demo,
+  ecto_repos: [Murmur.Repo]
 
 # Use Jason for JSON parsing in Phoenix
 config :phoenix, :json_library, Jason

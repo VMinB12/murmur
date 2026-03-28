@@ -1,5 +1,17 @@
 import Config
 
+# jido_murmur package — use mock LLM adapter in tests
+config :jido_murmur, :llm_adapter, JidoMurmur.LLM.Mock
+
+# jido_murmur test repo configuration (for isolated package tests)
+config :jido_murmur, JidoMurmur.TestRepo,
+  username: "postgres",
+  password: "postgres",
+  hostname: "localhost",
+  database: "murmur_test#{System.get_env("MIX_TEST_PARTITION")}",
+  pool: Ecto.Adapters.SQL.Sandbox,
+  pool_size: System.schedulers_online() * 2
+
 # Print only warnings and errors during test
 config :logger, level: :warning
 
@@ -25,9 +37,6 @@ config :murmur, MurmurWeb.Endpoint,
 
 # Use mock LLM adapter in tests (no real API calls)
 config :murmur, :llm_adapter, Murmur.Agents.LLM.Mock
-
-# jido_murmur package — use mock LLM adapter in tests
-config :jido_murmur, :llm_adapter, JidoMurmur.LLM.Mock
 
 # Skip hibernate (checkpoint persistence) in test — sandbox teardown causes noise
 config :murmur, :skip_hibernate, true

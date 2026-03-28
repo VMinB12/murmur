@@ -74,29 +74,29 @@
 
 ### Implementation for User Story 1
 
-- [ ] T025 [US1] Extract Runner (Murmur.Agents.Runner → JidoMurmur.Runner) with JidoMurmur config references at apps/jido_murmur/lib/jido_murmur/runner.ex
-- [ ] T026 [P] [US1] Extract and refactor Catalog (Murmur.Agents.Catalog → JidoMurmur.Catalog) to config-driven profile registry at apps/jido_murmur/lib/jido_murmur/catalog.ex
-- [ ] T027 [P] [US1] Extract UITurn (Murmur.Agents.UITurn → JidoMurmur.UITurn) at apps/jido_murmur/lib/jido_murmur/ui_turn.ex
-- [ ] T028 [P] [US1] Extract StreamingPlugin (Murmur.Agents.StreamingPlugin → JidoMurmur.StreamingPlugin) with JidoMurmur.pubsub() at apps/jido_murmur/lib/jido_murmur/streaming_plugin.ex
-- [ ] T029 [P] [US1] Extract ArtifactPlugin (Murmur.Agents.ArtifactPlugin → JidoMurmur.ArtifactPlugin) at apps/jido_murmur/lib/jido_murmur/artifact_plugin.ex
-- [ ] T030 [P] [US1] Extract Artifact helpers (Murmur.Agents.Artifact → JidoMurmur.Artifact) at apps/jido_murmur/lib/jido_murmur/artifact.ex
-- [ ] T031 [P] [US1] Extract TellAction (Murmur.Agents.TellAction → JidoMurmur.TellAction) at apps/jido_murmur/lib/jido_murmur/tell_action.ex
-- [ ] T032 [P] [US1] Extract StoreArtifact (Murmur.Agents.Actions.StoreArtifact → JidoMurmur.Actions.StoreArtifact) at apps/jido_murmur/lib/jido_murmur/actions/store_artifact.ex
-- [ ] T033 [P] [US1] Extract MessageInjector (Murmur.Agents.MessageInjector → JidoMurmur.MessageInjector) at apps/jido_murmur/lib/jido_murmur/message_injector.ex
-- [ ] T034 [P] [US1] Extract TeamInstructions (Murmur.Agents.TeamInstructions → JidoMurmur.TeamInstructions) at apps/jido_murmur/lib/jido_murmur/team_instructions.ex
-- [ ] T035 [US1] Create AgentHelper convenience module (start_agent, load_messages, load_artifacts, subscribe, cleanup) at apps/jido_murmur/lib/jido_murmur/agent_helper.ex
-- [ ] T036 [US1] Add :telemetry events to Runner (send_message start/stop/exception), agent start/stop, streaming signal, and artifact store at apps/jido_murmur/lib/jido_murmur/runner.ex and plugin modules
+- [x] T025 [US1] Extract Runner (Murmur.Agents.Runner → JidoMurmur.Runner) with JidoMurmur config references at apps/jido_murmur/lib/jido_murmur/runner.ex
+- [x] T026 [P] [US1] Extract and refactor Catalog (Murmur.Agents.Catalog → JidoMurmur.Catalog) to config-driven profile registry at apps/jido_murmur/lib/jido_murmur/catalog.ex
+- [x] T027 [P] [US1] Extract UITurn (Murmur.Agents.UITurn → JidoMurmur.UITurn) at apps/jido_murmur/lib/jido_murmur/ui_turn.ex
+- [x] T028 [P] [US1] Extract StreamingPlugin (Murmur.Agents.StreamingPlugin → JidoMurmur.StreamingPlugin) with JidoMurmur.pubsub() at apps/jido_murmur/lib/jido_murmur/streaming_plugin.ex
+- [x] T029 [P] [US1] Extract ArtifactPlugin (Murmur.Agents.ArtifactPlugin → JidoMurmur.ArtifactPlugin) at apps/jido_murmur/lib/jido_murmur/artifact_plugin.ex
+- [x] T030 [P] [US1] Extract Artifact helpers (Murmur.Agents.Artifact → JidoMurmur.Artifact) at apps/jido_murmur/lib/jido_murmur/artifact.ex
+- [x] T031 [P] [US1] Extract TellAction (Murmur.Agents.TellAction → JidoMurmur.TellAction) at apps/jido_murmur/lib/jido_murmur/tell_action.ex
+- [x] T032 [P] [US1] Extract StoreArtifact (Murmur.Agents.Actions.StoreArtifact → JidoMurmur.Actions.StoreArtifact) at apps/jido_murmur/lib/jido_murmur/actions/store_artifact.ex
+- [x] T033 [P] [US1] Extract MessageInjector (Murmur.Agents.MessageInjector → JidoMurmur.MessageInjector) at apps/jido_murmur/lib/jido_murmur/message_injector.ex
+- [x] T034 [P] [US1] Extract TeamInstructions (Murmur.Agents.TeamInstructions → JidoMurmur.TeamInstructions) at apps/jido_murmur/lib/jido_murmur/team_instructions.ex
+- [x] T035 [US1] Create AgentHelper convenience module (start_agent, load_messages, load_artifacts, subscribe, cleanup) at apps/jido_murmur/lib/jido_murmur/agent_helper.ex
+- [x] T036 [US1] Add :telemetry events to Runner (send_message start/stop/exception), agent start/stop, streaming signal, and artifact store at apps/jido_murmur/lib/jido_murmur/runner.ex and plugin modules
 
 ### Tests for User Story 1
 
-- [ ] T037 [P] [US1] Write unit tests for Runner send_message and drain-loop at apps/jido_murmur/test/jido_murmur/runner_test.exs
-- [ ] T038 [P] [US1] Write unit tests for config-driven Catalog at apps/jido_murmur/test/jido_murmur/catalog_test.exs
-- [ ] T039 [P] [US1] Write unit tests for Storage.Ecto (checkpoint and thread CRUD) at apps/jido_murmur/test/jido_murmur/storage/ecto_test.exs
-- [ ] T040 [P] [US1] Write unit tests for Workspaces context (workspace + session CRUD, auth hook) at apps/jido_murmur/test/jido_murmur/workspaces_test.exs
-- [ ] T041 [P] [US1] Write unit tests for PendingQueue (enqueue, drain, concurrent access) at apps/jido_murmur/test/jido_murmur/pending_queue_test.exs
-- [ ] T042 [P] [US1] Write unit tests for UITurn projection at apps/jido_murmur/test/jido_murmur/ui_turn_test.exs
-- [ ] T043 [P] [US1] Write unit tests for AgentHelper at apps/jido_murmur/test/jido_murmur/agent_helper_test.exs
-- [ ] T044 [US1] Write integration test for end-to-end message flow (send → Runner → LLM → streaming → persistence) at apps/jido_murmur/test/jido_murmur/integration/message_flow_test.exs
+- [x] T037 [P] [US1] Write unit tests for Runner send_message and drain-loop at apps/jido_murmur/test/jido_murmur/runner_test.exs
+- [x] T038 [P] [US1] Write unit tests for config-driven Catalog at apps/jido_murmur/test/jido_murmur/catalog_test.exs
+- [x] T039 [P] [US1] Write unit tests for Storage.Ecto (checkpoint and thread CRUD) at apps/jido_murmur/test/jido_murmur/storage/ecto_test.exs
+- [x] T040 [P] [US1] Write unit tests for Workspaces context (workspace + session CRUD, auth hook) at apps/jido_murmur/test/jido_murmur/workspaces_test.exs
+- [x] T041 [P] [US1] Write unit tests for PendingQueue (enqueue, drain, concurrent access) at apps/jido_murmur/test/jido_murmur/pending_queue_test.exs
+- [x] T042 [P] [US1] Write unit tests for UITurn projection at apps/jido_murmur/test/jido_murmur/ui_turn_test.exs
+- [x] T043 [P] [US1] Write unit tests for AgentHelper at apps/jido_murmur/test/jido_murmur/agent_helper_test.exs
+- [x] T044 [US1] Write integration test for end-to-end message flow (send → Runner → LLM → streaming → persistence) at apps/jido_murmur/test/jido_murmur/integration/message_flow_test.exs
 
 **Checkpoint**: jido_murmur core package is functional — a consumer can install, configure, define agents, and run multi-agent orchestration
 

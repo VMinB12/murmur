@@ -110,14 +110,14 @@
 
 ### Implementation for User Story 2
 
-- [ ] T045 [US2] Verify all public APIs return native Jido types (pids, Signal structs, Thread entries) — audit and fix any wrapping at apps/jido_murmur/lib/jido_murmur/agent_helper.ex and apps/jido_murmur/lib/jido_murmur/runner.ex
+- [x] T045 [US2] Verify all public APIs return native Jido types (pids, Signal structs, Thread entries) — audit and fix any wrapping at apps/jido_murmur/lib/jido_murmur/agent_helper.ex and apps/jido_murmur/lib/jido_murmur/runner.ex
 
 ### Tests for User Story 2
 
-- [ ] T046 [P] [US2] Write test for custom Jido.Plugin executing alongside StreamingPlugin and ArtifactPlugin at apps/jido_murmur/test/jido_murmur/integration/jido_interplay_test.exs
-- [ ] T047 [P] [US2] Write test for direct Jido.AgentServer.state/1 access on agent started via AgentHelper at apps/jido_murmur/test/jido_murmur/integration/jido_interplay_test.exs
-- [ ] T048 [US2] Write test for alternative Jido.Storage implementation working with Runner at apps/jido_murmur/test/jido_murmur/integration/jido_interplay_test.exs
-- [ ] T049 [US2] Document Jido interplay patterns and examples in apps/jido_murmur/README.md
+- [x] T046 [P] [US2] Write test for custom Jido.Plugin executing alongside StreamingPlugin and ArtifactPlugin at apps/jido_murmur/test/jido_murmur/integration/jido_interplay_test.exs
+- [x] T047 [P] [US2] Write test for direct Jido.AgentServer.state/1 access on agent started via AgentHelper at apps/jido_murmur/test/jido_murmur/integration/jido_interplay_test.exs
+- [x] T048 [US2] Write test for alternative Jido.Storage implementation working with Runner at apps/jido_murmur/test/jido_murmur/integration/jido_interplay_test.exs
+- [x] T049 [US2] Document Jido interplay patterns and examples in apps/jido_murmur/README.md
 
 **Checkpoint**: Jido-native design is validated — custom and package Jido components compose seamlessly
 

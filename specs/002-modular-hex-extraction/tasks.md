@@ -131,24 +131,24 @@
 
 ### Implementation for User Story 3
 
-- [ ] T050 [P] [US3] Extract ChatMessage function component to apps/jido_murmur_web/lib/jido_murmur_web/components/chat_message.ex
-- [ ] T051 [P] [US3] Extract ChatStream function component to apps/jido_murmur_web/lib/jido_murmur_web/components/chat_stream.ex
-- [ ] T052 [P] [US3] Extract AgentHeader function component to apps/jido_murmur_web/lib/jido_murmur_web/components/agent_header.ex
-- [ ] T053 [P] [US3] Extract MessageInput function component to apps/jido_murmur_web/lib/jido_murmur_web/components/message_input.ex
-- [ ] T054 [P] [US3] Extract StreamingIndicator function component to apps/jido_murmur_web/lib/jido_murmur_web/components/streaming_indicator.ex
-- [ ] T055 [P] [US3] Extract AgentSelector function component to apps/jido_murmur_web/lib/jido_murmur_web/components/agent_selector.ex
-- [ ] T056 [P] [US3] Extract WorkspaceList function component to apps/jido_murmur_web/lib/jido_murmur_web/components/workspace_list.ex
-- [ ] T057 [P] [US3] Extract ArtifactPanel function component with configurable renderer registry at apps/jido_murmur_web/lib/jido_murmur_web/components/artifact_panel.ex
-- [ ] T058 [US3] Create unified Components import module at apps/jido_murmur_web/lib/jido_murmur_web/components.ex
-- [ ] T059 [US3] Copy component source files as EEx templates for generator at apps/jido_murmur_web/priv/templates/components/
-- [ ] T060 [US3] Implement Mix.Tasks.JidoMurmurWeb.Install generator with component group selection (chat, workspace, artifacts, all) at apps/jido_murmur_web/lib/mix/tasks/jido_murmur_web.install.ex
+- [x] T050 [P] [US3] Extract ChatMessage function component to apps/jido_murmur_web/lib/jido_murmur_web/components/chat_message.ex
+- [x] T051 [P] [US3] Extract ChatStream function component to apps/jido_murmur_web/lib/jido_murmur_web/components/chat_stream.ex
+- [x] T052 [P] [US3] Extract AgentHeader function component to apps/jido_murmur_web/lib/jido_murmur_web/components/agent_header.ex
+- [x] T053 [P] [US3] Extract MessageInput function component to apps/jido_murmur_web/lib/jido_murmur_web/components/message_input.ex
+- [x] T054 [P] [US3] Extract StreamingIndicator function component to apps/jido_murmur_web/lib/jido_murmur_web/components/streaming_indicator.ex
+- [x] T055 [P] [US3] Extract AgentSelector function component to apps/jido_murmur_web/lib/jido_murmur_web/components/agent_selector.ex
+- [x] T056 [P] [US3] Extract WorkspaceList function component to apps/jido_murmur_web/lib/jido_murmur_web/components/workspace_list.ex
+- [x] T057 [P] [US3] Extract ArtifactPanel function component with configurable renderer registry at apps/jido_murmur_web/lib/jido_murmur_web/components/artifact_panel.ex
+- [x] T058 [US3] Create unified Components import module at apps/jido_murmur_web/lib/jido_murmur_web/components.ex
+- [x] T059 [US3] Copy component source files as EEx templates for generator at apps/jido_murmur_web/priv/templates/components/
+- [x] T060 [US3] Implement Mix.Tasks.JidoMurmurWeb.Install generator with component group selection (chat, workspace, artifacts, all) at apps/jido_murmur_web/lib/mix/tasks/jido_murmur_web.install.ex
 
 ### Tests for User Story 3
 
-- [ ] T061 [P] [US3] Write component render tests for ChatMessage, ChatStream, MessageInput at apps/jido_murmur_web/test/jido_murmur_web/components/chat_test.exs
-- [ ] T062 [P] [US3] Write component render tests for StreamingIndicator, AgentHeader, AgentSelector at apps/jido_murmur_web/test/jido_murmur_web/components/agent_test.exs
-- [ ] T063 [P] [US3] Write component render test for ArtifactPanel with renderer dispatch at apps/jido_murmur_web/test/jido_murmur_web/components/artifact_panel_test.exs
-- [ ] T064 [US3] Write generator test verifying file copy and namespace substitution at apps/jido_murmur_web/test/mix/tasks/install_test.exs
+- [x] T061 [P] [US3] Write component render tests for ChatMessage, ChatStream, MessageInput at apps/jido_murmur_web/test/jido_murmur_web/components/chat_test.exs
+- [x] T062 [P] [US3] Write component render tests for StreamingIndicator, AgentHeader, AgentSelector at apps/jido_murmur_web/test/jido_murmur_web/components/agent_test.exs
+- [x] T063 [P] [US3] Write component render test for ArtifactPanel with renderer dispatch at apps/jido_murmur_web/test/jido_murmur_web/components/artifact_panel_test.exs
+- [x] T064 [US3] Write generator test verifying file copy and namespace substitution at apps/jido_murmur_web/test/mix/tasks/install_test.exs
 
 **Checkpoint**: jido_murmur_web delivers reusable LiveView components via both direct import and generator installation
 

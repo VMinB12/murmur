@@ -265,7 +265,23 @@ murmur/                                   ← umbrella root
 
 **Separate Hex publishing still works:** Each app under `apps/` has its own `mix.exs` with full Hex metadata. Publishing is simply `cd apps/jido_arxiv && mix hex.publish`. A consumer who does `{:jido_arxiv, "~> 0.1"}` gets only that package — the umbrella structure is invisible to them. This means a developer interested only in the arXiv plugin can depend on just `jido_arxiv` without pulling in the rest.
 
-**Inter-app deps during development vs publishing:** During development inside the umbrella, inter-app dependencies use `in_umbrella: true`. For Hex publishing, these are switched to versioned Hex deps (e.g., `{:jido_murmur, "~> 0.1"}`). A Mix alias or release script automates this swap — it's a well-trodden pattern in the Elixir ecosystem.
+**Inter-app deps during development vs publishing:** During development inside the umbrella, inter-app dependencies use `in_umbrella: true`. For Hex publishing, these are switched to versioned Hex deps. The standard pattern is to keep both and select based on an environment variable:
+
+```elixir
+# In apps/jido_murmur_web/mix.exs
+defp deps do
+  jido_murmur_dep =
+    if System.get_env("HEX_PUBLISH") do
+      {:jido_murmur, "~> 0.1"}
+    else
+      {:jido_murmur, in_umbrella: true}
+    end
+
+  [jido_murmur_dep, ...]
+end
+```
+
+Then publish with: `HEX_PUBLISH=1 mix hex.publish`. This is a well-trodden pattern in the Elixir ecosystem (used by projects like Ecto, which publishes `ecto` and `ecto_sql` from the same umbrella).
 
 **Shared `mix.lock` is a feature, not a bug:** Since most consumers will upgrade all murmur packages together at once, having a single lockfile that ensures all packages are tested against the same dependency versions is exactly what we want. It catches incompatibilities at development time rather than in consumer projects.
 

@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-This document maps out the extraction of Murmur's multi-agent architecture into reusable Hex packages, organized as a **monorepo**. The core packages are `jido_murmur` (backend orchestration, Jido components, Ecto schemas) and `jido_murmur_web` (optional LiveView components). Domain-specific tool packages like `jido_arxiv` and `jido_tasks` are published independently. The current Murmur application remains in the monorepo as a **demo/reference project** that depends on all packages.
+This document maps out the extraction of Murmur's multi-agent architecture into reusable Hex packages, organized as a **Mix umbrella project**. The core packages are `jido_murmur` (backend orchestration, Jido components, Ecto schemas) and `jido_murmur_web` (optional LiveView components). Domain-specific tool packages like `jido_arxiv` and `jido_tasks` are published independently to Hex. The current Murmur application remains in the umbrella as a **demo/reference app** that depends on all packages.
 
 **Critical design principle:** Our hex packages must **not** abstract away Jido. Consumer projects are Jido projects. The packages we extract provide **pre-built Jido components** (actions, plugins, storage adapters, LiveView helpers) that consumers compose using Jido's own APIs. Jido types (`Signal`, `Thread`, `Agent`, `Action`, `Plugin`) are first-class citizens throughout — never wrapped, never hidden. This ensures consumer projects can always reach down to Jido when they need to, and that improvements to Jido flow through to everyone seamlessly.
 
@@ -214,59 +214,67 @@ This audit maps exactly where Jido types appear in the codebase, confirming that
 
 ## 3. Proposed Package Architecture
 
-### 3.1 Monorepo Structure
+### 3.1 Umbrella Structure
 
-All packages live in a single repository. This keeps coordinated changes easy, avoids git submodules, and allows the current Murmur application to serve as a demo project. Each subdirectory is an independently publishable Hex package.
+All packages live in a single repository as a **Mix umbrella project** (`mix new murmur --umbrella`). This gives us first-class tooling support — `mix test` from root runs all tests, `mix compile` catches cross-package breakage, and `mix cmd` allows targeted operations — while still allowing each app under `apps/` to be published independently to Hex.
 
 ```
-murmur/                                   ← monorepo root
-├── packages/
+murmur/                                   ← umbrella root
+├── apps/
 │   ├── jido_murmur/                      ← Core backend: orchestration, Jido components, Ecto schemas
 │   │   ├── lib/jido_murmur/
-│   │   ├── mix.exs                       ← {:jido_murmur, "~> 0.1"}
+│   │   ├── mix.exs                       ← {:jido_murmur, "~> 0.1"} on Hex
 │   │   └── test/
 │   │
 │   ├── jido_murmur_web/                  ← Optional LiveView components (chat, artifacts, etc.)
 │   │   ├── lib/jido_murmur_web/
-│   │   ├── mix.exs                       ← {:jido_murmur_web, "~> 0.1"}
+│   │   ├── mix.exs                       ← {:jido_murmur_web, "~> 0.1"} on Hex
 │   │   └── test/
 │   │
 │   ├── jido_tasks/                       ← Task management tools (Jido.Action modules + Ecto schema)
 │   │   ├── lib/jido_tasks/
-│   │   ├── mix.exs                       ← {:jido_tasks, "~> 0.1"}
+│   │   ├── mix.exs                       ← {:jido_tasks, "~> 0.1"} on Hex
 │   │   └── test/
 │   │
-│   └── jido_arxiv/                       ← arXiv search tools (Jido.Action modules)
-│       ├── lib/jido_arxiv/
-│       ├── mix.exs                       ← {:jido_arxiv, "~> 0.1"}
+│   ├── jido_arxiv/                       ← arXiv search tools (Jido.Action modules)
+│   │   ├── lib/jido_arxiv/
+│   │   ├── mix.exs                       ← {:jido_arxiv, "~> 0.1"} on Hex
+│   │   └── test/
+│   │
+│   └── murmur_demo/                      ← Current Murmur app lives here as a demo/reference project
+│       ├── lib/murmur/
+│       ├── lib/murmur_web/
+│       ├── mix.exs                       ← depends on siblings via in_umbrella: true
 │       └── test/
 │
-├── demo/                                 ← Current Murmur app lives here as a demo project
-│   ├── lib/murmur/
-│   ├── lib/murmur_web/
-│   ├── mix.exs                           ← depends on all packages via path: "../packages/jido_murmur"
-│   └── test/
-│
-├── .github/                              ← CI for entire monorepo
-├── mix.exs                               ← Optional umbrella-like root (or just CI scripts)
+├── config/                               ← shared config (scoped per-app: config :jido_murmur, ...)
+├── mix.exs                               ← umbrella root mix.exs
+├── mix.lock                              ← single shared lockfile
+├── .github/                              ← CI for entire umbrella
 └── README.md
 ```
 
-**Why monorepo:**
+**Why umbrella:**
+- **First-class Mix support** — `mix test` from root runs all tests; `mix test --app jido_arxiv` tests a single app; `mix compile` from root catches cross-package breakage automatically
+- **Single `mix.lock`** — all apps use the same version of every shared dependency (Phoenix, Ecto, Jido, etc.), preventing "works in jido_murmur but breaks in demo" version skew
+- **`in_umbrella: true`** for inter-app deps during development — cleaner than `path:` references
 - Single PR for cross-package changes (e.g., renaming a PubSub topic)
 - Demo app always tests against latest package code
 - No git submodule pain
-- Each package has its own `mix.exs` and can be published to Hex independently
-- CI runs all package tests together; individual packages can also be tested in isolation
+- CI runs all package tests together with zero custom scripts
 
-**Why NOT an umbrella:** Umbrella projects (`mix new --umbrella`) couple too tightly — they share a single `mix.lock`, compile together, and make it harder to publish individual packages. Instead, each package under `packages/` is a fully standalone Mix project. The demo app uses `path:` dependencies for development and switches to Hex versions for release.
+**Separate Hex publishing still works:** Each app under `apps/` has its own `mix.exs` with full Hex metadata. Publishing is simply `cd apps/jido_arxiv && mix hex.publish`. A consumer who does `{:jido_arxiv, "~> 0.1"}` gets only that package — the umbrella structure is invisible to them. This means a developer interested only in the arXiv plugin can depend on just `jido_arxiv` without pulling in the rest.
+
+**Inter-app deps during development vs publishing:** During development inside the umbrella, inter-app dependencies use `in_umbrella: true`. For Hex publishing, these are switched to versioned Hex deps (e.g., `{:jido_murmur, "~> 0.1"}`). A Mix alias or release script automates this swap — it's a well-trodden pattern in the Elixir ecosystem.
+
+**Shared `mix.lock` is a feature, not a bug:** Since most consumers will upgrade all murmur packages together at once, having a single lockfile that ensures all packages are tested against the same dependency versions is exactly what we want. It catches incompatibilities at development time rather than in consumer projects.
 
 ### 3.2 Consumer-Facing Package Diagram
 
 ```
 ┌────────────────────────────────────────────────────────────────────┐
 │                    Consumer Application                             │
-│  (or the demo/ app in the monorepo)                                │
+│  (or the murmur_demo/ app in the umbrella)                         │
 │                                                                     │
 │  ┌──────────────┐  ┌───────────────┐  ┌────────────────────────┐  │
 │  │ App Agents   │  │ App Frontend  │  │ App Business Logic     │  │
@@ -1126,7 +1134,7 @@ Tool Packages (jido_tasks, jido_arxiv, etc.)
 
 ### Phase 1: Prepare Codebase In-Place (1-2 weeks)
 
-**Goal:** Create the convenience functions, configuration hooks, and new components within the existing Murmur codebase before restructuring to monorepo. This de-risks the extraction.
+**Goal:** Create the convenience functions, configuration hooks, and new components within the existing Murmur codebase before restructuring to the umbrella. This de-risks the extraction.
 
 1. **Remove hardcoded max-agents limit**
    - Delete `@max_agents_per_workspace 8` from `Murmur.Workspaces`
@@ -1170,14 +1178,14 @@ Tool Packages (jido_tasks, jido_arxiv, etc.)
    - Add pluggable `authorize` config hook (defaults to nil / no-op)
    - **Test:** Existing tests unaffected (auth disabled by default)
 
-### Phase 2: Restructure to Monorepo (1-2 weeks)
+### Phase 2: Restructure to Umbrella (1-2 weeks)
 
-**Goal:** Move code into the monorepo directory structure. All packages coexist in one repo.
+**Goal:** Move code into a Mix umbrella directory structure. All packages coexist in one repo with first-class tooling support.
 
-1. **Create monorepo skeleton**
+1. **Create umbrella skeleton** (via `mix new murmur --umbrella`, then add apps)
    ```
    murmur/
-   ├── packages/
+   ├── apps/
    │   ├── jido_murmur/
    │   │   ├── lib/jido_murmur.ex
    │   │   ├── lib/jido_murmur/
@@ -1224,14 +1232,18 @@ Tool Packages (jido_tasks, jido_arxiv, etc.)
    │   ├── jido_tasks/
    │   │   └── ...
    │   │
-   │   └── jido_arxiv/
-   │       └── ...
+   │   ├── jido_arxiv/
+   │   │   └── ...
+   │   │
+   │   └── murmur_demo/                         # Current Murmur app (demo/reference)
+   │       ├── lib/murmur/
+   │       ├── lib/murmur_web/
+   │       ├── mix.exs                           # deps: in_umbrella: true
+   │       └── test/
    │
-   └── demo/                                    # Current Murmur app
-       ├── lib/murmur/
-       ├── lib/murmur_web/
-       ├── mix.exs                              # deps: path: "../packages/jido_murmur"
-       └── test/
+   ├── config/                                   # Shared config (scoped per-app)
+   ├── mix.exs                                   # Umbrella root
+   └── mix.lock                                  # Single shared lockfile
    ```
 
 2. **Move modules into packages** (following the mapping in Section 4.1)
@@ -1250,21 +1262,21 @@ Tool Packages (jido_tasks, jido_arxiv, etc.)
    - Mock LLM helpers (wrapping Mox stubs for `Jido.AI.Agent` ask/await)
    - Helpers use Jido types — consumers test with Jido's own test patterns
 
-5. **Update demo app to depend on packages**
-   - Add path dependencies: `{:jido_murmur, path: "../packages/jido_murmur"}`
+5. **Update demo app to depend on umbrella siblings**
+   - Add umbrella dependencies: `{:jido_murmur, in_umbrella: true}`
    - Update all module references
    - Remove extracted modules from demo app
-   - **Test:** All demo app tests pass
+   - **Test:** `mix test` from umbrella root — all demo app tests pass
 
 ### Phase 3: Extract Tool Packages (1 week each)
 
 1. **Extract `jido_tasks`**
-   - Move Task schema, Tasks context, task tools into `packages/jido_tasks/`
+   - Move Task schema, Tasks context, task tools into `apps/jido_tasks/`
    - Create migration generator
    - Update demo app to depend on it
 
 2. **Extract `jido_arxiv`**
-   - Move ArxivSearch, DisplayPaper tools into `packages/jido_arxiv/`
+   - Move ArxivSearch, DisplayPaper tools into `apps/jido_arxiv/`
    - Move PaperList, PdfViewer components to `jido_arxiv` (these are domain-specific, not generic UI)
    - Update demo app to depend on it
 
@@ -1310,7 +1322,7 @@ These components are **opt-in** — consumers can use them directly, install (co
    - Tool package creation guide
    - API reference (ExDoc)
    - Architecture decision records
-   - Monorepo development guide (how to develop across packages)
+   - Umbrella development guide (how to develop across apps, publish to Hex)
 
 3. **Publish packages** to Hex.pm
    - `jido_murmur`
@@ -1385,7 +1397,7 @@ These decisions were discussed and finalized. They are incorporated throughout t
 | # | Question | Decision | Where Reflected |
 |---|---|---|---|
 | 1 | Package naming | **`jido_murmur`** (not `jido_workbench`) | All sections |
-| 2 | Monorepo vs multi-repo | **Monorepo** with `packages/jido_murmur`, `packages/jido_murmur_web`, `packages/jido_tasks`, `packages/jido_arxiv`, and `demo/` (current Murmur app). Each package published independently to Hex. | Section 3.1 |
+| 2 | Monorepo vs multi-repo | **Mix umbrella** with `apps/jido_murmur`, `apps/jido_murmur_web`, `apps/jido_tasks`, `apps/jido_arxiv`, and `apps/murmur_demo` (current Murmur app). Each app published independently to Hex. Umbrella gives first-class `mix test`/`mix compile` from root, shared `mix.lock`, and `in_umbrella: true` deps — while still supporting per-app `cd apps/jido_arxiv && mix hex.publish`. | Section 3.1 |
 | 3 | LiveView components | **Opt-in via `jido_murmur_web`**. Two modes: direct import or shadcn-style generator that copies components into consumer project for full customization. | Section 3.3 Package 2, Phase 4 |
 | 4 | Workspace schema flexibility | **Wrappable, not extensible.** Fixed schemas with `metadata` JSONB escape hatch. Consumers create their own schemas with `belongs_to` for custom fields. | Section 4.2.6 |
 | 5 | Max agents per workspace | **Removed entirely.** The hardcoded limit of 8 should never have been there. Consumer decides their own limits if needed. | Phase 1 step 1, Section 4.2.8 |
@@ -1402,7 +1414,7 @@ These decisions were discussed and finalized. They are incorporated throughout t
 |---|---|---|---|
 | `jido_murmur` Hex package | Core backend | Pre-built Jido components (plugins, actions, storage) | P0 — Must have |
 | `jido_murmur_web` Hex package | Optional web | LiveView components + install generators | P1 — Should have |
-| Monorepo structure with demo app | Infrastructure | Demo app validates all packages | P0 — Must have |
+| Umbrella structure with demo app | Infrastructure | Demo app validates all packages | P0 — Must have |
 | ComposableRequestTransformer | `jido_murmur` | Chains multiple `ReAct.RequestTransformer` impls | P0 — Must have |
 | AgentHelper convenience functions | `jido_murmur` | Returns Jido types (pids, signals) | P0 — Must have |
 | Auth-ready schema design | `jido_murmur` | Optional `owner_id` + pluggable `authorize` hook | P0 — Must have |

@@ -61,12 +61,12 @@ config :murmur, MurmurWeb.Endpoint,
     web_console_logger: true,
     patterns: [
       # Static assets, except user uploads
-      ~r"priv/static/(?!uploads/).*\.(js|css|png|jpeg|jpg|gif|svg)$"E,
+      ~r"apps/murmur_demo/priv/static/(?!uploads/).*\.(js|css|png|jpeg|jpg|gif|svg)$"E,
       # Gettext translations
-      ~r"priv/gettext/.*\.po$"E,
+      ~r"apps/murmur_demo/priv/gettext/.*\.po$"E,
       # Router, Controllers, LiveViews and LiveComponents
-      ~r"lib/murmur_web/router\.ex$"E,
-      ~r"lib/murmur_web/(controllers|live|components)/.*\.(ex|heex)$"E
+      ~r"apps/murmur_demo/lib/murmur_web/router\.ex$"E,
+      ~r"apps/murmur_demo/lib/murmur_web/(controllers|live|components)/.*\.(ex|heex)$"E
     ]
   ]
 

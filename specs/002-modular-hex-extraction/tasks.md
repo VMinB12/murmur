@@ -28,14 +28,14 @@
 
 **Purpose**: Convert existing project to Mix umbrella and create package skeletons
 
-- [ ] T001 Create umbrella root mix.exs with apps_path and shared deps at mix.exs
-- [ ] T002 Create apps/ directory and jido_murmur package skeleton with mix.exs, lib/, test/ at apps/jido_murmur/
-- [ ] T003 [P] Create jido_murmur_web package skeleton with mix.exs, lib/, test/ at apps/jido_murmur_web/
-- [ ] T004 [P] Create jido_tasks package skeleton with mix.exs, lib/, test/ at apps/jido_tasks/
-- [ ] T005 [P] Create jido_arxiv package skeleton with mix.exs, lib/, test/ at apps/jido_arxiv/
-- [ ] T006 [P] Create murmur_demo app skeleton with mix.exs at apps/murmur_demo/
-- [ ] T007 Configure umbrella shared config files (config.exs, dev.exs, test.exs, prod.exs, runtime.exs) in config/
-- [ ] T008 Run mix deps.get from umbrella root and verify all packages compile
+- [x] T001 Create umbrella root mix.exs with apps_path and shared deps at mix.exs
+- [x] T002 Create apps/ directory and jido_murmur package skeleton with mix.exs, lib/, test/ at apps/jido_murmur/
+- [x] T003 [P] Create jido_murmur_web package skeleton with mix.exs, lib/, test/ at apps/jido_murmur_web/
+- [x] T004 [P] Create jido_tasks package skeleton with mix.exs, lib/, test/ at apps/jido_tasks/
+- [x] T005 [P] Create jido_arxiv package skeleton with mix.exs, lib/, test/ at apps/jido_arxiv/
+- [x] T006 [P] Create murmur_demo app skeleton with mix.exs at apps/murmur_demo/
+- [x] T007 Configure umbrella shared config files (config.exs, dev.exs, test.exs, prod.exs, runtime.exs) in config/
+- [x] T008 Run mix deps.get from umbrella root and verify all packages compile
 
 ---
 

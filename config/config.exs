@@ -13,7 +13,7 @@ config :esbuild,
   murmur: [
     args:
       ~w(js/app.js --bundle --target=es2022 --outdir=../priv/static/assets/js --external:/fonts/* --external:/images/* --alias:@=.),
-    cd: Path.expand("../assets", __DIR__),
+    cd: Path.expand("../apps/murmur_demo/assets", __DIR__),
     env: %{"NODE_PATH" => [Path.expand("../deps", __DIR__), Mix.Project.build_path()]}
   ]
 
@@ -32,7 +32,6 @@ config :logger, :default_formatter,
 
 config :murmur, Murmur.Jido, max_tasks: 1000, agent_pools: []
 
-# Configure the endpoint
 config :murmur, MurmurWeb.Endpoint,
   url: [host: "localhost"],
   adapter: Bandit.PhoenixAdapter,
@@ -56,8 +55,8 @@ config :tailwind,
   # Use git_hook
   murmur: [
     args: ~w(
-      --input=assets/css/app.css
-      --output=priv/static/assets/css/app.css
+      --input=apps/murmur_demo/assets/css/app.css
+      --output=apps/murmur_demo/priv/static/assets/css/app.css
     ),
     cd: Path.expand("..", __DIR__)
   ]

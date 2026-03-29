@@ -44,7 +44,7 @@ defmodule JidoArxiv.Tools.ArxivSearchTest do
 
       assert %Jido.Agent.Directive.Emit{signal: signal} = directive
       assert signal.type == "artifact.papers"
-      assert signal.data.mode == :append
+      assert signal.data.mode == :merge
       assert length(signal.data.data) == 2
     end
 

@@ -25,6 +25,10 @@ config :jido_ai,
     fast: "openai:gpt-5-mini"
   }
 
+# Configure jido_artifacts package
+config :jido_artifacts,
+  pubsub: Murmur.PubSub
+
 # Configure jido_murmur package to use the demo app's modules
 config :jido_murmur,
   repo: Murmur.Repo,

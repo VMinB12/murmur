@@ -9,9 +9,9 @@ defmodule Murmur.Agents.ArtifactPluginTest do
   """
   use Murmur.DataCase
 
-  alias JidoMurmur.Actions.StoreArtifact
-  alias JidoMurmur.Artifact
-  alias JidoMurmur.ArtifactPlugin
+  alias JidoArtifacts.Actions.StoreArtifact
+  alias JidoArtifacts.Artifact
+  alias JidoArtifacts.ArtifactPlugin
 
   @session_id "test-session-123"
 

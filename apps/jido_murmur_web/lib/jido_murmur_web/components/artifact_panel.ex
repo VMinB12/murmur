@@ -54,7 +54,7 @@ defmodule JidoMurmurWeb.Components.ArtifactPanel do
   def artifact_badge(assigns) do
     renderer = Map.get(assigns.renderers, assigns.name) || Map.get(@default_renderers, assigns.name)
     badge_fn = if renderer, do: &renderer.badge/1, else: &Generic.badge/1
-    badge_fn.(assigns)
+    badge_fn.(%{assigns | data: unwrap_envelope(assigns.data)})
   end
 
   # --- Detail dispatcher ---
@@ -68,8 +68,13 @@ defmodule JidoMurmurWeb.Components.ArtifactPanel do
   def artifact_detail(assigns) do
     renderer = Map.get(assigns.renderers, assigns.name) || Map.get(@default_renderers, assigns.name)
     detail_fn = if renderer, do: &renderer.detail/1, else: &Generic.detail/1
-    detail_fn.(assigns)
+    detail_fn.(%{assigns | data: unwrap_envelope(assigns.data)})
   end
+
+  # Unwrap metadata envelope if present. Envelopes have :data and :version keys.
+  # Pass through raw data unchanged for backward compatibility.
+  defp unwrap_envelope(%{data: inner, version: _version}), do: inner
+  defp unwrap_envelope(data), do: data
 
   # --- Artifact panel ---
 

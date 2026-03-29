@@ -15,7 +15,7 @@ defmodule JidoArxiv.Tools.DisplayPaper do
       arxiv_id: [type: :string, required: true, doc: "The arXiv paper ID (e.g. 2301.07041)"]
     ]
 
-  alias JidoMurmur.Artifact
+  alias JidoArtifacts.Artifact
 
   @impl true
   def run(params, ctx) do
@@ -30,7 +30,7 @@ defmodule JidoArxiv.Tools.DisplayPaper do
         pdf_url: "https://arxiv.org/pdf/#{arxiv_id}.pdf"
       }
 
-      artifact_directive = Artifact.emit(ctx, "displayed_paper", paper, mode: :replace)
+      artifact_directive = Artifact.emit(ctx, "displayed_paper", paper)
 
       {:ok, %{result: "Displaying PDF for arXiv paper #{arxiv_id}"}, artifact_directive}
     end

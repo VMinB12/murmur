@@ -18,7 +18,8 @@ defmodule JidoArxiv.Tools.ArxivSearch do
 
   import SweetXml, only: [sigil_x: 2, xpath: 3]
 
-  alias JidoMurmur.Artifact
+  alias JidoArtifacts.Artifact
+  alias JidoArtifacts.Merge
 
   @arxiv_api_url "https://export.arxiv.org/api/query"
   @max_results 5
@@ -28,7 +29,7 @@ defmodule JidoArxiv.Tools.ArxivSearch do
     case fetch_papers(params.query) do
       {:ok, papers} ->
         llm_summary = format_for_llm(papers)
-        artifact_directive = Artifact.emit(ctx, "papers", papers, mode: :append)
+        artifact_directive = Artifact.emit(ctx, "papers", papers, merge: &Merge.append/2)
 
         {:ok, %{result: llm_summary}, artifact_directive}
 

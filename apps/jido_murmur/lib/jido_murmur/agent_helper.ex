@@ -6,7 +6,7 @@ defmodule JidoMurmur.AgentHelper do
   Consumers can always bypass these helpers and call Jido APIs directly.
   """
 
-  alias JidoMurmur.Artifact
+  alias JidoArtifacts.Artifact
   alias JidoMurmur.Catalog
   alias JidoMurmur.StreamingPlugin
   alias JidoMurmur.UITurn

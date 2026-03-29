@@ -11,7 +11,7 @@ defmodule Murmur.Agents.Profiles.GeneralAgent do
       JidoTasks.Tools.UpdateTask,
       JidoTasks.Tools.ListTasks
     ],
-    plugins: [JidoMurmur.StreamingPlugin, JidoMurmur.ArtifactPlugin],
+    plugins: [JidoMurmur.StreamingPlugin, JidoArtifacts.ArtifactPlugin],
     request_transformer: JidoMurmur.MessageInjector,
     system_prompt: """
     You are a helpful assistant. Be concise and accurate in your responses.

@@ -19,9 +19,9 @@
 
 **Purpose**: Create the `jido_artifacts` umbrella app skeleton and configure dependencies
 
-- [ ] T001 Create `apps/jido_artifacts/` directory with `mix.exs` declaring deps: `{:jido, in_umbrella: true}, {:jido_signal, ...}, {:jido_action, ...}, {:phoenix_pubsub, "~> 2.0"}, {:jason, "~> 1.0"}`
-- [ ] T002 Create `apps/jido_artifacts/lib/jido_artifacts.ex` top-level module with `pubsub/0` config accessor
-- [ ] T003 [P] Create `apps/jido_artifacts/test/test_helper.exs` with ExUnit configuration
+- [x] T001 Create `apps/jido_artifacts/` directory with `mix.exs` declaring deps: `{:jido, in_umbrella: true}, {:jido_signal, ...}, {:jido_action, ...}, {:phoenix_pubsub, "~> 2.0"}, {:jason, "~> 1.0"}`
+- [x] T002 Create `apps/jido_artifacts/lib/jido_artifacts.ex` top-level module with `pubsub/0` config accessor
+- [x] T003 [P] Create `apps/jido_artifacts/test/test_helper.exs` with ExUnit configuration
 
 ---
 
@@ -31,21 +31,21 @@
 
 **⚠️ CRITICAL**: All user stories depend on the extracted package existing.
 
-- [ ] T004 [US4] Move `apps/jido_murmur/lib/jido_murmur/artifact.ex` to `apps/jido_artifacts/lib/jido_artifacts/artifact.ex`, rename module to `JidoArtifacts.Artifact`
-- [ ] T005 [US4] Move `apps/jido_murmur/lib/jido_murmur/artifact_plugin.ex` to `apps/jido_artifacts/lib/jido_artifacts/artifact_plugin.ex`, rename module to `JidoArtifacts.ArtifactPlugin`
-- [ ] T006 [US4] Move `apps/jido_murmur/lib/jido_murmur/actions/store_artifact.ex` to `apps/jido_artifacts/lib/jido_artifacts/actions/store_artifact.ex`, rename module to `JidoArtifacts.Actions.StoreArtifact`
-- [ ] T007 [US4] Delete original files from jido_murmur: `apps/jido_murmur/lib/jido_murmur/artifact.ex`, `artifact_plugin.ex`, `actions/store_artifact.ex`
-- [ ] T008 [US4] Update `apps/jido_murmur/mix.exs` to add `{:jido_artifacts, in_umbrella: true}` dependency
-- [ ] T009 [US4] Update all `JidoMurmur.Artifact` references in jido_murmur to `JidoArtifacts.Artifact` (imports, aliases, function calls)
-- [ ] T010 [US4] Update all `JidoMurmur.ArtifactPlugin` references in jido_murmur to `JidoArtifacts.ArtifactPlugin`
-- [ ] T011 [US4] Update all `JidoMurmur.Actions.StoreArtifact` references in jido_murmur to `JidoArtifacts.Actions.StoreArtifact`
-- [ ] T012 [US4] Update `apps/jido_arxiv/mix.exs` to depend on `{:jido_artifacts, in_umbrella: true}` instead of `jido_murmur` for artifact functionality
-- [ ] T013 [US4] Update all artifact references in `apps/jido_arxiv/` to use `JidoArtifacts.*` modules
-- [ ] T014 [US4] Update `apps/murmur_demo/mix.exs` to add `{:jido_artifacts, in_umbrella: true}` dependency
-- [ ] T015 [US4] Add `config :jido_artifacts, pubsub: Murmur.PubSub` to `config/config.exs`
-- [ ] T016 [US4] Update `ArtifactPlugin` to read PubSub from `:jido_artifacts` config via `JidoArtifacts.pubsub/0` instead of `JidoMurmur.pubsub/0`
-- [ ] T017 [US4] Update agent profile modules in `apps/murmur_demo/` to reference `JidoArtifacts.ArtifactPlugin` instead of `JidoMurmur.ArtifactPlugin`
-- [ ] T018 [US4] Verify umbrella compiles: run `mix compile` from repo root with zero errors
+- [x] T004 [US4] Move `apps/jido_murmur/lib/jido_murmur/artifact.ex` to `apps/jido_artifacts/lib/jido_artifacts/artifact.ex`, rename module to `JidoArtifacts.Artifact`
+- [x] T005 [US4] Move `apps/jido_murmur/lib/jido_murmur/artifact_plugin.ex` to `apps/jido_artifacts/lib/jido_artifacts/artifact_plugin.ex`, rename module to `JidoArtifacts.ArtifactPlugin`
+- [x] T006 [US4] Move `apps/jido_murmur/lib/jido_murmur/actions/store_artifact.ex` to `apps/jido_artifacts/lib/jido_artifacts/actions/store_artifact.ex`, rename module to `JidoArtifacts.Actions.StoreArtifact`
+- [x] T007 [US4] Delete original files from jido_murmur: `apps/jido_murmur/lib/jido_murmur/artifact.ex`, `artifact_plugin.ex`, `actions/store_artifact.ex`
+- [x] T008 [US4] Update `apps/jido_murmur/mix.exs` to add `{:jido_artifacts, in_umbrella: true}` dependency
+- [x] T009 [US4] Update all `JidoMurmur.Artifact` references in jido_murmur to `JidoArtifacts.Artifact` (imports, aliases, function calls)
+- [x] T010 [US4] Update all `JidoMurmur.ArtifactPlugin` references in jido_murmur to `JidoArtifacts.ArtifactPlugin`
+- [x] T011 [US4] Update all `JidoMurmur.Actions.StoreArtifact` references in jido_murmur to `JidoArtifacts.Actions.StoreArtifact`
+- [x] T012 [US4] Update `apps/jido_arxiv/mix.exs` to depend on `{:jido_artifacts, in_umbrella: true}` instead of `jido_murmur` for artifact functionality
+- [x] T013 [US4] Update all artifact references in `apps/jido_arxiv/` to use `JidoArtifacts.*` modules
+- [x] T014 [US4] Update `apps/murmur_demo/mix.exs` to add `{:jido_artifacts, in_umbrella: true}` dependency
+- [x] T015 [US4] Add `config :jido_artifacts, pubsub: Murmur.PubSub` to `config/config.exs`
+- [x] T016 [US4] Update `ArtifactPlugin` to read PubSub from `:jido_artifacts` config via `JidoArtifacts.pubsub/0` instead of `JidoMurmur.pubsub/0`
+- [x] T017 [US4] Update agent profile modules in `apps/murmur_demo/` to reference `JidoArtifacts.ArtifactPlugin` instead of `JidoMurmur.ArtifactPlugin`
+- [x] T018 [US4] Verify umbrella compiles: run `mix compile` from repo root with zero errors
 
 **Checkpoint**: Extraction complete. All modules live in jido_artifacts. Umbrella compiles. Existing behavior unchanged.
 
@@ -59,13 +59,13 @@
 
 ### Tests for User Story 1
 
-- [ ] T019 [P] [US1] Create `apps/jido_artifacts/test/jido_artifacts/merge_test.exs` with tests for `append/2`, `prepend/2`, `append_max/1`, `prepend_max/1`, `upsert_by/1` including nil-existing edge case
-- [ ] T020 [P] [US1] Create `apps/jido_artifacts/test/jido_artifacts/artifact_test.exs` with tests for `emit/4` with no merge (replace), with `merge: &Merge.append/2`, with `merge: Merge.append_max(50)`, and with custom function
+- [x] T019 [P] [US1] Create `apps/jido_artifacts/test/jido_artifacts/merge_test.exs` with tests for `append/2`, `prepend/2`, `append_max/1`, `prepend_max/1`, `upsert_by/1` including nil-existing edge case
+- [x] T020 [P] [US1] Create `apps/jido_artifacts/test/jido_artifacts/artifact_test.exs` with tests for `emit/4` with no merge (replace), with `merge: &Merge.append/2`, with `merge: Merge.append_max(50)`, and with custom function
 
 ### Implementation for User Story 1
 
-- [ ] T021 [P] [US1] Create `apps/jido_artifacts/lib/jido_artifacts/merge.ex` with `append/2`, `prepend/2`, `append_max/1`, `prepend_max/1`, `upsert_by/1` per contracts/jido-artifacts-api.md
-- [ ] T022 [US1] Rewrite `Artifact.emit/4` in `apps/jido_artifacts/lib/jido_artifacts/artifact.ex` to accept `:merge` keyword, apply merge eagerly from `ctx[:state][:artifacts]`, include `merge_result` in signal data when merge is provided, set `mode: :replace` when no merge
+- [x] T021 [P] [US1] Create `apps/jido_artifacts/lib/jido_artifacts/merge.ex` with `append/2`, `prepend/2`, `append_max/1`, `prepend_max/1`, `upsert_by/1` per contracts/jido-artifacts-api.md
+- [x] T022 [US1] Rewrite `Artifact.emit/4` in `apps/jido_artifacts/lib/jido_artifacts/artifact.ex` to accept `:merge` keyword, apply merge eagerly from `ctx[:state][:artifacts]`, include `merge_result` in signal data when merge is provided, set `mode: :replace` when no merge
 
 **Checkpoint**: Merge helpers work. emit/4 produces correct signal data with merge_result. Tests pass.
 
@@ -79,11 +79,11 @@
 
 ### Tests for User Story 2
 
-- [ ] T023 [P] [US2] Create `apps/jido_artifacts/test/jido_artifacts/actions/store_artifact_test.exs` with tests for: create (version 1), update (version increment), delete (nil merge_result removes key), merge_result storage
+- [x] T023 [P] [US2] Create `apps/jido_artifacts/test/jido_artifacts/actions/store_artifact_test.exs` with tests for: create (version 1), update (version increment), delete (nil merge_result removes key), merge_result storage
 
 ### Implementation for User Story 2
 
-- [ ] T024 [US2] Rewrite `StoreArtifact.run/2` in `apps/jido_artifacts/lib/jido_artifacts/actions/store_artifact.ex` to wrap data in metadata envelope `%{data: ..., updated_at: DateTime.utc_now(), source: agent_id, version: n}`, increment version on update, delete key when merge_result is nil
+- [x] T024 [US2] Rewrite `StoreArtifact.run/2` in `apps/jido_artifacts/lib/jido_artifacts/actions/store_artifact.ex` to wrap data in metadata envelope `%{data: ..., updated_at: DateTime.utc_now(), source: agent_id, version: n}`, increment version on update, delete key when merge_result is nil
 
 **Checkpoint**: Stored artifacts include metadata envelope. Version increments. Nil deletes. Tests pass.
 
@@ -97,11 +97,11 @@
 
 ### Tests for User Story 3
 
-- [ ] T025 [P] [US3] Add tests to `apps/jido_artifacts/test/jido_artifacts/artifact_test.exs` for: source set to `/jido_artifacts/#{name}`, subject set to `/agents/#{agent_id}` when present, subject is nil when no agent identity
+- [x] T025 [P] [US3] Add tests to `apps/jido_artifacts/test/jido_artifacts/artifact_test.exs` for: source set to `/jido_artifacts/#{name}`, subject set to `/agents/#{agent_id}` when present, subject is nil when no agent identity
 
 ### Implementation for User Story 3
 
-- [ ] T026 [US3] Update `Artifact.emit/4` in `apps/jido_artifacts/lib/jido_artifacts/artifact.ex` to set signal `source: "/jido_artifacts/#{name}"` and `subject: "/agents/#{agent_id}"` from `ctx[:state][:__agent_id__]`, defaulting subject to nil
+- [x] T026 [US3] Update `Artifact.emit/4` in `apps/jido_artifacts/lib/jido_artifacts/artifact.ex` to set signal `source: "/jido_artifacts/#{name}"` and `subject: "/agents/#{agent_id}"` from `ctx[:state][:__agent_id__]`, defaulting subject to nil
 
 **Checkpoint**: Signals carry CloudEvents identity. Degrades gracefully. Tests pass.
 
@@ -115,12 +115,12 @@
 
 ### Tests for User Story 5
 
-- [ ] T027 [P] [US5] Add tests to `apps/jido_artifacts/test/jido_artifacts/artifact_test.exs` for: default scope is `:agent`, explicit `scope: :agent` works, `scope: :workspace` accepted in signal data
+- [x] T027 [P] [US5] Add tests to `apps/jido_artifacts/test/jido_artifacts/artifact_test.exs` for: default scope is `:agent`, explicit `scope: :agent` works, `scope: :workspace` accepted in signal data
 
 ### Implementation for User Story 5
 
-- [ ] T028 [US5] Update `Artifact.emit/4` in `apps/jido_artifacts/lib/jido_artifacts/artifact.ex` to accept `:scope` keyword option, default to `:agent`, include scope in signal data
-- [ ] T029 [US5] Update `ArtifactPlugin.handle_signal/2` in `apps/jido_artifacts/lib/jido_artifacts/artifact_plugin.ex` to log warning when `scope: :workspace` is received (not yet implemented)
+- [x] T028 [US5] Update `Artifact.emit/4` in `apps/jido_artifacts/lib/jido_artifacts/artifact.ex` to accept `:scope` keyword option, default to `:agent`, include scope in signal data
+- [x] T029 [US5] Update `ArtifactPlugin.handle_signal/2` in `apps/jido_artifacts/lib/jido_artifacts/artifact_plugin.ex` to log warning when `scope: :workspace` is received (not yet implemented)
 
 **Checkpoint**: Scope field reserved in API. Workspace scope warns at plugin level. Tests pass.
 
@@ -134,7 +134,7 @@
 
 ### Implementation for User Story 6
 
-- [ ] T030 [US6] Update `apps/jido_murmur_web/lib/jido_murmur_web/components/artifact_panel.ex` to unwrap metadata envelope: if data is map with `:data` and `:version` keys, extract `.data`; otherwise pass through unchanged
+- [x] T030 [US6] Update `apps/jido_murmur_web/lib/jido_murmur_web/components/artifact_panel.ex` to unwrap metadata envelope: if data is map with `:data` and `:version` keys, extract `.data`; otherwise pass through unchanged
 
 **Checkpoint**: Renderers receive raw data regardless of envelope format. Backward compatible with old format.
 
@@ -144,9 +144,9 @@
 
 **Purpose**: Integration verification and documentation
 
-- [ ] T031 [P] Update `apps/jido_artifacts/lib/mix/tasks/jido_artifacts.install.ex` to add `config :jido_artifacts, pubsub: {App}.PubSub` (placeholder for 004-igniter-adoption)
-- [ ] T032 Run full umbrella test suite (`mix test`) from repo root — verify all existing tests pass with zero regressions
-- [ ] T033 Run `mix precommit` from repo root to verify Credo, Dialyxir, and formatting compliance
+- [x] T031 [P] Update `apps/jido_artifacts/lib/mix/tasks/jido_artifacts.install.ex` to add `config :jido_artifacts, pubsub: {App}.PubSub` (placeholder for 004-igniter-adoption)
+- [x] T032 Run full umbrella test suite (`mix test`) from repo root — verify all existing tests pass with zero regressions
+- [x] T033 Run `mix precommit` from repo root to verify Credo, Dialyxir, and formatting compliance
 
 ---
 

@@ -31,6 +31,7 @@ defmodule MurmurDemo.MixProject do
 
   defp deps do
     [
+      {:jido_artifacts, in_umbrella: true},
       {:jido_murmur, in_umbrella: true},
       {:jido_murmur_web, in_umbrella: true},
       {:jido_tasks, in_umbrella: true},

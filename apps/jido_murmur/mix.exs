@@ -34,6 +34,7 @@ defmodule JidoMurmur.MixProject do
 
   defp deps do
     [
+      {:jido_artifacts, in_umbrella: true},
       {:jido, "~> 2.0"},
       {:jido_ai, "~> 2.0"},
       {:jido_signal, "~> 2.0"},

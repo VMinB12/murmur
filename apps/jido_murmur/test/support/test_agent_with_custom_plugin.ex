@@ -13,7 +13,7 @@ defmodule JidoMurmur.TestAgentWithCustomPlugin do
     tools: [],
     plugins: [
       JidoMurmur.StreamingPlugin,
-      JidoMurmur.ArtifactPlugin,
+      JidoArtifacts.ArtifactPlugin,
       JidoMurmur.TestCustomPlugin
     ],
     system_prompt: "You are a test agent with custom plugins."

@@ -1,12 +1,12 @@
-defmodule JidoArxiv.MixProject do
+defmodule JidoArtifacts.MixProject do
   use Mix.Project
 
   @version "0.1.0"
-  @source_url "https://github.com/agentjido/jido_arxiv"
+  @source_url "https://github.com/agentjido/jido_artifacts"
 
   def project do
     [
-      app: :jido_arxiv,
+      app: :jido_artifacts,
       version: @version,
       build_path: "../../_build",
       config_path: "../../config/config.exs",
@@ -17,7 +17,7 @@ defmodule JidoArxiv.MixProject do
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       test_coverage: [summary: [threshold: 80]],
-      description: "arXiv academic research tools for Jido agents",
+      description: "Artifact system for Jido agents — emit, merge, store, and broadcast artifacts",
       package: package(),
       source_url: @source_url
     ]
@@ -34,13 +34,11 @@ defmodule JidoArxiv.MixProject do
 
   defp deps do
     [
-      {:jido_artifacts, in_umbrella: true},
       {:jido, "~> 2.0"},
+      {:jido_signal, "~> 2.0"},
       {:jido_action, "~> 2.0"},
-      {:req, "~> 0.5"},
-      {:sweet_xml, "~> 0.7"},
-      {:jason, "~> 1.2"},
-      {:plug, "~> 1.0", only: :test}
+      {:phoenix_pubsub, "~> 2.0"},
+      {:jason, "~> 1.0"}
     ]
   end
 

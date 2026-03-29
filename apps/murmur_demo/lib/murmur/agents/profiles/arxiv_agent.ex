@@ -13,7 +13,7 @@ defmodule Murmur.Agents.Profiles.ArxivAgent do
       JidoTasks.Tools.UpdateTask,
       JidoTasks.Tools.ListTasks
     ],
-    plugins: [JidoMurmur.StreamingPlugin, JidoMurmur.ArtifactPlugin],
+    plugins: [JidoMurmur.StreamingPlugin, JidoArtifacts.ArtifactPlugin],
     request_transformer: JidoMurmur.MessageInjector,
     system_prompt: """
     You are an expert research assistant with access to arXiv.

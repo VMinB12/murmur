@@ -3,7 +3,7 @@ defmodule MurmurWeb.WorkspaceLive do
   use MurmurWeb, :live_view
 
   alias Jido.Signal.ID
-  alias JidoMurmur.Artifact
+  alias JidoArtifacts.Artifact
   alias JidoMurmur.Catalog
   alias JidoMurmur.Runner
   alias JidoMurmur.StreamingPlugin

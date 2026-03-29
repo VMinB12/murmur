@@ -1,82 +1,76 @@
 defmodule Mix.Tasks.JidoTasks.InstallTest do
   use ExUnit.Case
 
-  import ExUnit.CaptureIO
+  import Igniter.Test
 
-  alias Mix.Tasks.JidoTasks.Install
+  describe "jido_tasks.install" do
+    test "chains jido_murmur.install when jido_murmur is not configured" do
+      {:ok, igniter, _} =
+        test_project()
+        |> Igniter.compose_task("jido_tasks.install")
+        |> apply_igniter()
 
-  @moduletag :tmp_dir
+      content =
+        igniter.rewrite
+        |> Rewrite.source!("config/config.exs")
+        |> Rewrite.Source.get(:content)
 
-  describe "run/1" do
-    test "creates migration file in priv/repo/migrations", %{tmp_dir: tmp_dir} do
-      migrations_path = Path.join(tmp_dir, "priv/repo/migrations")
-      File.mkdir_p!(migrations_path)
-
-      original_dir = File.cwd!()
-      File.cd!(tmp_dir)
-
-      try do
-        output =
-          capture_io(fn ->
-            Install.run([])
-          end)
-
-        assert output =~ "creating"
-        assert output =~ "Ensure jido_murmur migrations are run first"
-
-        files = File.ls!(migrations_path)
-        assert length(files) == 1
-        assert Enum.any?(files, &String.contains?(&1, "create_jido_tasks"))
-      after
-        File.cd!(original_dir)
-      end
+      # Both jido_murmur and jido_tasks config should be present
+      assert content =~ "config :jido_murmur"
+      assert content =~ "config :jido_tasks"
     end
 
-    test "skips existing migration", %{tmp_dir: tmp_dir} do
-      migrations_path = Path.join(tmp_dir, "priv/repo/migrations")
-      File.mkdir_p!(migrations_path)
+    test "standalone install when jido_murmur already configured" do
+      {:ok, igniter, _} =
+        test_project()
+        |> Igniter.compose_task("jido_murmur.install")
+        |> apply_igniter!()
+        |> Igniter.compose_task("jido_tasks.install")
+        |> apply_igniter()
 
-      File.write!(
-        Path.join(migrations_path, "20260101000000_create_jido_tasks.exs"),
-        "# existing"
-      )
+      content =
+        igniter.rewrite
+        |> Rewrite.source!("config/config.exs")
+        |> Rewrite.Source.get(:content)
 
-      original_dir = File.cwd!()
-      File.cd!(tmp_dir)
-
-      try do
-        output =
-          capture_io(fn ->
-            Install.run([])
-          end)
-
-        assert output =~ "already exists, skipping"
-      after
-        File.cd!(original_dir)
-      end
+      assert content =~ "config :jido_tasks"
+      assert content =~ "repo: Test.Repo"
+      assert content =~ "pubsub: Test.PubSub"
     end
 
-    test "migration file contains valid Elixir code", %{tmp_dir: tmp_dir} do
-      migrations_path = Path.join(tmp_dir, "priv/repo/migrations")
-      File.mkdir_p!(migrations_path)
+    test "generates create_jido_tasks migration" do
+      {:ok, igniter, _} =
+        test_project()
+        |> Igniter.compose_task("jido_tasks.install")
+        |> apply_igniter()
 
-      original_dir = File.cwd!()
-      File.cd!(tmp_dir)
+      sources = Map.keys(igniter.rewrite.sources)
 
-      try do
-        capture_io(fn ->
-          Install.run([])
+      migration_files =
+        Enum.filter(sources, fn path ->
+          String.starts_with?(path, "priv/repo/migrations/") &&
+            String.contains?(path, "create_jido_tasks")
         end)
 
-        [file] = File.ls!(migrations_path)
-        content = File.read!(Path.join(migrations_path, file))
+      assert length(migration_files) == 1
 
-        assert content =~ "defmodule"
-        assert content =~ "use Ecto.Migration"
-        assert content =~ "jido_tasks"
-      after
-        File.cd!(original_dir)
-      end
+      [file] = migration_files
+
+      content =
+        igniter.rewrite
+        |> Rewrite.source!(file)
+        |> Rewrite.Source.get(:content)
+
+      assert content =~ "use Ecto.Migration"
+      assert content =~ ":jido_tasks"
+    end
+
+    test "is idempotent — re-running produces no config duplicates" do
+      test_project()
+      |> Igniter.compose_task("jido_tasks.install")
+      |> apply_igniter!()
+      |> Igniter.compose_task("jido_tasks.install")
+      |> assert_unchanged("config/config.exs")
     end
   end
 end

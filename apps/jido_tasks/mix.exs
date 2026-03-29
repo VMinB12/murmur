@@ -36,6 +36,7 @@ defmodule JidoTasks.MixProject do
     [
       {:jido_murmur, jido_murmur_dep()},
       {:jido_arxiv, in_umbrella: true, only: :test},
+      {:igniter, "~> 0.7", optional: true, runtime: false},
       {:jido, "~> 2.0"},
       {:jido_action, "~> 2.0"},
       {:phoenix_pubsub, "~> 2.0"},

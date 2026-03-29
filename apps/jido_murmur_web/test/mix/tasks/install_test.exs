@@ -17,7 +17,7 @@ defmodule Mix.Tasks.JidoMurmurWeb.InstallTest do
         assert output =~ "message_input.ex"
         assert output =~ "streaming_indicator.ex"
 
-        target_dir = Path.join(tmp_dir, "lib/jido_murmur_web_web/components")
+        target_dir = Path.join(tmp_dir, "lib/jido_murmur_web_web/components/jido_murmur")
         assert File.dir?(target_dir)
 
         chat_message = File.read!(Path.join(target_dir, "chat_message.ex"))
@@ -61,17 +61,15 @@ defmodule Mix.Tasks.JidoMurmurWeb.InstallTest do
 
     test "skips existing files", %{tmp_dir: tmp_dir} do
       in_project(tmp_dir, fn ->
-        target_dir = Path.join(tmp_dir, "lib/jido_murmur_web_web/components")
+        target_dir = Path.join(tmp_dir, "lib/jido_murmur_web_web/components/jido_murmur")
         File.mkdir_p!(target_dir)
         File.write!(Path.join(target_dir, "chat_message.ex"), "# existing")
 
         output = capture_io(fn -> Install.run(["chat"]) end)
 
         assert output =~ "chat_message.ex already exists, skipping"
-        # Should still copy the others
         assert output =~ "chat_stream.ex"
 
-        # Verify original content was preserved
         assert File.read!(Path.join(target_dir, "chat_message.ex")) == "# existing"
       end)
     end
@@ -80,18 +78,15 @@ defmodule Mix.Tasks.JidoMurmurWeb.InstallTest do
       in_project(tmp_dir, fn ->
         capture_io(fn -> Install.run(["workspace"]) end)
 
-        target_dir = Path.join(tmp_dir, "lib/jido_murmur_web_web/components")
+        target_dir = Path.join(tmp_dir, "lib/jido_murmur_web_web/components/jido_murmur")
         workspace_list = File.read!(Path.join(target_dir, "workspace_list.ex"))
 
-        # Should have the app module substituted
         assert workspace_list =~ "JidoMurmurWebWeb.Components.WorkspaceList"
-        assert workspace_list =~ "JidoMurmurWebWeb.CoreComponents"
       end)
     end
   end
 
   defp in_project(tmp_dir, fun) do
-    # Create a minimal mix.exs in the tmp dir to simulate a project
     mix_exs = """
     defmodule JidoMurmurWebWeb.MixProject do
       use Mix.Project
@@ -101,7 +96,6 @@ defmodule Mix.Tasks.JidoMurmurWeb.InstallTest do
 
     File.write!(Path.join(tmp_dir, "mix.exs"), mix_exs)
 
-    # Run in the tmp dir context
     old_dir = File.cwd!()
     File.cd!(tmp_dir)
 

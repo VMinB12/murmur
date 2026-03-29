@@ -34,6 +34,7 @@ defmodule JidoArtifacts.MixProject do
 
   defp deps do
     [
+      {:igniter, "~> 0.7", optional: true, runtime: false},
       {:jido, "~> 2.0"},
       {:jido_signal, "~> 2.0"},
       {:jido_action, "~> 2.0"},

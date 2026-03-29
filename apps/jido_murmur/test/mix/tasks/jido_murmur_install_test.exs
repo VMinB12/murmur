@@ -1,92 +1,96 @@
 defmodule Mix.Tasks.JidoMurmur.InstallTest do
   use ExUnit.Case
 
-  import ExUnit.CaptureIO
+  import Igniter.Test
 
-  alias Mix.Tasks.JidoMurmur.Install
+  describe "jido_murmur.install" do
+    test "generates all four migration files" do
+      {:ok, igniter, _} =
+        test_project()
+        |> Igniter.compose_task("jido_murmur.install")
+        |> apply_igniter()
 
-  @moduletag :tmp_dir
+      sources = Map.keys(igniter.rewrite.sources)
 
-  describe "run/1" do
-    test "creates migration files in priv/repo/migrations", %{tmp_dir: tmp_dir} do
-      migrations_path = Path.join(tmp_dir, "priv/repo/migrations")
-      File.mkdir_p!(migrations_path)
+      migration_files =
+        Enum.filter(sources, &String.starts_with?(&1, "priv/repo/migrations/"))
 
-      original_dir = File.cwd!()
-      File.cd!(tmp_dir)
+      assert length(migration_files) == 4
 
-      try do
-        output =
-          capture_io(fn ->
-            Install.run([])
-          end)
-
-        assert output =~ "creating"
-        assert output =~ "Remember to run migrations"
-
-        files = File.ls!(migrations_path)
-        assert length(files) == 4
-
-        assert Enum.any?(files, &String.contains?(&1, "create_jido_murmur_workspaces"))
-        assert Enum.any?(files, &String.contains?(&1, "create_jido_murmur_agent_sessions"))
-        assert Enum.any?(files, &String.contains?(&1, "create_jido_murmur_checkpoints"))
-        assert Enum.any?(files, &String.contains?(&1, "create_jido_murmur_thread_entries"))
-      after
-        File.cd!(original_dir)
-      end
-    end
-
-    test "skips existing migrations", %{tmp_dir: tmp_dir} do
-      migrations_path = Path.join(tmp_dir, "priv/repo/migrations")
-      File.mkdir_p!(migrations_path)
-
-      # Create a pre-existing migration
-      File.write!(
-        Path.join(migrations_path, "20260101000000_create_jido_murmur_workspaces.exs"),
-        "# existing"
-      )
-
-      original_dir = File.cwd!()
-      File.cd!(tmp_dir)
-
-      try do
-        output =
-          capture_io(fn ->
-            Install.run([])
-          end)
-
-        assert output =~ "already exists, skipping"
-
-        files =
-          File.ls!(migrations_path)
-          |> Enum.reject(&(&1 == "20260101000000_create_jido_murmur_workspaces.exs"))
-
-        # Should only create 3 new files (workspaces was skipped)
-        assert length(files) == 3
-      after
-        File.cd!(original_dir)
-      end
-    end
-
-    test "migration files contain valid Elixir code", %{tmp_dir: tmp_dir} do
-      migrations_path = Path.join(tmp_dir, "priv/repo/migrations")
-      File.mkdir_p!(migrations_path)
-
-      original_dir = File.cwd!()
-      File.cd!(tmp_dir)
-
-      try do
-        capture_io(fn ->
-          Install.run([])
+      migration_names =
+        Enum.map(migration_files, fn f ->
+          f
+          |> Path.basename()
+          |> String.replace(~r/^\d{14}_/, "")
+          |> String.trim_trailing(".exs")
         end)
 
-        for file <- File.ls!(migrations_path) do
-          content = File.read!(Path.join(migrations_path, file))
-          assert content =~ "defmodule"
-          assert content =~ "use Ecto.Migration"
-        end
-      after
-        File.cd!(original_dir)
+      assert "create_jido_murmur_workspaces" in migration_names
+      assert "create_jido_murmur_agent_sessions" in migration_names
+      assert "create_jido_murmur_checkpoints" in migration_names
+      assert "create_jido_murmur_thread_entries" in migration_names
+    end
+
+    test "injects jido_murmur config into config.exs" do
+      {:ok, igniter, _} =
+        test_project()
+        |> Igniter.compose_task("jido_murmur.install")
+        |> apply_igniter()
+
+      content =
+        igniter.rewrite
+        |> Rewrite.source!("config/config.exs")
+        |> Rewrite.Source.get(:content)
+
+      assert content =~ "config :jido_murmur"
+      assert content =~ "repo: Test.Repo"
+      assert content =~ "pubsub: Test.PubSub"
+      assert content =~ "jido_mod: Test.Jido"
+      assert content =~ "otp_app: :test"
+    end
+
+    test "adds supervisor to application.ex" do
+      {:ok, igniter, _} =
+        test_project()
+        |> Igniter.compose_task("jido_murmur.install")
+        |> apply_igniter()
+
+      content =
+        igniter.rewrite
+        |> Rewrite.source!("lib/test/application.ex")
+        |> Rewrite.Source.get(:content)
+
+      assert content =~ "JidoMurmur.Supervisor"
+    end
+
+    test "is idempotent — re-running produces no config duplicates" do
+      test_project()
+      |> Igniter.compose_task("jido_murmur.install")
+      |> apply_igniter!()
+      |> Igniter.compose_task("jido_murmur.install")
+      |> assert_unchanged("config/config.exs")
+    end
+
+    test "migration files contain valid Ecto migration code" do
+      {:ok, igniter, _} =
+        test_project()
+        |> Igniter.compose_task("jido_murmur.install")
+        |> apply_igniter()
+
+      sources = Map.keys(igniter.rewrite.sources)
+
+      migration_files =
+        Enum.filter(sources, &String.starts_with?(&1, "priv/repo/migrations/"))
+
+      for file <- migration_files do
+        content =
+          igniter.rewrite
+          |> Rewrite.source!(file)
+          |> Rewrite.Source.get(:content)
+
+        assert content =~ "defmodule"
+        assert content =~ "use Ecto.Migration"
+        assert content =~ "def change"
       end
     end
   end

@@ -35,6 +35,7 @@ defmodule JidoMurmurWeb.MixProject do
   defp deps do
     [
       {:jido_murmur, jido_murmur_dep()},
+      {:igniter, "~> 0.7", optional: true, runtime: false},
       {:phoenix_live_view, "~> 1.1.0"},
       {:phoenix_html, "~> 4.1"},
       {:jason, "~> 1.2"},

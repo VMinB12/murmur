@@ -1,99 +1,140 @@
-defmodule Mix.Tasks.JidoTasks.Install do
-  @shortdoc "Generates jido_tasks migration file"
-  @moduledoc """
-  Generates the migration file for the jido_tasks database table.
+if Code.ensure_loaded?(Igniter) do
+  defmodule Mix.Tasks.JidoTasks.Install do
+    @shortdoc "Installs jido_tasks: generates migration, adds config, chains jido_murmur if needed"
+    @moduledoc """
+    Installs and configures jido_tasks in your project.
 
-      $ mix jido_tasks.install
+        $ mix jido_tasks.install
 
-  Creates a migration for the `jido_tasks` table.
+    This task will:
 
-  The migration includes a foreign key reference to `jido_murmur_workspaces`.
-  Ensure jido_murmur migrations have been run first.
+    1. Check if `:jido_murmur` is configured — if not, chains `jido_murmur.install` first
+    2. Generate the `create_jido_tasks` migration
+    3. Add `:jido_tasks` config block to `config/config.exs`
 
-  Existing migrations are detected by module name and skipped.
-  """
+    Pass `--yes` to apply changes without prompting.
 
-  use Mix.Task
+    Existing migrations and config are detected and skipped (idempotent).
+    """
 
-  import Mix.Generator
+    use Igniter.Mix.Task
 
-  @migrations [
-    {1, "create_jido_tasks"}
-  ]
+    alias Igniter.Libs.Ecto, as: IgniterEcto
+    alias Igniter.Project.Application, as: IgniterApp
+    alias Igniter.Project.Config, as: IgniterConfig
 
-  @impl true
-  def run(_args) do
-    migrations_path = get_migrations_path()
-    File.mkdir_p!(migrations_path)
-    existing = existing_migration_names(migrations_path)
+    @impl Igniter.Mix.Task
+    def info(_argv, _composing_task) do
+      %Igniter.Mix.Task.Info{
+        group: :jido_tasks,
+        adds_deps: [],
+        installs: [],
+        composes: ["jido_murmur.install"],
+        example: "mix jido_tasks.install"
+      }
+    end
 
-    migration_module = migration_module_prefix()
+    @impl Igniter.Mix.Task
+    def igniter(igniter) do
+      app_name = IgniterApp.app_name(igniter)
+      app_module_base = app_name |> to_string() |> Macro.camelize()
+      repo_module = Module.concat([app_module_base, "Repo"])
 
-    for {offset, name} <- @migrations do
-      if name in existing do
-        Mix.shell().info("Migration #{name} already exists, skipping.")
+      igniter
+      |> maybe_chain_jido_murmur()
+      |> generate_migration(repo_module)
+      |> inject_config(app_module_base)
+      |> Igniter.add_notice("""
+      jido_tasks installed!
+
+      Run migrations:
+
+          mix ecto.migrate
+      """)
+    end
+
+    defp maybe_chain_jido_murmur(igniter) do
+      if IgniterConfig.configures_key?(igniter, "config.exs", :jido_murmur, [:repo]) do
+        igniter
       else
-        timestamp = generate_timestamp(offset)
-        source = template_path(name)
-        target = Path.join(migrations_path, "#{timestamp}_#{name}.exs")
-
-        content = EEx.eval_file(source, assigns: %{migration_module: migration_module})
-        create_file(target, content)
+        Igniter.compose_task(igniter, "jido_murmur.install")
       end
     end
 
-    Mix.shell().info("""
+    defp generate_migration(igniter, repo_module) do
+      body = """
+      def change do
+        create table(:jido_tasks, primary_key: false) do
+          add :id, :binary_id, primary_key: true
+          add :workspace_id, references(:jido_murmur_workspaces, type: :binary_id, on_delete: :delete_all), null: false
+          add :title, :string, null: false, size: 200
+          add :description, :string, size: 2000
+          add :assignee, :string, null: false
+          add :status, :string, null: false, default: "todo"
+          add :created_by, :string, null: false
+          add :owner_id, :string
+          add :metadata, :map, default: %{}
 
-    Ensure jido_murmur migrations are run first (jido_tasks references jido_murmur_workspaces).
+          timestamps(type: :utc_datetime_usec)
+        end
 
-    Then run:
+        create index(:jido_tasks, [:workspace_id])
+        create index(:jido_tasks, [:workspace_id, :status])
+      end
+      """
 
-        $ mix ecto.migrate
-    """)
-  end
+      IgniterEcto.gen_migration(igniter, repo_module, "create_jido_tasks",
+        body: body,
+        on_exists: :skip
+      )
+    end
 
-  defp get_migrations_path do
-    if File.dir?("priv/repo/migrations") do
-      "priv/repo/migrations"
-    else
-      Path.join(["priv", "repo", "migrations"])
+    defp inject_config(igniter, app_module_base) do
+      repo = Module.concat([app_module_base, "Repo"])
+      pubsub = Module.concat([app_module_base, "PubSub"])
+
+      igniter
+      |> IgniterConfig.configure_new(
+        "config.exs",
+        :jido_tasks,
+        [:repo],
+        {:code, Sourceror.parse_string!("#{inspect(repo)}")}
+      )
+      |> IgniterConfig.configure_new(
+        "config.exs",
+        :jido_tasks,
+        [:pubsub],
+        {:code, Sourceror.parse_string!("#{inspect(pubsub)}")}
+      )
     end
   end
+else
+  defmodule Mix.Tasks.JidoTasks.Install do
+    @shortdoc "Installs jido_tasks (requires Igniter)"
+    @moduledoc """
+    Installs jido_tasks. Requires the Igniter package.
 
-  defp migration_module_prefix do
-    case Mix.Project.config()[:app] do
-      nil -> "MyApp.Repo.Migrations"
-      app -> app |> to_string() |> Macro.camelize() |> then(&"#{&1}.Repo.Migrations")
-    end
-  end
+    Add `{:igniter, "~> 0.7"}` to your deps in mix.exs, then re-run:
 
-  defp template_path(name) do
-    Application.app_dir(:jido_tasks, "priv/templates/#{name}.exs")
-  end
+        mix jido_tasks.install
+    """
 
-  defp generate_timestamp(offset) do
-    {{y, m, d}, {hh, mm, ss}} = :calendar.universal_time()
-    total_seconds = :calendar.datetime_to_gregorian_seconds({{y, m, d}, {hh, mm, ss}}) + offset
-    {{y2, m2, d2}, {hh2, mm2, ss2}} = :calendar.gregorian_seconds_to_datetime(total_seconds)
+    use Mix.Task
 
-    "#{y2}#{pad(m2)}#{pad(d2)}#{pad(hh2)}#{pad(mm2)}#{pad(ss2)}"
-  end
+    @impl Mix.Task
+    def run(_argv) do
+      Mix.shell().error("""
+      ** (Mix) This install task requires the Igniter package.
 
-  defp pad(i) when i < 10, do: "0#{i}"
-  defp pad(i), do: "#{i}"
+      Add {:igniter, "~> 0.7"} to your deps in mix.exs, then re-run:
 
-  defp existing_migration_names(path) do
-    if File.dir?(path) do
-      path
-      |> File.ls!()
-      |> Enum.map(fn filename ->
-        filename
-        |> String.replace(~r/^\d{14}_/, "")
-        |> String.trim_trailing(".exs")
-      end)
-      |> MapSet.new()
-    else
-      MapSet.new()
+          mix jido_tasks.install
+
+      For manual setup instructions, see:
+      https://hexdocs.pm/jido_tasks/installation.html
+      """)
+
+      exit({:shutdown, 1})
     end
   end
 end

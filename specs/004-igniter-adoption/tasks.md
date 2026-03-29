@@ -19,11 +19,11 @@
 
 **Purpose**: Add Igniter as optional dependency to all packages
 
-- [ ] T001 [P] Add `{:igniter, "~> 0.7", optional: true, runtime: false}` to `apps/jido_murmur/mix.exs` deps
-- [ ] T002 [P] Add `{:igniter, "~> 0.7", optional: true, runtime: false}` to `apps/jido_tasks/mix.exs` deps
-- [ ] T003 [P] Add `{:igniter, "~> 0.7", optional: true, runtime: false}` to `apps/jido_murmur_web/mix.exs` deps
-- [ ] T004 [P] Add `{:igniter, "~> 0.7", optional: true, runtime: false}` to `apps/jido_artifacts/mix.exs` deps (from spec 003)
-- [ ] T005 Run `mix deps.get` from repo root to fetch Igniter
+- [X] T001 [P] Add `{:igniter, "~> 0.7", optional: true, runtime: false}` to `apps/jido_murmur/mix.exs` deps
+- [X] T002 [P] Add `{:igniter, "~> 0.7", optional: true, runtime: false}` to `apps/jido_tasks/mix.exs` deps
+- [X] T003 [P] Add `{:igniter, "~> 0.7", optional: true, runtime: false}` to `apps/jido_murmur_web/mix.exs` deps
+- [X] T004 [P] Add `{:igniter, "~> 0.7", optional: true, runtime: false}` to `apps/jido_artifacts/mix.exs` deps (from spec 003)
+- [X] T005 Run `mix deps.get` from repo root to fetch Igniter
 
 ---
 
@@ -33,8 +33,8 @@
 
 **⚠️ CRITICAL**: The guard pattern is the safety mechanism that ensures packages compile without Igniter.
 
-- [ ] T006 [US4] Rewrite `apps/jido_murmur/lib/mix/tasks/jido_murmur.install.ex` with `if Code.ensure_loaded?(Igniter)` guard: Igniter branch defines `use Igniter` module, else branch defines `use Mix.Task` fallback with clear error message per contracts/install-tasks.md
-- [ ] T007 [US4] Verify the fallback branch compiles and prints the correct error message when Igniter is absent (can test by temporarily commenting out Igniter dep)
+- [X] T006 [US4] Rewrite `apps/jido_murmur/lib/mix/tasks/jido_murmur.install.ex` with `if Code.ensure_loaded?(Igniter)` guard: Igniter branch defines `use Igniter` module, else branch defines `use Mix.Task` fallback with clear error message per contracts/install-tasks.md
+- [X] T007 [US4] Verify the fallback branch compiles and prints the correct error message when Igniter is absent (can test by temporarily commenting out Igniter dep)
 
 **Checkpoint**: Guard pattern established. Fallback message works. Pattern ready for reuse across all packages.
 
@@ -48,14 +48,14 @@
 
 ### Tests for User Story 1
 
-- [ ] T008 [P] [US1] Create `apps/jido_murmur/test/mix/tasks/jido_murmur_install_test.exs` with tests for: migration generation, config block injection, supervisor addition, idempotency (re-run produces no duplicates)
+- [X] T008 [P] [US1] Create `apps/jido_murmur/test/mix/tasks/jido_murmur_install_test.exs` with tests for: migration generation, config block injection, supervisor addition, idempotency (re-run produces no duplicates)
 
 ### Implementation for User Story 1
 
-- [ ] T009 [US1] Implement Igniter branch of `apps/jido_murmur/lib/mix/tasks/jido_murmur.install.ex`: generate 4 migrations (workspaces, workspace_sessions, messages, workspace_agents) using `Igniter.Project.Module` or `Igniter.copy_template/3`
-- [ ] T010 [US1] Add config injection to jido_murmur install: use `Igniter.Project.Config.configure/5` to add `:jido_murmur` config block with `repo:`, `pubsub:`, `jido_mod:`, `otp_app:` keys
-- [ ] T011 [US1] Add supervisor injection to jido_murmur install: use `Igniter.Project.Application.add_new_child/3` to add `JidoMurmur.Supervisor` to the application supervision tree
-- [ ] T012 [US1] Add idempotency checks: skip config if `:jido_murmur` key already exists, skip migrations if migration files with matching names exist
+- [X] T009 [US1] Implement Igniter branch of `apps/jido_murmur/lib/mix/tasks/jido_murmur.install.ex`: generate 4 migrations (workspaces, workspace_sessions, messages, workspace_agents) using `Igniter.Project.Module` or `Igniter.copy_template/3`
+- [X] T010 [US1] Add config injection to jido_murmur install: use `Igniter.Project.Config.configure/5` to add `:jido_murmur` config block with `repo:`, `pubsub:`, `jido_mod:`, `otp_app:` keys
+- [X] T011 [US1] Add supervisor injection to jido_murmur install: use `Igniter.Project.Application.add_new_child/3` to add `JidoMurmur.Supervisor` to the application supervision tree
+- [X] T012 [US1] Add idempotency checks: skip config if `:jido_murmur` key already exists, skip migrations if migration files with matching names exist
 
 **Checkpoint**: jido_murmur install works end-to-end. Generates migrations, injects config, adds supervisor. Re-running is idempotent.
 
@@ -69,12 +69,12 @@
 
 ### Tests for User Story 2
 
-- [ ] T013 [P] [US2] Create `apps/jido_tasks/test/mix/tasks/jido_tasks_install_test.exs` with tests for: prerequisite chaining, standalone install (jido_murmur already configured), config block injection, idempotency
+- [X] T013 [P] [US2] Create `apps/jido_tasks/test/mix/tasks/jido_tasks_install_test.exs` with tests for: prerequisite chaining, standalone install (jido_murmur already configured), config block injection, idempotency
 
 ### Implementation for User Story 2
 
-- [ ] T014 [US2] Rewrite `apps/jido_tasks/lib/mix/tasks/jido_tasks.install.ex` with guard pattern: Igniter branch uses `Igniter.compose_task/3` to chain `jido_murmur.install` when `:jido_murmur` config is absent, else branch shows fallback error
-- [ ] T015 [US2] Implement jido_tasks Igniter install: generate `create_jido_tasks` migration, add `:jido_tasks` config block with `repo:` and `pubsub:` keys, idempotency checks
+- [X] T014 [US2] Rewrite `apps/jido_tasks/lib/mix/tasks/jido_tasks.install.ex` with guard pattern: Igniter branch uses `Igniter.compose_task/3` to chain `jido_murmur.install` when `:jido_murmur` config is absent, else branch shows fallback error
+- [X] T015 [US2] Implement jido_tasks Igniter install: generate `create_jido_tasks` migration, add `:jido_tasks` config block with `repo:` and `pubsub:` keys, idempotency checks
 
 **Checkpoint**: jido_tasks install chains prerequisites. Works standalone when jido_murmur already configured. Idempotent.
 
@@ -88,8 +88,8 @@
 
 ### Implementation for User Story 3
 
-- [ ] T016 [US3] Rewrite `apps/jido_murmur_web/lib/mix/tasks/jido_murmur_web.install.ex` with guard pattern: Igniter branch copies component files to consumer's `lib/{app}_web/components/jido_murmur/` using `Igniter.copy_template/3`, injects import into `{app}_web.ex` html_helpers block, else branch shows fallback error
-- [ ] T017 [US3] Add idempotency: skip files that already exist, skip import if already present
+- [X] T016 [US3] Rewrite `apps/jido_murmur_web/lib/mix/tasks/jido_murmur_web.install.ex` with guard pattern: Igniter branch copies component files to consumer's `lib/{app}_web/components/jido_murmur/` using `Igniter.copy_template/3`, injects import into `{app}_web.ex` html_helpers block, else branch shows fallback error
+- [X] T017 [US3] Add idempotency: skip files that already exist, skip import if already present
 
 **Checkpoint**: Component install works. Files copied. Imports injected. Idempotent.
 
@@ -103,9 +103,9 @@
 
 ### Implementation for User Story 4
 
-- [ ] T018 [P] [US4] Implement fallback branch in `apps/jido_tasks/lib/mix/tasks/jido_tasks.install.ex` (else branch of guard) with error message and remediation instructions
-- [ ] T019 [P] [US4] Implement fallback branch in `apps/jido_murmur_web/lib/mix/tasks/jido_murmur_web.install.ex` (else branch of guard) with error message
-- [ ] T020 [P] [US4] Create `apps/jido_artifacts/lib/mix/tasks/jido_artifacts.install.ex` with guard pattern: Igniter branch adds `:jido_artifacts` config block, else branch shows fallback error
+- [X] T018 [P] [US4] Implement fallback branch in `apps/jido_tasks/lib/mix/tasks/jido_tasks.install.ex` (else branch of guard) with error message and remediation instructions
+- [X] T019 [P] [US4] Implement fallback branch in `apps/jido_murmur_web/lib/mix/tasks/jido_murmur_web.install.ex` (else branch of guard) with error message
+- [X] T020 [P] [US4] Create `apps/jido_artifacts/lib/mix/tasks/jido_artifacts.install.ex` with guard pattern: Igniter branch adds `:jido_artifacts` config block, else branch shows fallback error
 
 **Checkpoint**: All four packages compile without Igniter and show clear error messages.
 
@@ -119,8 +119,8 @@
 
 ### Implementation for User Story 5
 
-- [ ] T021 [US5] Create `apps/jido_murmur/lib/mix/tasks/jido_murmur.gen.profile.ex` with guard pattern: Igniter branch generates profile module at `lib/{app}/agents/profiles/{name}.ex` with `use Jido.AI.Agent` boilerplate per contracts/install-tasks.md, else branch shows fallback error
-- [ ] T022 [US5] Implement profile template with configurable name, default tools (`JidoMurmur.TellAction`), default plugins (`JidoMurmur.StreamingPlugin`, `JidoArtifacts.ArtifactPlugin`), placeholder system_prompt, and `catalog_meta/0`
+- [X] T021 [US5] Create `apps/jido_murmur/lib/mix/tasks/jido_murmur.gen.profile.ex` with guard pattern: Igniter branch generates profile module at `lib/{app}/agents/profiles/{name}.ex` with `use Jido.AI.Agent` boilerplate per contracts/install-tasks.md, else branch shows fallback error
+- [X] T022 [US5] Implement profile template with configurable name, default tools (`JidoMurmur.TellAction`), default plugins (`JidoMurmur.StreamingPlugin`, `JidoArtifacts.ArtifactPlugin`), placeholder system_prompt, and `catalog_meta/0`
 
 **Checkpoint**: Profile generator creates compilable module following project conventions.
 
@@ -130,9 +130,9 @@
 
 **Purpose**: Integration verification
 
-- [ ] T023 Run full umbrella test suite (`mix test`) from repo root — verify all existing tests pass
-- [ ] T024 Run `mix precommit` from repo root to verify Credo, Dialyxir, and formatting compliance
-- [ ] T025 Verify all four install tasks work by testing against the murmur_demo app configuration
+- [X] T023 Run full umbrella test suite (`mix test`) from repo root — verify all existing tests pass
+- [X] T024 Run `mix precommit` from repo root to verify Credo, Dialyxir, and formatting compliance
+- [X] T025 Verify all four install tasks work by testing against the murmur_demo app configuration
 
 ---
 

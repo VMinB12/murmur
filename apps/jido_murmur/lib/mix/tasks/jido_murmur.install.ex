@@ -1,106 +1,197 @@
-defmodule Mix.Tasks.JidoMurmur.Install do
-  @shortdoc "Generates jido_murmur migration files"
-  @moduledoc """
-  Generates migration files for jido_murmur database tables.
+if Code.ensure_loaded?(Igniter) do
+  defmodule Mix.Tasks.JidoMurmur.Install do
+    @shortdoc "Installs jido_murmur: generates migrations, adds config, adds supervisor"
+    @moduledoc """
+    Installs and configures jido_murmur in your project.
 
-      $ mix jido_murmur.install
+        $ mix jido_murmur.install
 
-  Creates migrations for:
-    - `jido_murmur_workspaces`
-    - `jido_murmur_agent_sessions`
-    - `jido_murmur_checkpoints`
-    - `jido_murmur_thread_entries`
+    This task will:
 
-  Existing migrations are detected by module name and skipped.
-  """
+    1. Generate migrations for jido_murmur database tables
+    2. Add `:jido_murmur` config block to `config/config.exs`
+    3. Add `JidoMurmur.Supervisor` to your application supervision tree
 
-  use Mix.Task
+    Pass `--yes` to apply changes without prompting.
 
-  import Mix.Generator
+    Existing migrations and config are detected and skipped (idempotent).
+    """
 
-  @migrations [
-    {1, "create_jido_murmur_workspaces"},
-    {2, "create_jido_murmur_agent_sessions"},
-    {3, "create_jido_murmur_checkpoints"},
-    {4, "create_jido_murmur_thread_entries"}
-  ]
+    use Igniter.Mix.Task
 
-  @impl true
-  def run(_args) do
-    migrations_path = get_migrations_path()
-    File.mkdir_p!(migrations_path)
-    existing = existing_migration_names(migrations_path)
+    alias Igniter.Libs.Ecto, as: IgniterEcto
+    alias Igniter.Project.Application, as: IgniterApp
+    alias Igniter.Project.Config, as: IgniterConfig
 
-    migration_module = migration_module_prefix()
+    @migrations [
+      {"create_jido_murmur_workspaces",
+       """
+       def change do
+         create table(:jido_murmur_workspaces, primary_key: false) do
+           add :id, :binary_id, primary_key: true
+           add :name, :string, null: false
+           add :owner_id, :string
+           add :metadata, :map, default: %{}
 
-    for {offset, name} <- @migrations do
-      if name in existing do
-        Mix.shell().info("Migration #{name} already exists, skipping.")
-      else
-        timestamp = generate_timestamp(offset)
-        source = template_path(name)
-        target = Path.join(migrations_path, "#{timestamp}_#{name}.exs")
+           timestamps(type: :utc_datetime_usec)
+         end
 
-        content = EEx.eval_file(source, assigns: %{migration_module: migration_module})
-        create_file(target, content)
-      end
+         create index(:jido_murmur_workspaces, [:owner_id])
+       end
+       """},
+      {"create_jido_murmur_agent_sessions",
+       """
+       def change do
+         create table(:jido_murmur_agent_sessions, primary_key: false) do
+           add :id, :binary_id, primary_key: true
+           add :workspace_id, references(:jido_murmur_workspaces, type: :binary_id, on_delete: :delete_all), null: false
+           add :agent_profile_id, :string, null: false
+           add :display_name, :string, null: false
+           add :status, :string, default: "idle", null: false
+           add :owner_id, :string
+           add :metadata, :map, default: %{}
+
+           timestamps(type: :utc_datetime_usec)
+         end
+
+         create index(:jido_murmur_agent_sessions, [:workspace_id])
+         create unique_index(:jido_murmur_agent_sessions, [:workspace_id, :display_name])
+       end
+       """},
+      {"create_jido_murmur_checkpoints",
+       """
+       def change do
+         create table(:jido_murmur_checkpoints, primary_key: false) do
+           add :key, :string, primary_key: true
+           add :data, :map, null: false
+
+           timestamps(type: :utc_datetime_usec)
+         end
+       end
+       """},
+      {"create_jido_murmur_thread_entries",
+       """
+       def change do
+         create table(:jido_murmur_thread_entries, primary_key: false) do
+           add :id, :binary_id, primary_key: true
+           add :thread_id, :string, null: false
+           add :seq, :integer, null: false
+           add :kind, :string, null: false
+           add :payload, :map, default: %{}
+           add :refs, :map, default: %{}
+           add :at, :bigint, null: false
+
+           timestamps(type: :utc_datetime_usec, updated_at: false)
+         end
+
+         create unique_index(:jido_murmur_thread_entries, [:thread_id, :seq])
+         create index(:jido_murmur_thread_entries, [:thread_id])
+       end
+       """}
+    ]
+
+    @impl Igniter.Mix.Task
+    def info(_argv, _composing_task) do
+      %Igniter.Mix.Task.Info{
+        group: :jido_murmur,
+        adds_deps: [],
+        installs: [],
+        example: "mix jido_murmur.install"
+      }
     end
 
-    Mix.shell().info("""
+    @impl Igniter.Mix.Task
+    def igniter(igniter) do
+      app_name = IgniterApp.app_name(igniter)
+      app_module_base = app_name |> to_string() |> Macro.camelize()
+      repo_module = Module.concat([app_module_base, "Repo"])
 
-    Remember to run migrations:
+      igniter
+      |> generate_migrations(repo_module)
+      |> inject_config(app_name, app_module_base)
+      |> add_supervisor()
+      |> Igniter.add_notice("""
+      jido_murmur installed!
 
-        $ mix ecto.migrate
-    """)
-  end
+      Run migrations:
 
-  defp get_migrations_path do
-    path = Path.join(["priv", "repo", "migrations"])
-
-    # Check if we're in an umbrella — use the consumer app's priv path
-    if File.dir?("priv/repo/migrations") do
-      "priv/repo/migrations"
-    else
-      path
+          mix ecto.migrate
+      """)
     end
-  end
 
-  defp migration_module_prefix do
-    case Mix.Project.config()[:app] do
-      nil -> "MyApp.Repo.Migrations"
-      app -> app |> to_string() |> Macro.camelize() |> then(&"#{&1}.Repo.Migrations")
-    end
-  end
-
-  defp template_path(name) do
-    Application.app_dir(:jido_murmur, "priv/templates/#{name}.exs")
-  end
-
-  defp generate_timestamp(offset) do
-    {{y, m, d}, {hh, mm, ss}} = :calendar.universal_time()
-    # Add offset seconds to avoid timestamp collisions
-    total_seconds = :calendar.datetime_to_gregorian_seconds({{y, m, d}, {hh, mm, ss}}) + offset
-    {{y2, m2, d2}, {hh2, mm2, ss2}} = :calendar.gregorian_seconds_to_datetime(total_seconds)
-
-    "#{y2}#{pad(m2)}#{pad(d2)}#{pad(hh2)}#{pad(mm2)}#{pad(ss2)}"
-  end
-
-  defp pad(i) when i < 10, do: "0#{i}"
-  defp pad(i), do: "#{i}"
-
-  defp existing_migration_names(path) do
-    if File.dir?(path) do
-      path
-      |> File.ls!()
-      |> Enum.map(fn filename ->
-        # Strip timestamp prefix (14 digits + underscore)
-        filename
-        |> String.replace(~r/^\d{14}_/, "")
-        |> String.trim_trailing(".exs")
+    defp generate_migrations(igniter, repo_module) do
+      Enum.reduce(@migrations, igniter, fn {name, body}, igniter ->
+        IgniterEcto.gen_migration(igniter, repo_module, name, body: body, on_exists: :skip)
       end)
-      |> MapSet.new()
-    else
-      MapSet.new()
+    end
+
+    defp inject_config(igniter, app_name, app_module_base) do
+      repo = Module.concat([app_module_base, "Repo"])
+      pubsub = Module.concat([app_module_base, "PubSub"])
+      jido_mod = Module.concat([app_module_base, "Jido"])
+
+      IgniterConfig.configure_new(
+        igniter,
+        "config.exs",
+        :jido_murmur,
+        [:repo],
+        {:code, Sourceror.parse_string!("#{inspect(repo)}")}
+      )
+      |> IgniterConfig.configure_new(
+        "config.exs",
+        :jido_murmur,
+        [:pubsub],
+        {:code, Sourceror.parse_string!("#{inspect(pubsub)}")}
+      )
+      |> IgniterConfig.configure_new(
+        "config.exs",
+        :jido_murmur,
+        [:jido_mod],
+        {:code, Sourceror.parse_string!("#{inspect(jido_mod)}")}
+      )
+      |> IgniterConfig.configure_new(
+        "config.exs",
+        :jido_murmur,
+        [:otp_app],
+        app_name
+      )
+    end
+
+    defp add_supervisor(igniter) do
+      IgniterApp.add_new_child(
+        igniter,
+        JidoMurmur.Supervisor,
+        after: [Ecto.Repo, Phoenix.PubSub]
+      )
+    end
+  end
+else
+  defmodule Mix.Tasks.JidoMurmur.Install do
+    @shortdoc "Installs jido_murmur (requires Igniter)"
+    @moduledoc """
+    Installs jido_murmur. Requires the Igniter package.
+
+    Add `{:igniter, "~> 0.7"}` to your deps in mix.exs, then re-run:
+
+        mix jido_murmur.install
+    """
+
+    use Mix.Task
+
+    @impl Mix.Task
+    def run(_argv) do
+      Mix.shell().error("""
+      ** (Mix) This install task requires the Igniter package.
+
+      Add {:igniter, "~> 0.7"} to your deps in mix.exs, then re-run:
+
+          mix jido_murmur.install
+
+      For manual setup instructions, see:
+      https://hexdocs.pm/jido_murmur/installation.html
+      """)
+
+      exit({:shutdown, 1})
     end
   end
 end

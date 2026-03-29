@@ -174,6 +174,10 @@ The current Murmur application continues to function as a demo/reference app wit
 - Q: How should test database isolation work across packages in the umbrella? → A: Per-package test helpers with shared DB — each package ships its own TestCase module with Ecto sandbox checkout; single shared test database; packages independently testable
 - Q: What minimum test coverage is required per package before Hex publishing? → A: 80% line coverage minimum per package as a publishing gate
 
+### Session 2026-03-29
+
+- Q: Should the package install generators use Igniter or remain plain Mix.Task/Mix.Generator? → A: Defer Igniter adoption to post-extraction — complete extraction with current Mix.Task generators, then add Igniter as a follow-up enhancement. Jido upstream already supports Igniter (optional dep), so alignment is straightforward when the time comes
+
 ## Assumptions
 
 - Consumers are building Elixir/Phoenix applications and are familiar with the Jido framework ecosystem (jido, jido_ai, jido_signal, jido_action)
@@ -184,3 +188,4 @@ The current Murmur application continues to function as a demo/reference app wit
 - LiveView components use Tailwind CSS classes; consumers using the direct-import mode must add `@source` directives for the package paths in their CSS configuration
 - Each package starts at version 0.x.y to signal API instability during early development
 - The `jido_arxiv` package is a lower priority (P2) and may be extracted after the core packages are stable
+- Install generators use plain Mix.Task + Mix.Generator for the initial release; Igniter-based installers are deferred to a post-extraction enhancement pass (Jido upstream already lists `{:igniter, "~> 0.7", optional: true}`)

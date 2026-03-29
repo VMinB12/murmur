@@ -26,7 +26,7 @@ defmodule JidoMurmur.StreamingPlugin do
   @impl Jido.Plugin
   def handle_signal(signal, context) do
     session_id = context.agent.id
-    workspace_id = get_in(context, [:agent, :state, :workspace_id])
+    workspace_id = context.agent.state[:workspace_id]
     topic = stream_topic(workspace_id, session_id)
 
     :telemetry.execute(

@@ -2,6 +2,7 @@ defmodule MurmurWeb.WorkspaceLive do
   @moduledoc false
   use MurmurWeb, :live_view
 
+  alias Jido.AI.Signal.LLMResponse
   alias JidoMurmur.Catalog
   alias JidoMurmur.Runner
   alias JidoMurmur.Signals.MessageReceived
@@ -151,7 +152,10 @@ defmodule MurmurWeb.WorkspaceLive do
     Enum.each(socket.assigns.agent_sessions, fn session ->
       agent_module = Catalog.agent_module(session.agent_profile_id)
 
-      Murmur.Jido.start_agent(agent_module, id: session.id)
+      Murmur.Jido.start_agent(agent_module,
+        id: session.id,
+        initial_state: %{workspace_id: session.workspace_id}
+      )
     end)
 
     empty_messages = Map.new(socket.assigns.agent_sessions, &{&1.id, []})
@@ -396,22 +400,29 @@ defmodule MurmurWeb.WorkspaceLive do
   end
 
   @impl true
+  def handle_info(%Jido.Signal{type: "ai.llm.response"} = signal, socket) do
+    session_id = extract_session_id(signal)
+    tool_calls = LLMResponse.extract_tool_calls(signal)
+
+    if tool_calls != [] do
+      pending = Enum.map(tool_calls, &build_pending_tool_call/1)
+      {:noreply, append_streaming_tool_calls(socket, session_id, pending)}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  @impl true
   def handle_info(%Jido.Signal{type: "ai.tool.result", data: data} = signal, socket) do
     session_id = extract_session_id(signal)
-    tool_call = %{
-      name: data[:tool_name] || data["tool_name"] || "tool",
-      result: format_tool_result(data[:result] || data["result"]),
-      status: tool_result_status(data[:result] || data["result"])
-    }
+    call_id = data[:call_id] || data["call_id"]
+    tool_name = data[:tool_name] || data["tool_name"] || "tool"
+    result = data[:result] || data["result"]
+    formatted_result = format_tool_result(result)
+    status = tool_result_status(result)
 
-    socket =
-      update(socket, :streaming, fn streams ->
-        Map.update(streams, session_id, Map.put(@empty_stream, :tool_calls, [tool_call]), fn s ->
-          Map.update(s, :tool_calls, [tool_call], &(&1 ++ [tool_call]))
-        end)
-      end)
-
-    {:noreply, socket}
+    completed = %{id: call_id, name: tool_name, result: formatted_result, status: status}
+    {:noreply, merge_tool_result(socket, session_id, completed)}
   end
 
   @impl true
@@ -555,6 +566,43 @@ defmodule MurmurWeb.WorkspaceLive do
     end)
   end
 
+  defp build_pending_tool_call(tc) do
+    %{
+      id: tc[:id] || tc["id"],
+      name: tc[:name] || tc["name"] || "tool",
+      args: tc[:arguments] || tc["arguments"] || %{},
+      result: nil,
+      status: :running
+    }
+  end
+
+  defp append_streaming_tool_calls(socket, session_id, pending) do
+    update(socket, :streaming, fn streams ->
+      Map.update(streams, session_id, Map.put(@empty_stream, :tool_calls, pending), fn s ->
+        Map.update(s, :tool_calls, pending, &(&1 ++ pending))
+      end)
+    end)
+  end
+
+  defp merge_tool_result(socket, session_id, %{id: call_id} = completed) do
+    update(socket, :streaming, fn streams ->
+      Map.update(streams, session_id, @empty_stream, fn s ->
+        Map.update(s, :tool_calls, [], &update_or_append_tool_call(&1, call_id, completed))
+      end)
+    end)
+  end
+
+  defp update_or_append_tool_call(tcs, call_id, completed) do
+    if call_id && Enum.any?(tcs, &(&1[:id] == call_id)),
+      do: Enum.map(tcs, &maybe_merge_tool_call(&1, call_id, completed)),
+      else: tcs ++ [completed]
+  end
+
+  defp maybe_merge_tool_call(%{id: id} = tc, call_id, completed) when id == call_id,
+    do: Map.merge(tc, completed)
+
+  defp maybe_merge_tool_call(tc, _call_id, _completed), do: tc
+
   defp format_tool_result({:ok, result, _effects}), do: truncate_result(inspect(result))
   defp format_tool_result({:error, reason, _effects}), do: truncate_result("Error: #{inspect(reason)}")
   defp format_tool_result({:ok, result}), do: truncate_result(inspect(result))
@@ -686,8 +734,12 @@ defmodule MurmurWeb.WorkspaceLive do
         # Falls back to a fresh agent if no checkpoint exists.
         {agent, extra_opts} =
           case Murmur.Jido.thaw(agent_module, session.id) do
-            {:ok, thawed_agent} -> {thawed_agent, [agent_module: agent_module]}
-            {:error, :not_found} -> {agent_module, []}
+            {:ok, thawed_agent} ->
+              thawed_agent = put_in(thawed_agent.state[:workspace_id], session.workspace_id)
+              {thawed_agent, [agent_module: agent_module]}
+
+            {:error, :not_found} ->
+              {agent_module, [initial_state: %{workspace_id: session.workspace_id}]}
           end
 
         case Murmur.Jido.start_agent(agent, [id: session.id] ++ extra_opts) do

@@ -53,16 +53,32 @@ defmodule JidoMurmurWeb.Components.ChatStream do
           <summary class="flex items-center gap-1.5 cursor-pointer text-xs px-1 py-0.5 transition-colors hover:text-base-content/70">
             <.icon name="hero-wrench-screwdriver" class="w-3 h-3 text-base-content/50" />
             <span class="font-medium">{tc.name}</span>
-            <%= if tc.status == :completed do %>
-              <span class="text-success/70 text-[10px]">Completed</span>
-            <% else %>
-              <span class="text-error/70 text-[10px]">Error</span>
+            <%= cond do %>
+              <% tc.status == :running -> %>
+                <span class="loading loading-dots loading-xs text-info/70"></span>
+                <span class="text-info/70 text-[10px]">Running</span>
+              <% tc.status == :completed -> %>
+                <span class="text-success/70 text-[10px]">Completed</span>
+              <% true -> %>
+                <span class="text-error/70 text-[10px]">Error</span>
             <% end %>
             <.icon
               name="hero-chevron-right"
               class="w-3 h-3 text-base-content/40 transition-transform group-open:rotate-90"
             />
           </summary>
+          <%= if tc[:args] && tc[:args] != %{} && tc.status == :running do %>
+            <div class="mt-1 rounded-lg border border-base-300/50 text-xs overflow-hidden">
+              <div class="bg-base-200/20 px-3 py-1.5">
+                <span class="text-[10px] uppercase tracking-wider text-base-content/40">
+                  Arguments
+                </span>
+                <div class="mt-0.5 text-base-content/70 whitespace-pre-wrap break-words font-mono text-[11px]">
+                  {Jason.encode!(tc.args, pretty: true)}
+                </div>
+              </div>
+            </div>
+          <% end %>
           <%= if tc[:result] do %>
             <div class="mt-1 rounded-lg border border-base-300/50 text-xs overflow-hidden">
               <div class="bg-base-200/20 px-3 py-1.5">

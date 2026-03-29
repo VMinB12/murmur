@@ -27,7 +27,7 @@ defmodule JidoArtifacts.ArtifactPlugin do
   @impl Jido.Plugin
   def handle_signal(%{type: "artifact." <> _name, data: data} = signal, context) do
     session_id = context.agent.id
-    workspace_id = get_in(context, [:agent, :state, :workspace_id])
+    workspace_id = context.agent.state[:workspace_id]
     topic = Artifact.artifact_topic(workspace_id, session_id)
 
     {artifact_name, artifact_data, mode, merge_result, scope} = extract_signal_data(data)

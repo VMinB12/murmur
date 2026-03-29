@@ -31,8 +31,12 @@ defmodule JidoMurmur.AgentHelper do
       nil ->
         {agent, extra_opts} =
           case jido_mod.thaw(agent_module, session.id) do
-            {:ok, thawed_agent} -> {thawed_agent, [agent_module: agent_module]}
-            {:error, :not_found} -> {agent_module, []}
+            {:ok, thawed_agent} ->
+              thawed_agent = put_in(thawed_agent.state[:workspace_id], session.workspace_id)
+              {thawed_agent, [agent_module: agent_module]}
+
+            {:error, :not_found} ->
+              {agent_module, [initial_state: %{workspace_id: session.workspace_id}]}
           end
 
         :telemetry.execute(

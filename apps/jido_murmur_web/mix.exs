@@ -16,7 +16,7 @@ defmodule JidoMurmurWeb.MixProject do
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
       deps: deps(),
-      test_coverage: [threshold: 80],
+      test_coverage: [summary: [threshold: 80]],
       description: "Pre-built LiveView components for jido_murmur multi-agent chat",
       package: package(),
       source_url: @source_url
@@ -34,12 +34,18 @@ defmodule JidoMurmurWeb.MixProject do
 
   defp deps do
     [
-      {:jido_murmur, in_umbrella: true},
+      {:jido_murmur, jido_murmur_dep()},
       {:phoenix_live_view, "~> 1.1.0"},
       {:phoenix_html, "~> 4.1"},
       {:jason, "~> 1.2"},
       {:lazy_html, ">= 0.1.0", only: :test}
     ]
+  end
+
+  defp jido_murmur_dep do
+    if System.get_env("HEX_PUBLISH"),
+      do: "~> #{@version}",
+      else: [in_umbrella: true]
   end
 
   defp package do

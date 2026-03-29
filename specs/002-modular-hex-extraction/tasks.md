@@ -259,48 +259,48 @@
 
 ### Coverage — jido_murmur (66% → 80%)
 
-- [ ] T107 [P] Write unit tests for JidoMurmur.TellAction (send to existing/missing agent, queuing) at apps/jido_murmur/test/jido_murmur/tell_action_test.exs
-- [ ] T108 [P] Write unit tests for JidoMurmur.ArtifactPlugin (signal handling, artifact extraction) at apps/jido_murmur/test/jido_murmur/artifact_plugin_test.exs
-- [ ] T109 [P] Write unit tests for JidoMurmur.Actions.StoreArtifact (store/retrieve artifact state) at apps/jido_murmur/test/jido_murmur/actions/store_artifact_test.exs
-- [ ] T110 [P] Write unit tests for JidoMurmur.Supervisor (child spec, start_link) at apps/jido_murmur/test/jido_murmur/supervisor_test.exs
-- [ ] T111 [P] Write unit tests for JidoMurmur.TableOwner (ETS table creation, ownership transfer) at apps/jido_murmur/test/jido_murmur/table_owner_test.exs
-- [ ] T112 [P] Write unit tests for JidoMurmur.Artifact (helper functions, signal construction) at apps/jido_murmur/test/jido_murmur/artifact_test.exs
-- [ ] T113 [P] Write unit tests for JidoMurmur.StreamingPlugin (signal dispatch to PubSub) at apps/jido_murmur/test/jido_murmur/streaming_plugin_test.exs
-- [ ] T114 [P] Write unit test for Mix.Tasks.JidoMurmur.Install (migration file generation, duplicate detection) at apps/jido_murmur/test/mix/tasks/jido_murmur_install_test.exs
+- [x] T107 [P] Write unit tests for JidoMurmur.TellAction (send to existing/missing agent, queuing) at apps/jido_murmur/test/jido_murmur/tell_action_test.exs
+- [x] T108 [P] Write unit tests for JidoMurmur.ArtifactPlugin (signal handling, artifact extraction) at apps/jido_murmur/test/jido_murmur/artifact_plugin_test.exs
+- [x] T109 [P] Write unit tests for JidoMurmur.Actions.StoreArtifact (store/retrieve artifact state) at apps/jido_murmur/test/jido_murmur/actions/store_artifact_test.exs
+- [x] T110 [P] Write unit tests for JidoMurmur.Supervisor (child spec, start_link) at apps/jido_murmur/test/jido_murmur/supervisor_test.exs
+- [x] T111 [P] Write unit tests for JidoMurmur.TableOwner (ETS table creation, ownership transfer) at apps/jido_murmur/test/jido_murmur/table_owner_test.exs
+- [x] T112 [P] Write unit tests for JidoMurmur.Artifact (helper functions, signal construction) at apps/jido_murmur/test/jido_murmur/artifact_test.exs
+- [x] T113 [P] Write unit tests for JidoMurmur.StreamingPlugin (signal dispatch to PubSub) at apps/jido_murmur/test/jido_murmur/streaming_plugin_test.exs
+- [x] T114 [P] Write unit test for Mix.Tasks.JidoMurmur.Install (migration file generation, duplicate detection) at apps/jido_murmur/test/mix/tasks/jido_murmur_install_test.exs
 
 ### Coverage — jido_murmur_web (88% → 80%)
 
-- [ ] T115 [P] Write render test for JidoMurmurWeb.Components.WorkspaceList at apps/jido_murmur_web/test/jido_murmur_web/components/workspace_list_test.exs
+- [x] T115 [P] Write render test for JidoMurmurWeb.Components.WorkspaceList at apps/jido_murmur_web/test/jido_murmur_web/components/workspace_list_test.exs
 
 ### Coverage — jido_tasks (66% → 80%)
 
-- [ ] T116 [P] Write unit tests for JidoTasks.Tools.AddTask (param validation, task creation) at apps/jido_tasks/test/jido_tasks/tools/add_task_test.exs
-- [ ] T117 [P] Write unit tests for JidoTasks.Tools.UpdateTask (status transitions, error cases) at apps/jido_tasks/test/jido_tasks/tools/update_task_test.exs
-- [ ] T118 [P] Write unit test for Mix.Tasks.JidoTasks.Install (migration generation, FK check) at apps/jido_tasks/test/mix/tasks/jido_tasks_install_test.exs
+- [x] T116 [P] Write unit tests for JidoTasks.Tools.AddTask (param validation, task creation) at apps/jido_tasks/test/jido_tasks/tools/add_task_test.exs
+- [x] T117 [P] Write unit tests for JidoTasks.Tools.UpdateTask (status transitions, error cases) at apps/jido_tasks/test/jido_tasks/tools/update_task_test.exs
+- [x] T118 [P] Write unit test for Mix.Tasks.JidoTasks.Install (migration generation, FK check) at apps/jido_tasks/test/mix/tasks/jido_tasks_install_test.exs
 
 ### Coverage — jido_arxiv (28% → 80%)
 
-- [ ] T119 Write unit tests for JidoArxiv.Tools.ArxivSearch with mocked HTTP (Req.Test or similar) at apps/jido_arxiv/test/jido_arxiv/tools/arxiv_search_test.exs
+- [x] T119 Write unit tests for JidoArxiv.Tools.ArxivSearch with mocked HTTP (Req.Test or similar) at apps/jido_arxiv/test/jido_arxiv/tools/arxiv_search_test.exs
 
 ### Test Infrastructure Hygiene
 
-- [ ] T120 Fix Mox mock redefine warning — murmur_demo Mox.defmock(JidoMurmur.LLM.Mock) conflicts with lib module; either remove lib/jido_murmur/llm/mock.ex and use Mox exclusively, or remove Mox.defmock in murmur_demo and use the lib module directly at apps/jido_murmur/lib/jido_murmur/llm/mock.ex and apps/murmur_demo/test/test_helper.exs
+- [x] T120 Fix Mox mock redefine warning — murmur_demo Mox.defmock(JidoMurmur.LLM.Mock) conflicts with lib module; either remove lib/jido_murmur/llm/mock.ex and use Mox exclusively, or remove Mox.defmock in murmur_demo and use the lib module directly at apps/jido_murmur/lib/jido_murmur/llm/mock.ex and apps/murmur_demo/test/test_helper.exs
 
 ### Security Scanning
 
-- [ ] T121 Configure sobelow for umbrella — add per-app .sobelow-conf for murmur_demo (Phoenix app) and update umbrella precommit alias to run sobelow against apps/murmur_demo at .sobelow-conf and apps/murmur_demo/.sobelow-conf and mix.exs
+- [x] T121 Configure sobelow for umbrella — add per-app .sobelow-conf for murmur_demo (Phoenix app) and update umbrella precommit alias to run sobelow against apps/murmur_demo at .sobelow-conf and apps/murmur_demo/.sobelow-conf and mix.exs
 
 ### Hex Publishing Readiness
 
-- [ ] T122 [P] Add conditional deps to jido_murmur_web mix.exs — replace in_umbrella with version-pinned dep when HEX_PUBLISH env is set at apps/jido_murmur_web/mix.exs
-- [ ] T123 [P] Add conditional deps to jido_tasks mix.exs — replace in_umbrella with version-pinned dep when HEX_PUBLISH env is set at apps/jido_tasks/mix.exs
-- [ ] T124 [P] Add conditional deps to jido_arxiv mix.exs — replace in_umbrella with version-pinned dep when HEX_PUBLISH env is set at apps/jido_arxiv/mix.exs
-- [ ] T125 Verify hex.build for each package produces valid tarball (mix hex.build --unpack in tmp dir) for apps/jido_murmur, apps/jido_murmur_web, apps/jido_tasks, apps/jido_arxiv
+- [x] T122 [P] Add conditional deps to jido_murmur_web mix.exs — replace in_umbrella with version-pinned dep when HEX_PUBLISH env is set at apps/jido_murmur_web/mix.exs
+- [x] T123 [P] Add conditional deps to jido_tasks mix.exs — replace in_umbrella with version-pinned dep when HEX_PUBLISH env is set at apps/jido_tasks/mix.exs
+- [x] T124 [P] Add conditional deps to jido_arxiv mix.exs — replace in_umbrella with version-pinned dep when HEX_PUBLISH env is set at apps/jido_arxiv/mix.exs
+- [x] T125 Verify hex.build for each package produces valid tarball (mix hex.build --unpack in tmp dir) for apps/jido_murmur, apps/jido_murmur_web, apps/jido_tasks, apps/jido_arxiv
 
 ### Final Gate
 
-- [ ] T126 Run mix test --cover per package and verify all 4 library packages meet 80% threshold
-- [ ] T127 Run mix precommit from umbrella root and fix any remaining issues
+- [x] T126 Run mix test --cover per package and verify all 4 library packages meet 80% threshold
+- [x] T127 Run mix precommit from umbrella root and fix any remaining issues
 
 **Checkpoint**: All packages meet coverage gate, test suite is warning-free, packages are Hex-publishable
 

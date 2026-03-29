@@ -49,7 +49,7 @@ defmodule JidoArxiv.Tools.ArxivSearch do
           "sortOrder" => "descending"
         })
 
-    case Req.get(url, pool_timeout: 10_000, receive_timeout: 20_000) do
+    case Req.get(url, [pool_timeout: 10_000, receive_timeout: 20_000] ++ req_options()) do
       {:ok, %Req.Response{status: 200, body: body}} ->
         {:ok, parse_atom_feed(body)}
 
@@ -85,8 +85,8 @@ defmodule JidoArxiv.Tools.ArxivSearch do
         pdf_url: pdf_url(arxiv_id)
       }
     end)
-  rescue
-    _ -> []
+  catch
+    _, _ -> []
   end
 
   defp extract_arxiv_id(raw_id) do
@@ -102,6 +102,8 @@ defmodule JidoArxiv.Tools.ArxivSearch do
 
   defp abs_url(arxiv_id), do: "https://arxiv.org/abs/#{arxiv_id}"
   defp pdf_url(arxiv_id), do: "https://arxiv.org/pdf/#{arxiv_id}.pdf"
+
+  defp req_options, do: Application.get_env(:jido_arxiv, :req_options, [])
 
   defp format_for_llm(papers) do
     header = "Found #{length(papers)} papers:\n\n"

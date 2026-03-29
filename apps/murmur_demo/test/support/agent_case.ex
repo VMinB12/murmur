@@ -15,14 +15,14 @@ defmodule Murmur.AgentCase do
 
   use ExUnit.CaseTemplate
 
-  alias JidoMurmur.LLM.Mock
+  alias Murmur.LLM.MockBehaviour, as: Mock
 
   using do
     quote do
       import Mox
       import Murmur.AgentCase
 
-      alias JidoMurmur.LLM.Mock, as: LLMMock
+      alias Murmur.LLM.MockBehaviour, as: LLMMock
     end
   end
 

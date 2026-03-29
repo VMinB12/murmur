@@ -17,8 +17,8 @@ defmodule MurmurWeb.WorkspaceLiveTest do
   import Phoenix.LiveViewTest
 
   alias JidoMurmur.Catalog
-  alias JidoMurmur.LLM.Mock
   alias JidoMurmur.Workspaces
+  alias Murmur.LLM.MockBehaviour, as: Mock
 
   setup do
     # LiveView form submissions trigger Runner Tasks that call the LLM mock

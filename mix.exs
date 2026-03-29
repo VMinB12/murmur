@@ -43,7 +43,7 @@ defmodule Murmur.Umbrella.MixProject do
         "format",
         "test",
         "credo --strict",
-        "sobelow --config"
+        "sobelow --root apps/murmur_demo --config"
       ]
     ]
   end

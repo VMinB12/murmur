@@ -3,7 +3,7 @@ Application.put_env(:jido_murmur, :repo, Murmur.Repo)
 Application.put_env(:jido_murmur, :pubsub, Murmur.PubSub)
 Application.put_env(:jido_murmur, :jido_mod, Murmur.Jido)
 Application.put_env(:jido_murmur, :otp_app, :murmur_demo)
-Application.put_env(:jido_murmur, :llm_adapter, JidoMurmur.LLM.Mock)
+Application.put_env(:jido_murmur, :llm_adapter, Murmur.LLM.MockBehaviour)
 Application.put_env(:jido_murmur, :skip_hibernate, true)
 Application.put_env(:jido_murmur, :profiles, [
   Murmur.Agents.Profiles.GeneralAgent,
@@ -19,7 +19,7 @@ for table <- [:jido_murmur_active_runners, :jido_murmur_pending_messages] do
   end
 end
 
-Mox.defmock(JidoMurmur.LLM.Mock, for: JidoMurmur.LLM)
+Mox.defmock(Murmur.LLM.MockBehaviour, for: JidoMurmur.LLM)
 
 ExUnit.start()
 Ecto.Adapters.SQL.Sandbox.mode(Murmur.Repo, :manual)

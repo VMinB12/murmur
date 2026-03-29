@@ -12,9 +12,9 @@ defmodule MurmurWeb.WorkspaceLiveTaskBoardTest do
 
   import Phoenix.LiveViewTest
 
-  alias JidoMurmur.LLM.Mock
   alias JidoMurmur.Workspaces
   alias JidoTasks.Tasks
+  alias Murmur.LLM.MockBehaviour, as: Mock
 
   setup do
     Mox.set_mox_global()

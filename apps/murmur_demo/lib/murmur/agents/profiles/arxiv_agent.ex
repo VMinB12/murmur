@@ -6,7 +6,8 @@ defmodule Murmur.Agents.Profiles.ArxivAgent do
     name: "arxiv_agent",
     description: "Research assistant with arXiv paper search and display",
     model: :fast,
-    tool_timeout_ms: 30_000,
+    tool_timeout_ms: 300_000,
+    tool_max_retries: 0,
     tools: [
       JidoMurmur.TellAction,
       JidoArxiv.Tools.ArxivSearch,

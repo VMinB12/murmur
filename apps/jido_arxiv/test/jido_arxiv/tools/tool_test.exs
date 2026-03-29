@@ -54,6 +54,7 @@ defmodule JidoArxiv.Tools.ToolTest do
 
   describe "ArxivSearch action module" do
     test "module is a valid Jido.Action" do
+      Code.ensure_loaded!(JidoArxiv.Tools.ArxivSearch)
       assert function_exported?(JidoArxiv.Tools.ArxivSearch, :run, 2)
     end
 

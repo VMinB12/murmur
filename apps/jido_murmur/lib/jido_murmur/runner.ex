@@ -127,7 +127,11 @@ defmodule JidoMurmur.Runner do
   end
 
   defp handle_await(agent_module, req, session, topic, start_time) do
-    case llm_adapter().await(agent_module, req, timeout: 120_000) do
+    # A single ReAct run may loop for many iterations (LLM → tools → LLM …)
+    # and individual tool calls can be slow (e.g. arXiv, web scraping).
+    # Use :infinity so the agent's own internal timeouts govern cancellation
+    # rather than an arbitrary outer wall-clock limit.
+    case llm_adapter().await(agent_module, req, timeout: :infinity) do
       {:ok, response} ->
         :telemetry.execute(
           [:jido_murmur, :runner, :send_message, :stop],

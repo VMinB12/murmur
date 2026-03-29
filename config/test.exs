@@ -2,6 +2,9 @@ import Config
 
 alias Ecto.Adapters.SQL.Sandbox
 
+# Disable observability tracing in tests
+config :agent_obs, enabled: false
+
 # jido_murmur test repo configuration (for isolated package tests)
 config :jido_murmur, JidoMurmur.TestRepo,
   username: "postgres",

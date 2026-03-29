@@ -11,10 +11,13 @@ defmodule JidoMurmur.TableOwner do
     GenServer.start_link(__MODULE__, opts, name: __MODULE__)
   end
 
+  alias JidoMurmur.ObsTracer.Cache, as: ObsCache
+
   @impl true
   def init(_opts) do
     :ets.new(:jido_murmur_pending_messages, [:named_table, :public, :duplicate_bag])
     :ets.new(:jido_murmur_active_runners, [:set, :public, :named_table])
+    ObsCache.create_table()
     {:ok, %{}}
   end
 end

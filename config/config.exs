@@ -7,6 +7,10 @@
 # General application configuration
 import Config
 
+config :agent_obs,
+  enabled: true,
+  handlers: [AgentObs.Handlers.Phoenix]
+
 # Configure esbuild (the version is required)
 config :esbuild,
   version: "0.25.4",
@@ -16,6 +20,8 @@ config :esbuild,
     cd: Path.expand("../apps/murmur_demo/assets", __DIR__),
     env: %{"NODE_PATH" => [Path.expand("../deps", __DIR__), Mix.Project.build_path()]}
   ]
+
+config :jido, :observability, tracer: JidoMurmur.ObsTracer
 
 config :jido_action, default_timeout: 30_000, default_max_retries: 1, default_backoff: 250
 

@@ -41,6 +41,7 @@ defmodule JidoMurmur.MixProject do
       {:jido_signal, "~> 2.0"},
       {:jido_action, "~> 2.0"},
       {:req_llm, "~> 1.0"},
+      {:agent_obs, "~> 0.1.4"},
       {:phoenix_pubsub, "~> 2.0"},
       {:ecto_sql, "~> 3.13"},
       {:postgrex, ">= 0.0.0"},

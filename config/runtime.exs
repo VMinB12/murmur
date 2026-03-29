@@ -20,6 +20,15 @@ if System.get_env("PHX_SERVER") do
   config :murmur_demo, MurmurWeb.Endpoint, server: true
 end
 
+# OpenTelemetry configuration for LLM observability (Arize Phoenix)
+config :opentelemetry,
+  span_processor: :batch,
+  resource: [service: [name: "murmur"]]
+
+config :opentelemetry_exporter,
+  otlp_protocol: :http_protobuf,
+  otlp_endpoint: System.get_env("ARIZE_PHOENIX_OTLP_ENDPOINT", "http://localhost:6006")
+
 # LLM API keys for jido_ai / req_llm
 if api_key = System.get_env("ANTHROPIC_API_KEY") do
   config :req_llm, anthropic_api_key: api_key

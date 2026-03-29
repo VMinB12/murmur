@@ -15,6 +15,7 @@ defmodule JidoMurmur.TellAction do
       message: [type: :string, required: true, doc: "The message to send to the target agent"]
     ]
 
+  alias Jido.Tracing.Context, as: TracingContext
   alias JidoMurmur.Runner
   alias JidoMurmur.Signals.MessageReceived
   alias JidoMurmur.Workspaces
@@ -56,11 +57,20 @@ defmodule JidoMurmur.TellAction do
     if pid do
       topic = JidoMurmur.Topics.agent_messages(target_session.workspace_id, target_session.id)
 
+      sender_name = String.replace(message, ~r/^\[([^\]]+)\]:.*/, "\\1")
+
+      sender_trace_id =
+        case TracingContext.get() do
+          %{trace_id: tid} when is_binary(tid) -> tid
+          _ -> nil
+        end
+
       inter_msg = %{
         id: Uniq.UUID.uuid7(),
         role: "user",
         content: message,
-        sender_name: String.replace(message, ~r/^\[([^\]]+)\]:.*/, "\\1")
+        sender_name: sender_name,
+        sender_trace_id: sender_trace_id
       }
 
       signal =

@@ -33,6 +33,7 @@ defmodule JidoArxiv.MixProject do
 
   defp deps do
     [
+      {:jido_murmur, in_umbrella: true},
       {:jido, "~> 2.0"},
       {:jido_action, "~> 2.0"},
       {:req, "~> 0.5"},

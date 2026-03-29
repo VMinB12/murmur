@@ -162,27 +162,27 @@
 
 ### Implementation for User Story 4 — jido_tasks
 
-- [ ] T065 [US4] Implement JidoTasks root config module with repo/pubsub accessors at apps/jido_tasks/lib/jido_tasks.ex
-- [ ] T066 [P] [US4] Extract Task schema (Murmur.Tasks.Task → JidoTasks.Task) with owner_id, metadata fields at apps/jido_tasks/lib/jido_tasks/task.ex
-- [ ] T067 [US4] Extract Tasks context (Murmur.Tasks → JidoTasks.Tasks) with CRUD, stats, PubSub broadcasts at apps/jido_tasks/lib/jido_tasks/tasks.ex
-- [ ] T068 [P] [US4] Extract AddTask tool (Murmur.Agents.Tools.AddTask → JidoTasks.Tools.AddTask) at apps/jido_tasks/lib/jido_tasks/tools/add_task.ex
-- [ ] T069 [P] [US4] Extract UpdateTask tool (Murmur.Agents.Tools.UpdateTask → JidoTasks.Tools.UpdateTask) at apps/jido_tasks/lib/jido_tasks/tools/update_task.ex
-- [ ] T070 [P] [US4] Extract ListTasks tool (Murmur.Agents.Tools.ListTasks → JidoTasks.Tools.ListTasks) at apps/jido_tasks/lib/jido_tasks/tools/list_tasks.ex
-- [ ] T071 [US4] Create migration template and Mix.Tasks.JidoTasks.Install generator with jido_murmur_workspaces FK check at apps/jido_tasks/lib/mix/tasks/jido_tasks.install.ex
-- [ ] T072 [US4] Create test infrastructure (test_helper.exs, JidoTasks.Case with sandbox) at apps/jido_tasks/test/support/case.ex
+- [x] T065 [US4] Implement JidoTasks root config module with repo/pubsub accessors at apps/jido_tasks/lib/jido_tasks.ex
+- [x] T066 [P] [US4] Extract Task schema (Murmur.Tasks.Task → JidoTasks.Task) with owner_id, metadata fields at apps/jido_tasks/lib/jido_tasks/task.ex
+- [x] T067 [US4] Extract Tasks context (Murmur.Tasks → JidoTasks.Tasks) with CRUD, stats, PubSub broadcasts at apps/jido_tasks/lib/jido_tasks/tasks.ex
+- [x] T068 [P] [US4] Extract AddTask tool (Murmur.Agents.Tools.AddTask → JidoTasks.Tools.AddTask) at apps/jido_tasks/lib/jido_tasks/tools/add_task.ex
+- [x] T069 [P] [US4] Extract UpdateTask tool (Murmur.Agents.Tools.UpdateTask → JidoTasks.Tools.UpdateTask) at apps/jido_tasks/lib/jido_tasks/tools/update_task.ex
+- [x] T070 [P] [US4] Extract ListTasks tool (Murmur.Agents.Tools.ListTasks → JidoTasks.Tools.ListTasks) at apps/jido_tasks/lib/jido_tasks/tools/list_tasks.ex
+- [x] T071 [US4] Create migration template and Mix.Tasks.JidoTasks.Install generator with jido_murmur_workspaces FK check at apps/jido_tasks/lib/mix/tasks/jido_tasks.install.ex
+- [x] T072 [US4] Create test infrastructure (test_helper.exs, JidoTasks.Case with sandbox) at apps/jido_tasks/test/support/case.ex
 
 ### Implementation for User Story 4 — jido_arxiv
 
-- [ ] T073 [US4] Implement JidoArxiv root module at apps/jido_arxiv/lib/jido_arxiv.ex
-- [ ] T074 [P] [US4] Extract ArxivSearch tool (Murmur.Agents.Tools.ArxivSearch → JidoArxiv.Tools.ArxivSearch) at apps/jido_arxiv/lib/jido_arxiv/tools/arxiv_search.ex
-- [ ] T075 [P] [US4] Extract DisplayPaper tool (Murmur.Agents.Tools.DisplayPaper → JidoArxiv.Tools.DisplayPaper) at apps/jido_arxiv/lib/jido_arxiv/tools/display_paper.ex
+- [x] T073 [US4] Implement JidoArxiv root module at apps/jido_arxiv/lib/jido_arxiv.ex
+- [x] T074 [P] [US4] Extract ArxivSearch tool (Murmur.Agents.Tools.ArxivSearch → JidoArxiv.Tools.ArxivSearch) at apps/jido_arxiv/lib/jido_arxiv/tools/arxiv_search.ex
+- [x] T075 [P] [US4] Extract DisplayPaper tool (Murmur.Agents.Tools.DisplayPaper → JidoArxiv.Tools.DisplayPaper) at apps/jido_arxiv/lib/jido_arxiv/tools/display_paper.ex
 
 ### Tests for User Story 4
 
-- [ ] T076 [P] [US4] Write unit tests for Tasks context (create, update, list, stats, PubSub) at apps/jido_tasks/test/jido_tasks/tasks_test.exs
-- [ ] T077 [P] [US4] Write unit tests for AddTask, UpdateTask, ListTasks tools at apps/jido_tasks/test/jido_tasks/tools/tool_test.exs
-- [ ] T078 [P] [US4] Write unit tests for ArxivSearch and DisplayPaper tools at apps/jido_arxiv/test/jido_arxiv/tools/tool_test.exs
-- [ ] T079 [US4] Write integration test for agent with tools from multiple packages (jido_murmur + jido_tasks + jido_arxiv) at apps/jido_tasks/test/jido_tasks/integration/multi_package_test.exs
+- [x] T076 [P] [US4] Write unit tests for Tasks context (create, update, list, stats, PubSub) at apps/jido_tasks/test/jido_tasks/tasks_test.exs
+- [x] T077 [P] [US4] Write unit tests for AddTask, UpdateTask, ListTasks tools at apps/jido_tasks/test/jido_tasks/tools/tool_test.exs
+- [x] T078 [P] [US4] Write unit tests for ArxivSearch and DisplayPaper tools at apps/jido_arxiv/test/jido_arxiv/tools/tool_test.exs
+- [x] T079 [US4] Write integration test for agent with tools from multiple packages (jido_murmur + jido_tasks + jido_arxiv) at apps/jido_tasks/test/jido_tasks/integration/multi_package_test.exs
 
 **Checkpoint**: Plugin packages deliver domain-specific Jido.Action tools that compose via standard Jido mechanisms
 

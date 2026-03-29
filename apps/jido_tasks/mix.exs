@@ -33,6 +33,8 @@ defmodule JidoTasks.MixProject do
 
   defp deps do
     [
+      {:jido_murmur, in_umbrella: true},
+      {:jido_arxiv, in_umbrella: true, only: :test},
       {:jido, "~> 2.0"},
       {:jido_action, "~> 2.0"},
       {:phoenix_pubsub, "~> 2.0"},

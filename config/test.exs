@@ -1,7 +1,6 @@
 import Config
 
-# jido_murmur package — use mock LLM adapter in tests
-config :jido_murmur, :llm_adapter, JidoMurmur.LLM.Mock
+alias Ecto.Adapters.SQL.Sandbox
 
 # jido_murmur test repo configuration (for isolated package tests)
 config :jido_murmur, JidoMurmur.TestRepo,
@@ -9,8 +8,11 @@ config :jido_murmur, JidoMurmur.TestRepo,
   password: "postgres",
   hostname: "localhost",
   database: "murmur_test#{System.get_env("MIX_TEST_PARTITION")}",
-  pool: Ecto.Adapters.SQL.Sandbox,
+  pool: Sandbox,
   pool_size: System.schedulers_online() * 2
+
+# jido_murmur package — use mock LLM adapter in tests
+config :jido_murmur, :llm_adapter, JidoMurmur.LLM.Mock
 
 # jido_tasks test repo configuration (for isolated package tests)
 config :jido_tasks, JidoTasks.TestRepo,
@@ -18,7 +20,7 @@ config :jido_tasks, JidoTasks.TestRepo,
   password: "postgres",
   hostname: "localhost",
   database: "murmur_test#{System.get_env("MIX_TEST_PARTITION")}",
-  pool: Ecto.Adapters.SQL.Sandbox,
+  pool: Sandbox,
   pool_size: System.schedulers_online() * 2
 
 # Print only warnings and errors during test
@@ -34,7 +36,7 @@ config :murmur, Murmur.Repo,
   password: "postgres",
   hostname: "localhost",
   database: "murmur_test#{System.get_env("MIX_TEST_PARTITION")}",
-  pool: Ecto.Adapters.SQL.Sandbox,
+  pool: Sandbox,
   pool_size: System.schedulers_online() * 2
 
 # We don't run a server during test. If one is required,

@@ -196,12 +196,12 @@
 
 ### Implementation for User Story 5
 
-- [ ] T080 [US5] Implement ComposableRequestTransformer with sequential chain and deep-merge at apps/jido_murmur/lib/jido_murmur/composable_request_transformer.ex
+- [x] T080 [US5] Implement ComposableRequestTransformer with sequential chain and deep-merge at apps/jido_murmur/lib/jido_murmur/composable_request_transformer.ex
 
 ### Tests for User Story 5
 
-- [ ] T081 [P] [US5] Write unit tests for ComposableRequestTransformer (chain execution, deep-merge, error propagation) at apps/jido_murmur/test/jido_murmur/composable_request_transformer_test.exs
-- [ ] T082 [US5] Write integration test composing MessageInjector with a custom transformer at apps/jido_murmur/test/jido_murmur/integration/composable_transformer_test.exs
+- [x] T081 [P] [US5] Write unit tests for ComposableRequestTransformer (chain execution, deep-merge, error propagation) at apps/jido_murmur/test/jido_murmur/composable_request_transformer_test.exs
+- [x] T082 [US5] Write integration test composing MessageInjector with a custom transformer at apps/jido_murmur/test/jido_murmur/integration/composable_transformer_test.exs
 
 **Checkpoint**: Multi-transformer composition works, enabling extensible request processing
 

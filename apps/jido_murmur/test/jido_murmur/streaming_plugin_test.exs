@@ -3,76 +3,81 @@ defmodule JidoMurmur.StreamingPluginTest do
 
   alias JidoMurmur.StreamingPlugin
 
+  defp build_context(session_id, workspace_id) do
+    %{agent: %{id: session_id, state: %{workspace_id: workspace_id}}}
+  end
+
   describe "handle_signal/2" do
     test "broadcasts signal to PubSub on stream topic" do
+      workspace_id = Ecto.UUID.generate()
       session_id = Ecto.UUID.generate()
-      topic = StreamingPlugin.stream_topic(session_id)
+      topic = StreamingPlugin.stream_topic(workspace_id, session_id)
       Phoenix.PubSub.subscribe(JidoMurmur.pubsub(), topic)
 
       signal = %{type: "ai.llm.delta", data: %{content: "Hello"}}
-      context = %{agent: %{id: session_id}}
 
-      assert {:ok, :continue} = StreamingPlugin.handle_signal(signal, context)
+      assert {:ok, :continue} = StreamingPlugin.handle_signal(signal, build_context(session_id, workspace_id))
 
       assert_receive {:agent_signal, ^session_id, ^signal}
     end
 
     test "handles ai.llm.response signal" do
+      workspace_id = Ecto.UUID.generate()
       session_id = Ecto.UUID.generate()
-      topic = StreamingPlugin.stream_topic(session_id)
+      topic = StreamingPlugin.stream_topic(workspace_id, session_id)
       Phoenix.PubSub.subscribe(JidoMurmur.pubsub(), topic)
 
       signal = %{type: "ai.llm.response", data: %{content: "Full response"}}
-      context = %{agent: %{id: session_id}}
 
-      assert {:ok, :continue} = StreamingPlugin.handle_signal(signal, context)
+      assert {:ok, :continue} = StreamingPlugin.handle_signal(signal, build_context(session_id, workspace_id))
 
       assert_receive {:agent_signal, ^session_id, ^signal}
     end
 
     test "handles ai.tool.result signal" do
+      workspace_id = Ecto.UUID.generate()
       session_id = Ecto.UUID.generate()
-      topic = StreamingPlugin.stream_topic(session_id)
+      topic = StreamingPlugin.stream_topic(workspace_id, session_id)
       Phoenix.PubSub.subscribe(JidoMurmur.pubsub(), topic)
 
       signal = %{type: "ai.tool.result", data: %{tool: "search", result: "found"}}
-      context = %{agent: %{id: session_id}}
 
-      assert {:ok, :continue} = StreamingPlugin.handle_signal(signal, context)
+      assert {:ok, :continue} = StreamingPlugin.handle_signal(signal, build_context(session_id, workspace_id))
 
       assert_receive {:agent_signal, ^session_id, ^signal}
     end
 
     test "handles ai.request.started signal" do
+      workspace_id = Ecto.UUID.generate()
       session_id = Ecto.UUID.generate()
-      topic = StreamingPlugin.stream_topic(session_id)
+      topic = StreamingPlugin.stream_topic(workspace_id, session_id)
       Phoenix.PubSub.subscribe(JidoMurmur.pubsub(), topic)
 
       signal = %{type: "ai.request.started", data: %{}}
-      context = %{agent: %{id: session_id}}
 
-      assert {:ok, :continue} = StreamingPlugin.handle_signal(signal, context)
+      assert {:ok, :continue} = StreamingPlugin.handle_signal(signal, build_context(session_id, workspace_id))
 
       assert_receive {:agent_signal, ^session_id, ^signal}
     end
 
     test "handles ai.request.failed signal" do
+      workspace_id = Ecto.UUID.generate()
       session_id = Ecto.UUID.generate()
-      topic = StreamingPlugin.stream_topic(session_id)
+      topic = StreamingPlugin.stream_topic(workspace_id, session_id)
       Phoenix.PubSub.subscribe(JidoMurmur.pubsub(), topic)
 
       signal = %{type: "ai.request.failed", data: %{error: "timeout"}}
-      context = %{agent: %{id: session_id}}
 
-      assert {:ok, :continue} = StreamingPlugin.handle_signal(signal, context)
+      assert {:ok, :continue} = StreamingPlugin.handle_signal(signal, build_context(session_id, workspace_id))
 
       assert_receive {:agent_signal, ^session_id, ^signal}
     end
   end
 
-  describe "stream_topic/1" do
-    test "returns session-scoped topic" do
-      assert StreamingPlugin.stream_topic("abc-123") == "agent_stream:abc-123"
+  describe "stream_topic/2" do
+    test "returns workspace-scoped topic" do
+      assert StreamingPlugin.stream_topic("ws-1", "abc-123") ==
+               "workspace:ws-1:agent:abc-123:stream"
     end
   end
 end

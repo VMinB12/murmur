@@ -13,15 +13,16 @@ defmodule Murmur.Agents.ArtifactPluginTest do
   alias JidoArtifacts.Artifact
   alias JidoArtifacts.ArtifactPlugin
 
+  @workspace_id "test-workspace-456"
   @session_id "test-session-123"
 
   setup do
-    Phoenix.PubSub.subscribe(Murmur.PubSub, Artifact.artifact_topic(@session_id))
+    Phoenix.PubSub.subscribe(Murmur.PubSub, Artifact.artifact_topic(@workspace_id, @session_id))
     :ok
   end
 
   defp build_context do
-    %{agent: %{id: @session_id}}
+    %{agent: %{id: @session_id, state: %{workspace_id: @workspace_id}}}
   end
 
   defp build_signal(name, data, mode) do

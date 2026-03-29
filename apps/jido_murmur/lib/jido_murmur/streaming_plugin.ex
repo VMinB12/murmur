@@ -25,7 +25,8 @@ defmodule JidoMurmur.StreamingPlugin do
   @impl Jido.Plugin
   def handle_signal(signal, context) do
     session_id = context.agent.id
-    topic = stream_topic(session_id)
+    workspace_id = get_in(context, [:agent, :state, :workspace_id])
+    topic = stream_topic(workspace_id, session_id)
 
     :telemetry.execute(
       [:jido_murmur, :streaming, :signal],
@@ -38,5 +39,6 @@ defmodule JidoMurmur.StreamingPlugin do
   end
 
   @doc "Returns the PubSub topic for agent signals for the given session."
-  def stream_topic(session_id), do: "agent_stream:#{session_id}"
+  def stream_topic(workspace_id, session_id),
+    do: JidoMurmur.Topics.agent_stream(workspace_id, session_id)
 end

@@ -1,5 +1,6 @@
 defmodule Murmur.Agents.Profiles.ArxivAgent do
   @moduledoc "Research assistant agent with arXiv search and paper display capabilities."
+  @behaviour JidoMurmur.AgentProfile
 
   use Jido.AI.Agent,
     name: "arxiv_agent",
@@ -22,5 +23,6 @@ defmodule Murmur.Agents.Profiles.ArxivAgent do
     When presenting search results, briefly summarize each paper's key contribution.
     """
 
+  @impl JidoMurmur.AgentProfile
   def catalog_meta, do: %{color: "violet"}
 end

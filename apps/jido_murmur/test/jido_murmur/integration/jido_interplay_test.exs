@@ -53,13 +53,13 @@ defmodule JidoMurmur.Integration.JidoInterplayTest do
 
       # Subscribe to streaming topic (StreamingPlugin broadcasts here)
       pubsub = JidoMurmur.pubsub()
-      Phoenix.PubSub.subscribe(pubsub, StreamingPlugin.stream_topic(session.id))
+      Phoenix.PubSub.subscribe(pubsub, StreamingPlugin.stream_topic(session.workspace_id, session.id))
 
       # Subscribe to custom plugin topic
       Phoenix.PubSub.subscribe(pubsub, "custom_plugin:#{session.id}")
 
       # Subscribe to agent topic for completion
-      agent_topic = "workspace:#{session.workspace_id}:agent:#{session.id}"
+      agent_topic = JidoMurmur.Topics.agent_messages(session.workspace_id, session.id)
       Phoenix.PubSub.subscribe(pubsub, agent_topic)
 
       # Trigger a message
@@ -176,7 +176,7 @@ defmodule JidoMurmur.Integration.JidoInterplayTest do
 
       # Subscribe for completion
       pubsub = JidoMurmur.pubsub()
-      agent_topic = "workspace:#{session.workspace_id}:agent:#{session.id}"
+      agent_topic = JidoMurmur.Topics.agent_messages(session.workspace_id, session.id)
       Phoenix.PubSub.subscribe(pubsub, agent_topic)
 
       LLM.Mock.set_response(%{content: "ETS storage response"})

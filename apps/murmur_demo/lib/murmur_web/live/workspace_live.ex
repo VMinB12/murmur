@@ -3,10 +3,9 @@ defmodule MurmurWeb.WorkspaceLive do
   use MurmurWeb, :live_view
 
   alias Jido.Signal.ID
-  alias JidoArtifacts.Artifact
   alias JidoMurmur.Catalog
   alias JidoMurmur.Runner
-  alias JidoMurmur.StreamingPlugin
+  alias JidoMurmur.Topics
   alias JidoMurmur.UITurn
   alias JidoMurmur.Workspaces
   alias JidoTasks.Tasks
@@ -51,13 +50,12 @@ defmodule MurmurWeb.WorkspaceLive do
 
     socket =
       if connected?(socket) do
-        Phoenix.PubSub.subscribe(Murmur.PubSub, Tasks.tasks_topic(workspace_id))
+        Phoenix.PubSub.subscribe(Murmur.PubSub, Topics.workspace_tasks(workspace_id))
 
         Enum.reduce(agent_sessions, socket, fn session, acc ->
-          topic = agent_topic(workspace_id, session.id)
-          Phoenix.PubSub.subscribe(Murmur.PubSub, topic)
-          Phoenix.PubSub.subscribe(Murmur.PubSub, StreamingPlugin.stream_topic(session.id))
-          Phoenix.PubSub.subscribe(Murmur.PubSub, Artifact.artifact_topic(session.id))
+          Phoenix.PubSub.subscribe(Murmur.PubSub, Topics.agent_messages(workspace_id, session.id))
+          Phoenix.PubSub.subscribe(Murmur.PubSub, Topics.agent_stream(workspace_id, session.id))
+          Phoenix.PubSub.subscribe(Murmur.PubSub, Topics.agent_artifacts(workspace_id, session.id))
           ensure_agent_started(session)
 
           status = get_agent_status(session.id)
@@ -81,7 +79,7 @@ defmodule MurmurWeb.WorkspaceLive do
     else
       session = Workspaces.get_agent_session!(session_id)
       workspace_id = socket.assigns.workspace.id
-      topic = agent_topic(workspace_id, session_id)
+      topic = Topics.agent_messages(workspace_id, session_id)
 
       # Add user message to local display immediately
       user_msg = %{
@@ -114,10 +112,9 @@ defmodule MurmurWeb.WorkspaceLive do
            "display_name" => display_name
          }) do
       {:ok, session} ->
-        topic = agent_topic(workspace.id, session.id)
-        Phoenix.PubSub.subscribe(Murmur.PubSub, topic)
-        Phoenix.PubSub.subscribe(Murmur.PubSub, StreamingPlugin.stream_topic(session.id))
-        Phoenix.PubSub.subscribe(Murmur.PubSub, Artifact.artifact_topic(session.id))
+        Phoenix.PubSub.subscribe(Murmur.PubSub, Topics.agent_messages(workspace.id, session.id))
+        Phoenix.PubSub.subscribe(Murmur.PubSub, Topics.agent_stream(workspace.id, session.id))
+        Phoenix.PubSub.subscribe(Murmur.PubSub, Topics.agent_artifacts(workspace.id, session.id))
         ensure_agent_started(session)
 
         socket =
@@ -201,7 +198,7 @@ defmodule MurmurWeb.WorkspaceLive do
       {:ok, task} ->
         Phoenix.PubSub.broadcast(
           Murmur.PubSub,
-          Tasks.tasks_topic(workspace_id),
+          Topics.workspace_tasks(workspace_id),
           {:task_created, task}
         )
 
@@ -223,7 +220,7 @@ defmodule MurmurWeb.WorkspaceLive do
       {:ok, updated} ->
         Phoenix.PubSub.broadcast(
           Murmur.PubSub,
-          Tasks.tasks_topic(socket.assigns.workspace.id),
+          Topics.workspace_tasks(socket.assigns.workspace.id),
           {:task_updated, updated}
         )
 
@@ -247,10 +244,10 @@ defmodule MurmurWeb.WorkspaceLive do
 
   def handle_event("remove_agent", %{"session-id" => session_id}, socket) do
     session = Workspaces.get_agent_session!(session_id)
-    topic = agent_topic(socket.assigns.workspace.id, session_id)
-    Phoenix.PubSub.unsubscribe(Murmur.PubSub, topic)
-    Phoenix.PubSub.unsubscribe(Murmur.PubSub, StreamingPlugin.stream_topic(session_id))
-    Phoenix.PubSub.unsubscribe(Murmur.PubSub, Artifact.artifact_topic(session_id))
+    workspace_id = socket.assigns.workspace.id
+    Phoenix.PubSub.unsubscribe(Murmur.PubSub, Topics.agent_messages(workspace_id, session_id))
+    Phoenix.PubSub.unsubscribe(Murmur.PubSub, Topics.agent_stream(workspace_id, session_id))
+    Phoenix.PubSub.unsubscribe(Murmur.PubSub, Topics.agent_artifacts(workspace_id, session_id))
     stop_agent(session_id)
     cleanup_storage(session)
     Workspaces.delete_agent_session(session)
@@ -487,7 +484,7 @@ defmodule MurmurWeb.WorkspaceLive do
 
       target_session ->
         message = build_task_notification(task, sender_name)
-        topic = "workspace:#{workspace_id}:agent:#{target_session.id}"
+        topic = Topics.agent_messages(workspace_id, target_session.id)
 
         inter_msg = %{
           id: ID.generate!(),
@@ -675,10 +672,6 @@ defmodule MurmurWeb.WorkspaceLive do
     end
   end
 
-  defp agent_topic(workspace_id, session_id) do
-    "workspace:#{workspace_id}:agent:#{session_id}"
-  end
-
   # --- Helpers ---
 
   defp find_session(socket, session_id) do
@@ -691,7 +684,7 @@ defmodule MurmurWeb.WorkspaceLive do
 
   defp send_to_target(socket, target_session, content) do
     workspace_id = socket.assigns.workspace.id
-    topic = agent_topic(workspace_id, target_session.id)
+    topic = Topics.agent_messages(workspace_id, target_session.id)
 
     user_msg = %{
       id: ID.generate!(),

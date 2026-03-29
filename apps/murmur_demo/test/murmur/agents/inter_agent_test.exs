@@ -41,8 +41,8 @@ defmodule Murmur.Agents.InterAgentTest do
     {:ok, _} = Murmur.Jido.start_agent(alice_module, id: alice.id)
     {:ok, _} = Murmur.Jido.start_agent(bob_module, id: bob.id)
 
-    alice_topic = "workspace:#{workspace.id}:agent:#{alice.id}"
-    bob_topic = "workspace:#{workspace.id}:agent:#{bob.id}"
+    alice_topic = JidoMurmur.Topics.agent_messages(workspace.id, alice.id)
+    bob_topic = JidoMurmur.Topics.agent_messages(workspace.id, bob.id)
     Phoenix.PubSub.subscribe(Murmur.PubSub, alice_topic)
     Phoenix.PubSub.subscribe(Murmur.PubSub, bob_topic)
 

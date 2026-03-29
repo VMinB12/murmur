@@ -78,7 +78,7 @@ defmodule MurmurWeb.WorkspaceLiveIntegrationTest do
       session: session
     } do
       # Subscribe test process to PubSub to know when completion arrives
-      topic = "workspace:#{workspace.id}:agent:#{session.id}"
+      topic = JidoMurmur.Topics.agent_messages(workspace.id, session.id)
       Phoenix.PubSub.subscribe(Murmur.PubSub, topic)
 
       stub_llm_success("The answer is 2.")
@@ -108,7 +108,7 @@ defmodule MurmurWeb.WorkspaceLiveIntegrationTest do
       session: session
     } do
       # Subscribe test process to know when completion arrives
-      topic = "workspace:#{workspace.id}:agent:#{session.id}"
+      topic = JidoMurmur.Topics.agent_messages(workspace.id, session.id)
       Phoenix.PubSub.subscribe(Murmur.PubSub, topic)
 
       stub_llm_success("I am Alice")

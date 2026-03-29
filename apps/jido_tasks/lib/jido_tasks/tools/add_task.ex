@@ -67,7 +67,7 @@ defmodule JidoTasks.Tools.AddTask do
   defp broadcast_task_created(workspace_id, task) do
     Phoenix.PubSub.broadcast(
       JidoTasks.pubsub(),
-      Tasks.tasks_topic(workspace_id),
+      JidoMurmur.Topics.workspace_tasks(workspace_id),
       {:task_created, task}
     )
   end
@@ -87,7 +87,7 @@ defmodule JidoTasks.Tools.AddTask do
 
       target_session ->
         message = build_notification(task, sender_name)
-        topic = "workspace:#{workspace_id}:agent:#{target_session.id}"
+        topic = JidoMurmur.Topics.agent_messages(workspace_id, target_session.id)
 
         inter_msg = %{
           id: ID.generate!(),

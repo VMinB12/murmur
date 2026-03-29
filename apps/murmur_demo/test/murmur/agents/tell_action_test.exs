@@ -37,7 +37,7 @@ defmodule Murmur.Agents.TellActionTest do
     agent_module = Catalog.agent_module(bob.agent_profile_id)
     {:ok, _pid} = Murmur.Jido.start_agent(agent_module, id: bob.id)
 
-    topic = "workspace:#{workspace.id}:agent:#{bob.id}"
+    topic = JidoMurmur.Topics.agent_messages(workspace.id, bob.id)
     Phoenix.PubSub.subscribe(Murmur.PubSub, topic)
 
     # Stub LLM so background Runner Task doesn't make real API calls

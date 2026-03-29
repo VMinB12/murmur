@@ -12,6 +12,7 @@ defmodule Murmur.Application do
     end
 
     Jido.Telemetry.setup()
+    JidoTasks.Config.validate!()
 
     children = [
       MurmurWeb.Telemetry,

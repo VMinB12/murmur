@@ -87,7 +87,7 @@ defmodule Murmur.Agents.Tools.AddTaskTest do
     end
 
     test "notifies assigned agent via PubSub", %{workspace: workspace, bob: bob} do
-      topic = "workspace:#{workspace.id}:agent:#{bob.id}"
+      topic = JidoMurmur.Topics.agent_messages(workspace.id, bob.id)
       Phoenix.PubSub.subscribe(Murmur.PubSub, topic)
 
       params = %{title: "For Bob", assignee: "Bob"}
@@ -101,7 +101,7 @@ defmodule Murmur.Agents.Tools.AddTaskTest do
     end
 
     test "does not notify when assigning to self", %{workspace: workspace, alice: alice} do
-      topic = "workspace:#{workspace.id}:agent:#{alice.id}"
+      topic = JidoMurmur.Topics.agent_messages(workspace.id, alice.id)
       Phoenix.PubSub.subscribe(Murmur.PubSub, topic)
 
       params = %{title: "Self-assign", assignee: "Alice"}

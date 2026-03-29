@@ -187,7 +187,7 @@ defmodule JidoMurmur.Runner do
   end
 
   defp agent_topic(session) do
-    "workspace:#{session.workspace_id}:agent:#{session.id}"
+    JidoMurmur.Topics.agent_messages(session.workspace_id, session.id)
   end
 
   defp broadcast(topic, message) do

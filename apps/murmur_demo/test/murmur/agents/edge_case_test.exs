@@ -32,7 +32,7 @@ defmodule Murmur.Agents.EdgeCaseTest do
       agent_module = Catalog.agent_module(session.agent_profile_id)
       {:ok, _} = Murmur.Jido.start_agent(agent_module, id: session.id)
 
-      topic = "workspace:#{workspace.id}:agent:#{session.id}"
+      topic = JidoMurmur.Topics.agent_messages(workspace.id, session.id)
       Phoenix.PubSub.subscribe(Murmur.PubSub, topic)
 
       on_exit(fn ->
@@ -102,7 +102,7 @@ defmodule Murmur.Agents.EdgeCaseTest do
       agent_module = Catalog.agent_module(bob.agent_profile_id)
       {:ok, _} = Murmur.Jido.start_agent(agent_module, id: bob.id)
 
-      topic = "workspace:#{workspace.id}:agent:#{bob.id}"
+      topic = JidoMurmur.Topics.agent_messages(workspace.id, bob.id)
       Phoenix.PubSub.subscribe(Murmur.PubSub, topic)
 
       stub_llm_success("loop response")

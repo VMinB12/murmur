@@ -1,5 +1,6 @@
 defmodule Murmur.Agents.Profiles.GeneralAgent do
   @moduledoc "General-purpose AI assistant agent profile."
+  @behaviour JidoMurmur.AgentProfile
 
   use Jido.AI.Agent,
     name: "general_agent",
@@ -17,5 +18,6 @@ defmodule Murmur.Agents.Profiles.GeneralAgent do
     You are a helpful assistant. Be concise and accurate in your responses.
     """
 
+  @impl JidoMurmur.AgentProfile
   def catalog_meta, do: %{color: "blue"}
 end

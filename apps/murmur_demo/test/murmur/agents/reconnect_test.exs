@@ -28,7 +28,7 @@ defmodule Murmur.Agents.ReconnectTest do
     agent_module = Catalog.agent_module(session.agent_profile_id)
     {:ok, _pid} = Murmur.Jido.start_agent(agent_module, id: session.id)
 
-    topic = "workspace:#{workspace.id}:agent:#{session.id}"
+    topic = JidoMurmur.Topics.agent_messages(workspace.id, session.id)
     Phoenix.PubSub.subscribe(Murmur.PubSub, topic)
 
     stub_llm_success("Reconnect mock response")

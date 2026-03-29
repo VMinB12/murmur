@@ -19,6 +19,8 @@ defmodule JidoMurmur.Supervisor do
 
   @impl true
   def init(_opts) do
+    JidoMurmur.Config.validate!()
+
     children = [
       JidoMurmur.TableOwner
     ]

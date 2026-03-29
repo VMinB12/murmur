@@ -19,11 +19,11 @@
 
 **Purpose**: Create new module files and verify telemetry dependency availability
 
-- [ ] T001 Verify `:telemetry` dependency is available in `apps/jido_tasks/mix.exs` deps (should be transitive via phoenix)
-- [ ] T002 [P] Create `apps/jido_murmur/lib/jido_murmur/topics.ex` placeholder module `JidoMurmur.Topics`
-- [ ] T003 [P] Create `apps/jido_murmur/lib/jido_murmur/config.ex` placeholder module `JidoMurmur.Config`
-- [ ] T004 [P] Create `apps/jido_murmur/lib/jido_murmur/agent_profile.ex` placeholder module `JidoMurmur.AgentProfile`
-- [ ] T005 [P] Create `apps/jido_tasks/lib/jido_tasks/config.ex` placeholder module `JidoTasks.Config`
+- [X] T001 Verify `:telemetry` dependency is available in `apps/jido_tasks/mix.exs` deps (should be transitive via phoenix)
+- [X] T002 [P] Create `apps/jido_murmur/lib/jido_murmur/topics.ex` placeholder module `JidoMurmur.Topics`
+- [X] T003 [P] Create `apps/jido_murmur/lib/jido_murmur/config.ex` placeholder module `JidoMurmur.Config`
+- [X] T004 [P] Create `apps/jido_murmur/lib/jido_murmur/agent_profile.ex` placeholder module `JidoMurmur.AgentProfile`
+- [X] T005 [P] Create `apps/jido_tasks/lib/jido_tasks/config.ex` placeholder module `JidoTasks.Config`
 
 ---
 
@@ -35,14 +35,14 @@
 
 ### Tests for Foundational Phase
 
-- [ ] T006 [P] Create `apps/jido_murmur/test/jido_murmur/workspace_context_test.exs` with tests for: plugin `handle_signal/2` extracts `workspace_id` from agent state, falls back gracefully when `workspace_id` is absent
+- [X] T006 [P] Create `apps/jido_murmur/test/jido_murmur/workspace_context_test.exs` with tests for: plugin `handle_signal/2` extracts `workspace_id` from agent state, falls back gracefully when `workspace_id` is absent
 
 ### Implementation for Foundational Phase
 
-- [ ] T007 [US2] Update `apps/jido_murmur/lib/jido_murmur/streaming_plugin.ex` — extract `workspace_id` from `agent.state` in `handle_signal/2`, pass to PubSub broadcast topic construction
-- [ ] T008 [US2] Update `apps/jido_murmur/lib/jido_murmur/artifact_plugin.ex` (or `apps/jido_artifacts/lib/jido_artifacts/artifact_plugin.ex` if spec 003 is done) — extract `workspace_id` from agent state, pass to PubSub broadcast topic construction
-- [ ] T009 [US2] Update `apps/jido_murmur/lib/jido_murmur/runner.ex` — ensure `workspace_id` is threaded through agent execution context and available to plugins
-- [ ] T010 [US2] Verify backward compatibility: when agent state lacks `workspace_id`, plugins fall back to session-only topic or log a warning
+- [X] T007 [US2] Update `apps/jido_murmur/lib/jido_murmur/streaming_plugin.ex` — extract `workspace_id` from `agent.state` in `handle_signal/2`, pass to PubSub broadcast topic construction
+- [X] T008 [US2] Update `apps/jido_murmur/lib/jido_murmur/artifact_plugin.ex` (or `apps/jido_artifacts/lib/jido_artifacts/artifact_plugin.ex` if spec 003 is done) — extract `workspace_id` from agent state, pass to PubSub broadcast topic construction
+- [X] T009 [US2] Update `apps/jido_murmur/lib/jido_murmur/runner.ex` — ensure `workspace_id` is threaded through agent execution context and available to plugins
+- [X] T010 [US2] Verify backward compatibility: when agent state lacks `workspace_id`, plugins fall back to session-only topic or log a warning
 
 **Checkpoint**: All plugins can access `workspace_id`. Backward compatible when absent.
 
@@ -56,19 +56,19 @@
 
 ### Tests for User Story 1
 
-- [ ] T011 [P] [US1] Create `apps/jido_murmur/test/jido_murmur/topics_test.exs` with tests for: `agent_artifacts/2` returns `"workspace:{wid}:agent:{sid}:artifacts"`, `agent_stream/2` returns `"workspace:{wid}:agent:{sid}:stream"`, `agent_messages/2` returns `"workspace:{wid}:agent:{sid}:messages"`, `workspace_tasks/1` returns `"workspace:{wid}:tasks"`, `workspace/1` returns `"workspace:{wid}"`
+- [X] T011 [P] [US1] Create `apps/jido_murmur/test/jido_murmur/topics_test.exs` with tests for: `agent_artifacts/2` returns `"workspace:{wid}:agent:{sid}:artifacts"`, `agent_stream/2` returns `"workspace:{wid}:agent:{sid}:stream"`, `agent_messages/2` returns `"workspace:{wid}:agent:{sid}:messages"`, `workspace_tasks/1` returns `"workspace:{wid}:tasks"`, `workspace/1` returns `"workspace:{wid}"`
 
 ### Implementation for User Story 1
 
-- [ ] T012 [US1] Implement `JidoMurmur.Topics` in `apps/jido_murmur/lib/jido_murmur/topics.ex` with all 5 functions per contracts/platform-contracts.md and data-model.md topic format
-- [ ] T013 [US1] Update `apps/jido_murmur/lib/jido_murmur/streaming_plugin.ex` — replace inline `"agent_stream:#{session_id}"` topic with `Topics.agent_stream(workspace_id, session_id)`
-- [ ] T014 [US1] Update `apps/jido_murmur/lib/jido_murmur/artifact_plugin.ex` (or jido_artifacts equivalent) — replace inline `"agent_artifacts:#{session_id}"` topic with `Topics.agent_artifacts(workspace_id, session_id)`
-- [ ] T015 [US1] Update `apps/jido_murmur/lib/jido_murmur/runner.ex` — replace inline `"workspace:#{wid}:agent:#{sid}"` topic with `Topics.agent_messages(workspace_id, session_id)`
-- [ ] T016 [US1] Update `apps/jido_murmur/lib/jido_murmur/tell_action.ex` — replace inline topic strings with `Topics` function calls
-- [ ] T017 [US1] Update `apps/jido_tasks/lib/jido_tasks/tools/add_task.ex` — replace inline `"jido_tasks:tasks:#{workspace_id}"` topic with `Topics.workspace_tasks(workspace_id)` (add `JidoMurmur.Topics` as import or alias)
-- [ ] T018 [US1] Update `apps/jido_tasks/lib/jido_tasks/tools/update_task.ex` — replace inline topic string with `Topics.workspace_tasks(workspace_id)`
-- [ ] T019 [US1] Update `apps/murmur_demo/lib/murmur_web/live/workspace_live.ex` — update all PubSub subscriptions to use `Topics` function calls instead of inline topic strings
-- [ ] T020 [US1] Grep entire codebase for remaining inline PubSub topic strings: patterns `"agent_artifacts:`, `"agent_stream:`, `"jido_tasks:tasks:` — verify zero matches outside of `Topics` module
+- [X] T012 [US1] Implement `JidoMurmur.Topics` in `apps/jido_murmur/lib/jido_murmur/topics.ex` with all 5 functions per contracts/platform-contracts.md and data-model.md topic format
+- [X] T013 [US1] Update `apps/jido_murmur/lib/jido_murmur/streaming_plugin.ex` — replace inline `"agent_stream:#{session_id}"` topic with `Topics.agent_stream(workspace_id, session_id)`
+- [X] T014 [US1] Update `apps/jido_murmur/lib/jido_murmur/artifact_plugin.ex` (or jido_artifacts equivalent) — replace inline `"agent_artifacts:#{session_id}"` topic with `Topics.agent_artifacts(workspace_id, session_id)`
+- [X] T015 [US1] Update `apps/jido_murmur/lib/jido_murmur/runner.ex` — replace inline `"workspace:#{wid}:agent:#{sid}"` topic with `Topics.agent_messages(workspace_id, session_id)`
+- [X] T016 [US1] Update `apps/jido_murmur/lib/jido_murmur/tell_action.ex` — replace inline topic strings with `Topics` function calls
+- [X] T017 [US1] Update `apps/jido_tasks/lib/jido_tasks/tools/add_task.ex` — replace inline `"jido_tasks:tasks:#{workspace_id}"` topic with `Topics.workspace_tasks(workspace_id)` (add `JidoMurmur.Topics` as import or alias)
+- [X] T018 [US1] Update `apps/jido_tasks/lib/jido_tasks/tools/update_task.ex` — replace inline topic string with `Topics.workspace_tasks(workspace_id)`
+- [X] T019 [US1] Update `apps/murmur_demo/lib/murmur_web/live/workspace_live.ex` — update all PubSub subscriptions to use `Topics` function calls instead of inline topic strings
+- [X] T020 [US1] Grep entire codebase for remaining inline PubSub topic strings: patterns `"agent_artifacts:`, `"agent_stream:`, `"jido_tasks:tasks:` — verify zero matches outside of `Topics` module
 
 **Checkpoint**: All PubSub topics constructed via centralized `Topics` module. Zero inline topic strings remain. SC-001 met.
 
@@ -82,15 +82,15 @@
 
 ### Tests for User Story 3
 
-- [ ] T021 [P] [US3] Create `apps/jido_murmur/test/jido_murmur/config_test.exs` with tests for: `validate!/0` passes with all keys present, raises with clear message listing missing `:repo` key, raises with multiple missing keys
-- [ ] T022 [P] [US3] Create `apps/jido_tasks/test/jido_tasks/config_test.exs` with tests for: `validate!/0` passes with all keys, raises listing missing `:repo` or `:pubsub`
+- [X] T021 [P] [US3] Create `apps/jido_murmur/test/jido_murmur/config_test.exs` with tests for: `validate!/0` passes with all keys present, raises with clear message listing missing `:repo` key, raises with multiple missing keys
+- [X] T022 [P] [US3] Create `apps/jido_tasks/test/jido_tasks/config_test.exs` with tests for: `validate!/0` passes with all keys, raises listing missing `:repo` or `:pubsub`
 
 ### Implementation for User Story 3
 
-- [ ] T023 [US3] Implement `JidoMurmur.Config.validate!/0` in `apps/jido_murmur/lib/jido_murmur/config.ex` — check required keys `[:repo, :pubsub, :jido_mod, :otp_app]` from `Application.get_env(:jido_murmur, key)`, raise with error format from data-model.md including missing key names and remediation config snippet
-- [ ] T024 [US3] Implement `JidoTasks.Config.validate!/0` in `apps/jido_tasks/lib/jido_tasks/config.ex` — check required keys `[:repo, :pubsub]` from `Application.get_env(:jido_tasks, key)`, raise with error format and remediation instructions
-- [ ] T025 [US3] Call `JidoMurmur.Config.validate!/0` from `apps/jido_murmur/lib/jido_murmur/supervisor.ex` `init/1` callback (or application startup)
-- [ ] T026 [US3] Call `JidoTasks.Config.validate!/0` from `apps/jido_tasks/lib/jido_tasks/supervisor.ex` or appropriate startup point
+- [X] T023 [US3] Implement `JidoMurmur.Config.validate!/0` in `apps/jido_murmur/lib/jido_murmur/config.ex` — check required keys `[:repo, :pubsub, :jido_mod, :otp_app]` from `Application.get_env(:jido_murmur, key)`, raise with error format from data-model.md including missing key names and remediation config snippet
+- [X] T024 [US3] Implement `JidoTasks.Config.validate!/0` in `apps/jido_tasks/lib/jido_tasks/config.ex` — check required keys `[:repo, :pubsub]` from `Application.get_env(:jido_tasks, key)`, raise with error format and remediation instructions
+- [X] T025 [US3] Call `JidoMurmur.Config.validate!/0` from `apps/jido_murmur/lib/jido_murmur/supervisor.ex` `init/1` callback (or application startup)
+- [X] T026 [US3] Call `JidoTasks.Config.validate!/0` from `apps/jido_tasks/lib/jido_tasks/supervisor.ex` or appropriate startup point
 
 **Checkpoint**: Missing config produces clear, actionable error messages at startup. SC-003 met.
 
@@ -104,13 +104,13 @@
 
 ### Tests for User Story 4
 
-- [ ] T027 [P] [US4] Create `apps/jido_tasks/test/jido_tasks/tasks_telemetry_test.exs` with tests for: `:telemetry.attach/4` captures `[:jido_tasks, :task, :create, :stop]` event with `duration` and `task_id`, captures `[:jido_tasks, :task, :update, :stop]` with `old_status` and `new_status`, captures `[:jido_tasks, :task, :list, :stop]` with `count`
+- [X] T027 [P] [US4] Create `apps/jido_tasks/test/jido_tasks/tasks_telemetry_test.exs` with tests for: `:telemetry.attach/4` captures `[:jido_tasks, :task, :create, :stop]` event with `duration` and `task_id`, captures `[:jido_tasks, :task, :update, :stop]` with `old_status` and `new_status`, captures `[:jido_tasks, :task, :list, :stop]` with `count`
 
 ### Implementation for User Story 4
 
-- [ ] T028 [US4] Wrap task creation in `apps/jido_tasks/lib/jido_tasks/tasks.ex` (or context module) with `:telemetry.span([:jido_tasks, :task, :create], metadata, fn -> ... end)` per contracts/platform-contracts.md
-- [ ] T029 [US4] Wrap task update in same context module with `:telemetry.span([:jido_tasks, :task, :update], metadata, fn -> ... end)` including `old_status` and `new_status` in metadata
-- [ ] T030 [US4] Wrap task listing in same context module with `:telemetry.span([:jido_tasks, :task, :list], metadata, fn -> ... end)` including `count` in result metadata
+- [X] T028 [US4] Wrap task creation in `apps/jido_tasks/lib/jido_tasks/tasks.ex` (or context module) with `:telemetry.span([:jido_tasks, :task, :create], metadata, fn -> ... end)` per contracts/platform-contracts.md
+- [X] T029 [US4] Wrap task update in same context module with `:telemetry.span([:jido_tasks, :task, :update], metadata, fn -> ... end)` including `old_status` and `new_status` in metadata
+- [X] T030 [US4] Wrap task listing in same context module with `:telemetry.span([:jido_tasks, :task, :list], metadata, fn -> ... end)` including `count` in result metadata
 
 **Checkpoint**: All task operations emit telemetry events. Handlers can capture timing and metadata. SC-004 met.
 
@@ -124,14 +124,14 @@
 
 ### Tests for User Story 5
 
-- [ ] T031 [P] [US5] Create `apps/jido_murmur/test/jido_murmur/agent_profile_test.exs` with tests for: a module implementing all callbacks compiles without warnings, behaviour module exports all callback definitions
+- [X] T031 [P] [US5] Create `apps/jido_murmur/test/jido_murmur/agent_profile_test.exs` with tests for: a module implementing all callbacks compiles without warnings, behaviour module exports all callback definitions
 
 ### Implementation for User Story 5
 
-- [ ] T032 [US5] Implement `JidoMurmur.AgentProfile` behaviour in `apps/jido_murmur/lib/jido_murmur/agent_profile.ex` with `@callback` definitions: `name/0`, `description/0`, `system_prompt/0`, `tools/0`, `plugins/0`, `opts/0` per contracts/platform-contracts.md
-- [ ] T033 [P] [US5] Add `@behaviour JidoMurmur.AgentProfile` to `apps/murmur_demo/lib/murmur/agents/profiles/general_agent.ex`
-- [ ] T034 [P] [US5] Add `@behaviour JidoMurmur.AgentProfile` to `apps/murmur_demo/lib/murmur/agents/profiles/arxiv_agent.ex`
-- [ ] T035 [US5] Verify both profile modules compile without missing-callback warnings
+- [X] T032 [US5] Implement `JidoMurmur.AgentProfile` behaviour in `apps/jido_murmur/lib/jido_murmur/agent_profile.ex` with `@callback` definitions: `name/0`, `description/0`, `system_prompt/0`, `tools/0`, `plugins/0`, `opts/0` per contracts/platform-contracts.md
+- [X] T033 [P] [US5] Add `@behaviour JidoMurmur.AgentProfile` to `apps/murmur_demo/lib/murmur/agents/profiles/general_agent.ex`
+- [X] T034 [P] [US5] Add `@behaviour JidoMurmur.AgentProfile` to `apps/murmur_demo/lib/murmur/agents/profiles/arxiv_agent.ex`
+- [X] T035 [US5] Verify both profile modules compile without missing-callback warnings
 
 **Checkpoint**: Behaviour defined. Existing profiles annotated. Compiler validates callbacks. SC-005 met.
 
@@ -141,10 +141,10 @@
 
 **Purpose**: Integration verification and final validation
 
-- [ ] T036 Run full umbrella test suite (`mix test`) from repo root — verify all existing tests pass with zero regressions
-- [ ] T037 Run `mix precommit` from repo root to verify Credo, Dialyxir, and formatting compliance
-- [ ] T038 Verify SC-001: grep for inline PubSub topic strings outside `Topics` module — should find zero
-- [ ] T039 Verify SC-002: confirm all PubSub topics include workspace context
+- [X] T036 Run full umbrella test suite (`mix test`) from repo root — verify all existing tests pass with zero regressions
+- [X] T037 Run `mix precommit` from repo root to verify Credo, Dialyxir, and formatting compliance
+- [X] T038 Verify SC-001: grep for inline PubSub topic strings outside `Topics` module — should find zero
+- [X] T039 Verify SC-002: confirm all PubSub topics include workspace context
 
 ---
 

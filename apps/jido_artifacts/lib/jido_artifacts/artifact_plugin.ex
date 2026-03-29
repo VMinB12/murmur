@@ -7,7 +7,7 @@ defmodule JidoArtifacts.ArtifactPlugin do
   The plugin:
   1. Broadcasts the artifact payload as
      `{:artifact_update, session_id, artifact_name, data, mode}`
-     on the PubSub topic `"jido_artifacts:<session_id>"`.
+     on the workspace-scoped PubSub topic.
   2. Overrides routing to the `StoreArtifact` action which merges the
      artifact data into `agent.state.artifacts`, ensuring it survives
      hibernate/thaw and page refresh.
@@ -27,7 +27,8 @@ defmodule JidoArtifacts.ArtifactPlugin do
   @impl Jido.Plugin
   def handle_signal(%{type: "artifact." <> _name, data: data} = _signal, context) do
     session_id = context.agent.id
-    topic = Artifact.artifact_topic(session_id)
+    workspace_id = get_in(context, [:agent, :state, :workspace_id])
+    topic = Artifact.artifact_topic(workspace_id, session_id)
 
     {artifact_name, artifact_data, mode, merge_result, scope} = extract_signal_data(data)
 

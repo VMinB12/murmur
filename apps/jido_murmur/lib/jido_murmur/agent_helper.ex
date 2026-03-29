@@ -6,9 +6,7 @@ defmodule JidoMurmur.AgentHelper do
   Consumers can always bypass these helpers and call Jido APIs directly.
   """
 
-  alias JidoArtifacts.Artifact
   alias JidoMurmur.Catalog
-  alias JidoMurmur.StreamingPlugin
   alias JidoMurmur.UITurn
 
   require Logger
@@ -87,17 +85,16 @@ defmodule JidoMurmur.AgentHelper do
   @doc "Subscribe to all PubSub topics for a session (workspace agent, streaming, artifacts)."
   def subscribe(session) do
     pubsub = JidoMurmur.pubsub()
-    topic = "workspace:#{session.workspace_id}:agent:#{session.id}"
-    Phoenix.PubSub.subscribe(pubsub, topic)
-    Phoenix.PubSub.subscribe(pubsub, StreamingPlugin.stream_topic(session.id))
-    Phoenix.PubSub.subscribe(pubsub, Artifact.artifact_topic(session.id))
+    Phoenix.PubSub.subscribe(pubsub, JidoMurmur.Topics.agent_messages(session.workspace_id, session.id))
+    Phoenix.PubSub.subscribe(pubsub, JidoMurmur.Topics.agent_stream(session.workspace_id, session.id))
+    Phoenix.PubSub.subscribe(pubsub, JidoMurmur.Topics.agent_artifacts(session.workspace_id, session.id))
     :ok
   end
 
   @doc "Subscribe to workspace-level PubSub topics."
   def subscribe_workspace(workspace_id) do
     pubsub = JidoMurmur.pubsub()
-    Phoenix.PubSub.subscribe(pubsub, "workspace:#{workspace_id}")
+    Phoenix.PubSub.subscribe(pubsub, JidoMurmur.Topics.workspace(workspace_id))
     :ok
   end
 

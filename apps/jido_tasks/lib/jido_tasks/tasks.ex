@@ -7,15 +7,18 @@ defmodule JidoTasks.Tasks do
 
   @doc "Lists tasks for a workspace, optionally filtered by status."
   def list_tasks(workspace_id, opts \\ []) do
-    query = from(t in Task, where: t.workspace_id == ^workspace_id, order_by: [asc: t.inserted_at])
+    :telemetry.span([:jido_tasks, :task, :list], %{workspace_id: workspace_id}, fn ->
+      query = from(t in Task, where: t.workspace_id == ^workspace_id, order_by: [asc: t.inserted_at])
 
-    query =
-      case Keyword.get(opts, :status) do
-        nil -> query
-        status -> where(query, [t], t.status == ^status)
-      end
+      query =
+        case Keyword.get(opts, :status) do
+          nil -> query
+          status -> where(query, [t], t.status == ^status)
+        end
 
-    JidoTasks.repo().all(query)
+      tasks = JidoTasks.repo().all(query)
+      {tasks, %{workspace_id: workspace_id, count: length(tasks)}}
+    end)
   end
 
   @doc "Gets a single task by ID. Raises if not found."
@@ -26,16 +29,37 @@ defmodule JidoTasks.Tasks do
 
   @doc "Creates a task in the given workspace."
   def create_task(workspace_id, attrs, created_by) do
-    %Task{workspace_id: workspace_id, created_by: created_by}
-    |> Task.create_changeset(attrs)
-    |> JidoTasks.repo().insert()
+    :telemetry.span([:jido_tasks, :task, :create], %{workspace_id: workspace_id}, fn ->
+      result =
+        %Task{workspace_id: workspace_id, created_by: created_by}
+        |> Task.create_changeset(attrs)
+        |> JidoTasks.repo().insert()
+
+      case result do
+        {:ok, task} -> {result, %{task_id: task.id, workspace_id: workspace_id}}
+        {:error, _} -> {result, %{workspace_id: workspace_id}}
+      end
+    end)
   end
 
   @doc "Updates an existing task's title, description, or status."
   def update_task(%Task{} = task, attrs) do
-    task
-    |> Task.update_changeset(attrs)
-    |> JidoTasks.repo().update()
+    old_status = task.status
+
+    :telemetry.span([:jido_tasks, :task, :update], %{task_id: task.id}, fn ->
+      result =
+        task
+        |> Task.update_changeset(attrs)
+        |> JidoTasks.repo().update()
+
+      case result do
+        {:ok, updated} ->
+          {result, %{task_id: task.id, old_status: old_status, new_status: updated.status}}
+
+        {:error, _} ->
+          {result, %{task_id: task.id, old_status: old_status}}
+      end
+    end)
   end
 
   @doc "Returns task counts grouped by status for a workspace."
@@ -55,5 +79,5 @@ defmodule JidoTasks.Tasks do
   end
 
   @doc "PubSub topic for task updates in a workspace."
-  def tasks_topic(workspace_id), do: "workspace:#{workspace_id}:tasks"
+  def tasks_topic(workspace_id), do: JidoMurmur.Topics.workspace_tasks(workspace_id)
 end

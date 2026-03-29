@@ -122,9 +122,10 @@ defmodule JidoArtifacts.ArtifactTest do
     end
   end
 
-  describe "artifact_topic/1" do
-    test "returns a scoped PubSub topic" do
-      assert Artifact.artifact_topic("session-123") == "jido_artifacts:session-123"
+  describe "artifact_topic/2" do
+    test "returns workspace-scoped PubSub topic" do
+      assert Artifact.artifact_topic("ws-1", "session-123") ==
+               "workspace:ws-1:agent:session-123:artifacts"
     end
   end
 end

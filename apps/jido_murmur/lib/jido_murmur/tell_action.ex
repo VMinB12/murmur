@@ -54,7 +54,7 @@ defmodule JidoMurmur.TellAction do
     pid = jido_mod.whereis(target_session.id)
 
     if pid do
-      topic = "workspace:#{target_session.workspace_id}:agent:#{target_session.id}"
+      topic = JidoMurmur.Topics.agent_messages(target_session.workspace_id, target_session.id)
 
       inter_msg = %{
         id: ID.generate!(),

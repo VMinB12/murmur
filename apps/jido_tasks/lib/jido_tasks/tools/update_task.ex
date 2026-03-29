@@ -74,7 +74,7 @@ defmodule JidoTasks.Tools.UpdateTask do
   defp broadcast_task_updated(workspace_id, task) do
     Phoenix.PubSub.broadcast(
       JidoTasks.pubsub(),
-      Tasks.tasks_topic(workspace_id),
+      JidoMurmur.Topics.workspace_tasks(workspace_id),
       {:task_updated, task}
     )
   end

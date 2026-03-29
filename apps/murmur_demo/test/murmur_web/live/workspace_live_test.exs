@@ -187,7 +187,7 @@ defmodule MurmurWeb.WorkspaceLiveTest do
       {:ok, view, _html} = live(conn, ~p"/workspaces/#{workspace.id}")
 
       # Send a message so there's conversation history
-      topic = "workspace:#{workspace.id}:agent:#{session.id}"
+      topic = JidoMurmur.Topics.agent_messages(workspace.id, session.id)
 
       Phoenix.PubSub.broadcast!(
         Murmur.PubSub,

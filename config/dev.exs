@@ -4,7 +4,7 @@ import Config
 config :logger, :default_formatter, format: "[$level] $message\n"
 
 # Configure your database
-config :murmur, Murmur.Repo,
+config :murmur_demo, Murmur.Repo,
   username: "postgres",
   password: "postgres",
   hostname: "localhost",
@@ -19,7 +19,7 @@ config :murmur, Murmur.Repo,
 # The watchers configuration can be used to run external
 # watchers to your application. For example, we can use it
 # to bundle .js and .css sources.
-config :murmur, MurmurWeb.Endpoint,
+config :murmur_demo, MurmurWeb.Endpoint,
   # Binding to loopback ipv4 address prevents access from other machines.
   # Change to `ip: {0, 0, 0, 0}` to allow access from other machines.
   http: [ip: {127, 0, 0, 1}],
@@ -28,8 +28,8 @@ config :murmur, MurmurWeb.Endpoint,
   debug_errors: true,
   secret_key_base: "l+3OCGZQIU5ENtFeqNy9ELXfEGs29kzLmpJ/aMm8VGiAILm72bkBuFwVlV6Clk68",
   watchers: [
-    esbuild: {Esbuild, :install_and_run, [:murmur, ~w(--sourcemap=inline --watch)]},
-    tailwind: {Tailwind, :install_and_run, [:murmur, ~w(--watch)]}
+    esbuild: {Esbuild, :install_and_run, [:murmur_demo, ~w(--sourcemap=inline --watch)]},
+    tailwind: {Tailwind, :install_and_run, [:murmur_demo, ~w(--watch)]}
   ]
 
 # ## SSL Support
@@ -56,7 +56,7 @@ config :murmur, MurmurWeb.Endpoint,
 # different ports.
 
 # Reload browser tabs when matching files change.
-config :murmur, MurmurWeb.Endpoint,
+config :murmur_demo, MurmurWeb.Endpoint,
   live_reload: [
     web_console_logger: true,
     patterns: [
@@ -71,10 +71,10 @@ config :murmur, MurmurWeb.Endpoint,
   ]
 
 # Drop log messages longer than 500 chars (Jido state dumps, large Ecto payloads)
-config :murmur, :log_filter, true
+config :murmur_demo, :log_filter, true
 
 # Enable dev routes for dashboard and mailbox
-config :murmur, dev_routes: true
+config :murmur_demo, dev_routes: true
 
 # Initialize plugs at runtime for faster development compilation
 config :phoenix, :plug_init_mode, :runtime

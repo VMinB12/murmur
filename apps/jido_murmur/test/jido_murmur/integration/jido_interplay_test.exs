@@ -10,6 +10,7 @@ defmodule JidoMurmur.Integration.JidoInterplayTest do
   use JidoMurmur.Case, async: false
 
   alias JidoMurmur.AgentHelper
+  alias JidoMurmur.LLM
   alias JidoMurmur.Runner
   alias JidoMurmur.StreamingPlugin
   alias JidoMurmur.Workspaces
@@ -18,7 +19,7 @@ defmodule JidoMurmur.Integration.JidoInterplayTest do
     ensure_ets_tables()
 
     original_profiles = Application.get_env(:jido_murmur, :profiles, [])
-    Application.put_env(:jido_murmur, :llm_adapter, JidoMurmur.LLM.Mock)
+    Application.put_env(:jido_murmur, :llm_adapter, LLM.Mock)
     Application.put_env(:jido_murmur, :skip_hibernate, true)
 
     on_exit(fn ->
@@ -62,7 +63,7 @@ defmodule JidoMurmur.Integration.JidoInterplayTest do
       Phoenix.PubSub.subscribe(pubsub, agent_topic)
 
       # Trigger a message
-      JidoMurmur.LLM.Mock.set_response(%{content: "Plugin interplay response"})
+      LLM.Mock.set_response(%{content: "Plugin interplay response"})
       assert :queued = Runner.send_message(session, "Test plugin interplay")
 
       # The agent should complete (mock LLM responds immediately)
@@ -178,7 +179,7 @@ defmodule JidoMurmur.Integration.JidoInterplayTest do
       agent_topic = "workspace:#{session.workspace_id}:agent:#{session.id}"
       Phoenix.PubSub.subscribe(pubsub, agent_topic)
 
-      JidoMurmur.LLM.Mock.set_response(%{content: "ETS storage response"})
+      LLM.Mock.set_response(%{content: "ETS storage response"})
       assert :queued = Runner.send_message(session, "Test with ETS storage")
 
       assert_receive {:message_completed, _session_id, _response}, 10_000

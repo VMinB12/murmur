@@ -77,18 +77,37 @@ defmodule JidoMurmur.ComposableRequestTransformerTest do
   describe "transform_request/4 with empty chain" do
     test "returns empty overrides when no transformers configured" do
       ctx = %{request_transformers: []}
-      assert {:ok, %{}} = ComposableRequestTransformer.transform_request(base_request(), stub_state(), stub_config(), ctx)
+      assert {:ok, %{}} =
+               ComposableRequestTransformer.transform_request(
+                 base_request(),
+                 stub_state(),
+                 stub_config(),
+                 ctx
+               )
     end
 
     test "returns empty overrides when request_transformers key is missing" do
-      assert {:ok, %{}} = ComposableRequestTransformer.transform_request(base_request(), stub_state(), stub_config(), %{})
+      assert {:ok, %{}} =
+               ComposableRequestTransformer.transform_request(
+                 base_request(),
+                 stub_state(),
+                 stub_config(),
+                 %{}
+               )
     end
   end
 
   describe "transform_request/4 with single transformer" do
     test "passes through a noop transformer" do
       ctx = %{request_transformers: [NoopTransformer]}
-      assert {:ok, %{}} = ComposableRequestTransformer.transform_request(base_request(), stub_state(), stub_config(), ctx)
+
+      assert {:ok, %{}} =
+               ComposableRequestTransformer.transform_request(
+                 base_request(),
+                 stub_state(),
+                 stub_config(),
+                 ctx
+               )
     end
 
     test "applies message override from a single transformer" do

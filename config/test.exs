@@ -31,7 +31,7 @@ config :logger, level: :warning
 # The MIX_TEST_PARTITION environment variable can be used
 # to provide built-in test partitioning in CI environment.
 # Run `mix help test` for more information.
-config :murmur, Murmur.Repo,
+config :murmur_demo, Murmur.Repo,
   username: "postgres",
   password: "postgres",
   hostname: "localhost",
@@ -41,16 +41,16 @@ config :murmur, Murmur.Repo,
 
 # We don't run a server during test. If one is required,
 # you can enable the server option below.
-config :murmur, MurmurWeb.Endpoint,
+config :murmur_demo, MurmurWeb.Endpoint,
   http: [ip: {127, 0, 0, 1}, port: 4002],
   secret_key_base: "vlHcXXv+itjrdV2bB7djTx5qptibFxdal7XJsLZhatmeaCo4mRyEO5ltddLjdMnC",
   server: false
 
 # Use mock LLM adapter in tests (no real API calls)
-config :murmur, :llm_adapter, Murmur.Agents.LLM.Mock
+config :murmur_demo, :llm_adapter, Murmur.Agents.LLM.Mock
 
 # Skip hibernate (checkpoint persistence) in test — sandbox teardown causes noise
-config :murmur, :skip_hibernate, true
+config :murmur_demo, :skip_hibernate, true
 
 # Initialize plugs at runtime for faster test compilation
 config :phoenix, :plug_init_mode, :runtime

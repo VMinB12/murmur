@@ -3,12 +3,14 @@ defmodule Mix.Tasks.JidoMurmurWeb.InstallTest do
 
   import ExUnit.CaptureIO
 
+  alias Mix.Tasks.JidoMurmurWeb.Install
+
   @moduletag :tmp_dir
 
   describe "jido_murmur_web.install" do
     test "copies chat group components", %{tmp_dir: tmp_dir} do
       in_project(tmp_dir, fn ->
-        output = capture_io(fn -> Mix.Tasks.JidoMurmurWeb.Install.run(["chat"]) end)
+        output = capture_io(fn -> Install.run(["chat"]) end)
 
         assert output =~ "chat_message.ex"
         assert output =~ "chat_stream.ex"
@@ -26,7 +28,7 @@ defmodule Mix.Tasks.JidoMurmurWeb.InstallTest do
 
     test "copies workspace group components", %{tmp_dir: tmp_dir} do
       in_project(tmp_dir, fn ->
-        output = capture_io(fn -> Mix.Tasks.JidoMurmurWeb.Install.run(["workspace"]) end)
+        output = capture_io(fn -> Install.run(["workspace"]) end)
 
         assert output =~ "workspace_list.ex"
         assert output =~ "agent_selector.ex"
@@ -36,7 +38,7 @@ defmodule Mix.Tasks.JidoMurmurWeb.InstallTest do
 
     test "copies artifacts group components", %{tmp_dir: tmp_dir} do
       in_project(tmp_dir, fn ->
-        output = capture_io(fn -> Mix.Tasks.JidoMurmurWeb.Install.run(["artifacts"]) end)
+        output = capture_io(fn -> Install.run(["artifacts"]) end)
 
         assert output =~ "artifact_panel.ex"
       end)
@@ -44,7 +46,7 @@ defmodule Mix.Tasks.JidoMurmurWeb.InstallTest do
 
     test "copies all components with 'all' group", %{tmp_dir: tmp_dir} do
       in_project(tmp_dir, fn ->
-        output = capture_io(fn -> Mix.Tasks.JidoMurmurWeb.Install.run(["all"]) end)
+        output = capture_io(fn -> Install.run(["all"]) end)
 
         assert output =~ "chat_message.ex"
         assert output =~ "chat_stream.ex"
@@ -63,7 +65,7 @@ defmodule Mix.Tasks.JidoMurmurWeb.InstallTest do
         File.mkdir_p!(target_dir)
         File.write!(Path.join(target_dir, "chat_message.ex"), "# existing")
 
-        output = capture_io(fn -> Mix.Tasks.JidoMurmurWeb.Install.run(["chat"]) end)
+        output = capture_io(fn -> Install.run(["chat"]) end)
 
         assert output =~ "chat_message.ex already exists, skipping"
         # Should still copy the others
@@ -76,7 +78,7 @@ defmodule Mix.Tasks.JidoMurmurWeb.InstallTest do
 
     test "substitutes module namespace", %{tmp_dir: tmp_dir} do
       in_project(tmp_dir, fn ->
-        capture_io(fn -> Mix.Tasks.JidoMurmurWeb.Install.run(["workspace"]) end)
+        capture_io(fn -> Install.run(["workspace"]) end)
 
         target_dir = Path.join(tmp_dir, "lib/jido_murmur_web_web/components")
         workspace_list = File.read!(Path.join(target_dir, "workspace_list.ex"))

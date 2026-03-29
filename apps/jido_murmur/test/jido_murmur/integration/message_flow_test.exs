@@ -9,6 +9,7 @@ defmodule JidoMurmur.Integration.MessageFlowTest do
   use JidoMurmur.Case, async: false
 
   alias JidoMurmur.AgentHelper
+  alias JidoMurmur.LLM
   alias JidoMurmur.Runner
   alias JidoMurmur.StreamingPlugin
   alias JidoMurmur.Workspaces
@@ -54,7 +55,7 @@ defmodule JidoMurmur.Integration.MessageFlowTest do
     Phoenix.PubSub.subscribe(pubsub, agent_topic)
 
     # Set mock response
-    JidoMurmur.LLM.Mock.set_response(%{content: "Integration test response"})
+    LLM.Mock.set_response(%{content: "Integration test response"})
 
     # Send a message through Runner
     assert :queued = Runner.send_message(session, "Hello from integration test")

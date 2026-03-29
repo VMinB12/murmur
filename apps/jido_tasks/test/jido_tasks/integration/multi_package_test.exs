@@ -6,12 +6,12 @@ defmodule JidoTasks.Integration.MultiPackageTest do
   """
   use JidoTasks.Case, async: true
 
+  alias JidoArxiv.Tools.ArxivSearch
+  alias JidoArxiv.Tools.DisplayPaper
   alias JidoTasks.Tasks
   alias JidoTasks.Tools.AddTask
   alias JidoTasks.Tools.ListTasks
   alias JidoTasks.Tools.UpdateTask
-  alias JidoArxiv.Tools.ArxivSearch
-  alias JidoArxiv.Tools.DisplayPaper
 
   setup do
     {:ok, workspace} =

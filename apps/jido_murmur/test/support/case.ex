@@ -15,16 +15,19 @@ defmodule JidoMurmur.Case do
   using do
     quote do
       import Ecto.Query
-      alias JidoMurmur.Workspaces.Workspace
-      alias JidoMurmur.Workspaces.AgentSession
+      alias Ecto.Adapters.SQL.Sandbox
       alias JidoMurmur.Storage.Checkpoint
       alias JidoMurmur.Storage.ThreadEntry
+      alias JidoMurmur.Workspaces.AgentSession
+      alias JidoMurmur.Workspaces.Workspace
     end
   end
 
+  alias Ecto.Adapters.SQL.Sandbox
+
   setup tags do
-    pid = Ecto.Adapters.SQL.Sandbox.start_owner!(JidoMurmur.repo(), shared: !tags[:async])
-    on_exit(fn -> Ecto.Adapters.SQL.Sandbox.stop_owner(pid) end)
+    pid = Sandbox.start_owner!(JidoMurmur.repo(), shared: !tags[:async])
+    on_exit(fn -> Sandbox.stop_owner(pid) end)
     :ok
   end
 end

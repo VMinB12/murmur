@@ -13,7 +13,7 @@ defmodule JidoMurmur.CatalogTest do
   describe "list_profiles/0" do
     test "returns profiles from config" do
       profiles = Catalog.list_profiles()
-      assert length(profiles) >= 1
+      assert [_ | _] = profiles
       assert Enum.any?(profiles, &(&1.id == "test_agent"))
     end
 

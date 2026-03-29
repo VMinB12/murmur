@@ -215,21 +215,21 @@
 
 ### Implementation for User Story 6
 
-- [ ] T083 [US6] Move Murmur.Application to apps/murmur_demo/lib/murmur/application.ex and add JidoMurmur.Supervisor to children
-- [ ] T084 [P] [US6] Move Murmur.Repo to apps/murmur_demo/lib/murmur/repo.ex
-- [ ] T085 [P] [US6] Move Murmur.Jido to apps/murmur_demo/lib/murmur/jido.ex with JidoMurmur.Storage.Ecto config
-- [ ] T086 [P] [US6] Move agent profiles (GeneralAgent, ArxivAgent) to apps/murmur_demo/lib/murmur/agents/profiles/
-- [ ] T087 [US6] Move MurmurWeb module and helpers to apps/murmur_demo/lib/murmur_web.ex
-- [ ] T088 [P] [US6] Move web infrastructure (endpoint, router, telemetry) to apps/murmur_demo/lib/murmur_web/
-- [ ] T089 [US6] Move LiveViews (WorkspaceLive, WorkspaceListLive) to apps/murmur_demo/lib/murmur_web/live/ and update references from Murmur.Agents.* to JidoMurmur.*
-- [ ] T090 [US6] Move web components (core_components.ex, layouts.ex, artifacts.ex) to apps/murmur_demo/lib/murmur_web/components/
-- [ ] T091 [US6] Move assets (JS, CSS, vendor) to apps/murmur_demo/assets/
-- [ ] T092 [US6] Move priv/ (static files, gettext, existing migrations) to apps/murmur_demo/priv/
-- [ ] T093 [US6] Update murmur_demo config to reference JidoMurmur, JidoTasks, JidoArxiv packages
-- [ ] T094 [US6] Update all module references throughout demo app (Murmur.Agents.Runner → JidoMurmur.Runner, Murmur.Agents.Catalog → JidoMurmur.Catalog, Murmur.Storage.* → JidoMurmur.Storage.*, Murmur.Tasks.* → JidoTasks.*, etc.)
-- [ ] T095 [US6] Migrate existing tests to apps/murmur_demo/test/ with updated module references
-- [ ] T096 [US6] Remove old top-level lib/ and test/ directories after migration is verified
-- [ ] T097 [US6] Run full test suite from umbrella root and verify all existing tests pass
+- [X] T083 [US6] Move Murmur.Application to apps/murmur_demo/lib/murmur/application.ex and add JidoMurmur.Supervisor to children
+- [X] T084 [P] [US6] Move Murmur.Repo to apps/murmur_demo/lib/murmur/repo.ex
+- [X] T085 [P] [US6] Move Murmur.Jido to apps/murmur_demo/lib/murmur/jido.ex with JidoMurmur.Storage.Ecto config
+- [X] T086 [P] [US6] Move agent profiles (GeneralAgent, ArxivAgent) to apps/murmur_demo/lib/murmur/agents/profiles/
+- [X] T087 [US6] Move MurmurWeb module and helpers to apps/murmur_demo/lib/murmur_web.ex
+- [X] T088 [P] [US6] Move web infrastructure (endpoint, router, telemetry) to apps/murmur_demo/lib/murmur_web/
+- [X] T089 [US6] Move LiveViews (WorkspaceLive, WorkspaceListLive) to apps/murmur_demo/lib/murmur_web/live/ and update references from Murmur.Agents.* to JidoMurmur.*
+- [X] T090 [US6] Move web components (core_components.ex, layouts.ex, artifacts.ex) to apps/murmur_demo/lib/murmur_web/components/
+- [X] T091 [US6] Move assets (JS, CSS, vendor) to apps/murmur_demo/assets/
+- [X] T092 [US6] Move priv/ (static files, gettext, existing migrations) to apps/murmur_demo/priv/
+- [X] T093 [US6] Update murmur_demo config to reference JidoMurmur, JidoTasks, JidoArxiv packages
+- [X] T094 [US6] Update all module references throughout demo app (Murmur.Agents.Runner → JidoMurmur.Runner, Murmur.Agents.Catalog → JidoMurmur.Catalog, Murmur.Storage.* → JidoMurmur.Storage.*, Murmur.Tasks.* → JidoTasks.*, etc.)
+- [X] T095 [US6] Migrate existing tests to apps/murmur_demo/test/ with updated module references
+- [X] T096 [US6] Remove old top-level lib/ and test/ directories after migration is verified
+- [X] T097 [US6] Run full test suite from umbrella root and verify all existing tests pass
 
 **Checkpoint**: Demo app runs identically to pre-extraction Murmur — all features and tests operational
 

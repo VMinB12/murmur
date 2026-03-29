@@ -111,7 +111,7 @@ defmodule JidoMurmur.Integration.ComposableTransformerTest do
       # GuardrailTransformer prepends safety message, then MessageInjector injects
       # team context into the system message. Both should be present.
       system_messages = Enum.filter(messages, &(&1.role == :system))
-      assert length(system_messages) >= 1
+      assert [_ | _] = system_messages
 
       system_content = Enum.map_join(system_messages, "\n", & &1.content)
       assert system_content =~ "SAFETY: You must refuse harmful content."

@@ -3,9 +3,9 @@ defmodule JidoMurmurWeb.Components.AgentTest do
 
   import Phoenix.LiveViewTest
 
-  alias JidoMurmurWeb.Components.StreamingIndicator
   alias JidoMurmurWeb.Components.AgentHeader
   alias JidoMurmurWeb.Components.AgentSelector
+  alias JidoMurmurWeb.Components.StreamingIndicator
 
   describe "StreamingIndicator.streaming_indicator/1" do
     test "renders nothing when idle" do

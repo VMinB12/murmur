@@ -10,7 +10,7 @@ import Config
 # Configure esbuild (the version is required)
 config :esbuild,
   version: "0.25.4",
-  murmur: [
+  murmur_demo: [
     args:
       ~w(js/app.js --bundle --target=es2022 --outdir=../priv/static/assets/js --external:/fonts/* --external:/images/* --alias:@=.),
     cd: Path.expand("../apps/murmur_demo/assets", __DIR__),
@@ -30,19 +30,27 @@ config :jido_murmur,
   repo: Murmur.Repo,
   pubsub: Murmur.PubSub,
   jido_mod: Murmur.Jido,
-  otp_app: :murmur,
-  profiles: [],
+  otp_app: :murmur_demo,
+  profiles: [
+    Murmur.Agents.Profiles.GeneralAgent,
+    Murmur.Agents.Profiles.ArxivAgent
+  ],
   authorize: nil,
   artifact_renderers: %{}
+
+# Configure jido_tasks package to use the demo app's modules
+config :jido_tasks,
+  repo: Murmur.Repo,
+  pubsub: Murmur.PubSub
 
 # Configure Elixir's Logger
 config :logger, :default_formatter,
   format: "$time $metadata[$level] $message\n",
   metadata: [:request_id]
 
-config :murmur, Murmur.Jido, max_tasks: 1000, agent_pools: []
+config :murmur_demo, Murmur.Jido, max_tasks: 1000, agent_pools: []
 
-config :murmur, MurmurWeb.Endpoint,
+config :murmur_demo, MurmurWeb.Endpoint,
   url: [host: "localhost"],
   adapter: Bandit.PhoenixAdapter,
   render_errors: [
@@ -52,13 +60,9 @@ config :murmur, MurmurWeb.Endpoint,
   pubsub_server: Murmur.PubSub,
   live_view: [signing_salt: "78A9aJAw"]
 
-config :murmur,
+config :murmur_demo,
   ecto_repos: [Murmur.Repo],
   generators: [timestamp_type: :utc_datetime]
-
-# Configure murmur_demo ecto_repos (for umbrella migration commands)
-config :murmur_demo,
-  ecto_repos: [Murmur.Repo]
 
 # Use Jason for JSON parsing in Phoenix
 config :phoenix, :json_library, Jason
@@ -67,7 +71,7 @@ config :phoenix, :json_library, Jason
 config :tailwind,
   version: "4.1.12",
   # Use git_hook
-  murmur: [
+  murmur_demo: [
     args: ~w(
       --input=apps/murmur_demo/assets/css/app.css
       --output=apps/murmur_demo/priv/static/assets/css/app.css

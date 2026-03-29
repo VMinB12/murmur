@@ -45,7 +45,7 @@ defmodule JidoTasks.Tools.ToolTest do
       params = %{title: "Notify test", assignee: "human"}
       assert {:ok, _} = AddTask.run(params, context)
 
-      assert_receive {:task_created, task}
+      assert_receive %Jido.Signal{type: "task.created", data: %{task: task}}
       assert task.title == "Notify test"
     end
 
@@ -106,7 +106,7 @@ defmodule JidoTasks.Tools.ToolTest do
       params = %{task_id: task.id, status: "done"}
       assert {:ok, _} = UpdateTask.run(params, context)
 
-      assert_receive {:task_updated, updated}
+      assert_receive %Jido.Signal{type: "task.updated", data: %{task: updated}}
       assert updated.status == :done
     end
 

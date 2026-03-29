@@ -14,11 +14,11 @@ defmodule JidoMurmur.StreamingPluginTest do
       topic = StreamingPlugin.stream_topic(workspace_id, session_id)
       Phoenix.PubSub.subscribe(JidoMurmur.pubsub(), topic)
 
-      signal = %{type: "ai.llm.delta", data: %{content: "Hello"}}
+      signal = Jido.Signal.new!("ai.llm.delta", %{content: "Hello"}, source: "/test")
 
       assert {:ok, :continue} = StreamingPlugin.handle_signal(signal, build_context(session_id, workspace_id))
 
-      assert_receive {:agent_signal, ^session_id, ^signal}
+      assert_receive %Jido.Signal{type: "ai.llm.delta", subject: "/agents/" <> _}
     end
 
     test "handles ai.llm.response signal" do
@@ -27,11 +27,11 @@ defmodule JidoMurmur.StreamingPluginTest do
       topic = StreamingPlugin.stream_topic(workspace_id, session_id)
       Phoenix.PubSub.subscribe(JidoMurmur.pubsub(), topic)
 
-      signal = %{type: "ai.llm.response", data: %{content: "Full response"}}
+      signal = Jido.Signal.new!("ai.llm.response", %{content: "Full response"}, source: "/test")
 
       assert {:ok, :continue} = StreamingPlugin.handle_signal(signal, build_context(session_id, workspace_id))
 
-      assert_receive {:agent_signal, ^session_id, ^signal}
+      assert_receive %Jido.Signal{type: "ai.llm.response", subject: "/agents/" <> _}
     end
 
     test "handles ai.tool.result signal" do
@@ -40,11 +40,11 @@ defmodule JidoMurmur.StreamingPluginTest do
       topic = StreamingPlugin.stream_topic(workspace_id, session_id)
       Phoenix.PubSub.subscribe(JidoMurmur.pubsub(), topic)
 
-      signal = %{type: "ai.tool.result", data: %{tool: "search", result: "found"}}
+      signal = Jido.Signal.new!("ai.tool.result", %{tool: "search", result: "found"}, source: "/test")
 
       assert {:ok, :continue} = StreamingPlugin.handle_signal(signal, build_context(session_id, workspace_id))
 
-      assert_receive {:agent_signal, ^session_id, ^signal}
+      assert_receive %Jido.Signal{type: "ai.tool.result", subject: "/agents/" <> _}
     end
 
     test "handles ai.request.started signal" do
@@ -53,11 +53,11 @@ defmodule JidoMurmur.StreamingPluginTest do
       topic = StreamingPlugin.stream_topic(workspace_id, session_id)
       Phoenix.PubSub.subscribe(JidoMurmur.pubsub(), topic)
 
-      signal = %{type: "ai.request.started", data: %{}}
+      signal = Jido.Signal.new!("ai.request.started", %{}, source: "/test")
 
       assert {:ok, :continue} = StreamingPlugin.handle_signal(signal, build_context(session_id, workspace_id))
 
-      assert_receive {:agent_signal, ^session_id, ^signal}
+      assert_receive %Jido.Signal{type: "ai.request.started", subject: "/agents/" <> _}
     end
 
     test "handles ai.request.failed signal" do
@@ -66,11 +66,24 @@ defmodule JidoMurmur.StreamingPluginTest do
       topic = StreamingPlugin.stream_topic(workspace_id, session_id)
       Phoenix.PubSub.subscribe(JidoMurmur.pubsub(), topic)
 
-      signal = %{type: "ai.request.failed", data: %{error: "timeout"}}
+      signal = Jido.Signal.new!("ai.request.failed", %{error: "timeout"}, source: "/test")
 
       assert {:ok, :continue} = StreamingPlugin.handle_signal(signal, build_context(session_id, workspace_id))
 
-      assert_receive {:agent_signal, ^session_id, ^signal}
+      assert_receive %Jido.Signal{type: "ai.request.failed", subject: "/agents/" <> _}
+    end
+
+    test "preserves existing subject if already set" do
+      workspace_id = Ecto.UUID.generate()
+      session_id = Ecto.UUID.generate()
+      topic = StreamingPlugin.stream_topic(workspace_id, session_id)
+      Phoenix.PubSub.subscribe(JidoMurmur.pubsub(), topic)
+
+      signal = Jido.Signal.new!("ai.llm.delta", %{content: "Hello"}, source: "/test", subject: "/custom/subject")
+
+      assert {:ok, :continue} = StreamingPlugin.handle_signal(signal, build_context(session_id, workspace_id))
+
+      assert_receive %Jido.Signal{type: "ai.llm.delta", subject: "/custom/subject"}
     end
   end
 

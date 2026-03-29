@@ -3,9 +3,10 @@ defmodule JidoMurmur.StreamingPlugin do
   Jido Plugin that intercepts lifecycle signals emitted by the ReAct
   strategy and forwards them to the LiveView via PubSub.
 
-  All matched signals are broadcast as `{:agent_signal, session_id, signal}`
-  on a session-scoped PubSub topic. The LiveView pattern-matches on the
-  signal type to decide what to render.
+  Each matched signal is broadcast directly as a `%Jido.Signal{}` struct
+  on a session-scoped PubSub topic. The `subject` field is populated with
+  the agent's session path. The LiveView pattern-matches on the signal
+  type to decide what to render.
   """
 
   use Jido.Plugin,
@@ -34,7 +35,15 @@ defmodule JidoMurmur.StreamingPlugin do
       %{session_id: session_id, signal_type: signal.type}
     )
 
-    Phoenix.PubSub.broadcast(JidoMurmur.pubsub(), topic, {:agent_signal, session_id, signal})
+    # Set subject on the signal if not already set, then broadcast directly
+    signal =
+      if signal.subject do
+        signal
+      else
+        %{signal | subject: "/agents/#{session_id}"}
+      end
+
+    Phoenix.PubSub.broadcast(JidoMurmur.pubsub(), topic, signal)
     {:ok, :continue}
   end
 

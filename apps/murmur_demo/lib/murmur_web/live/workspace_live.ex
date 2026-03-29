@@ -2,12 +2,14 @@ defmodule MurmurWeb.WorkspaceLive do
   @moduledoc false
   use MurmurWeb, :live_view
 
-  alias Jido.Signal.ID
   alias JidoMurmur.Catalog
   alias JidoMurmur.Runner
+  alias JidoMurmur.Signals.MessageReceived
   alias JidoMurmur.Topics
   alias JidoMurmur.UITurn
   alias JidoMurmur.Workspaces
+  alias JidoTasks.Signals.TaskCreated
+  alias JidoTasks.Signals.TaskUpdated
   alias JidoTasks.Tasks
 
   require Logger
@@ -83,7 +85,7 @@ defmodule MurmurWeb.WorkspaceLive do
 
       # Add user message to local display immediately
       user_msg = %{
-        id: ID.generate!(),
+        id: Uniq.UUID.uuid7(),
         role: "user",
         content: content,
         sender_name: "You"
@@ -196,10 +198,16 @@ defmodule MurmurWeb.WorkspaceLive do
 
     case Tasks.create_task(workspace_id, attrs, "human") do
       {:ok, task} ->
+        signal =
+          TaskCreated.new!(
+            %{task: task},
+            subject: TaskCreated.subject(workspace_id, task.id)
+          )
+
         Phoenix.PubSub.broadcast(
           Murmur.PubSub,
           Topics.workspace_tasks(workspace_id),
-          {:task_created, task}
+          signal
         )
 
         notify_task_assignee(workspace_id, task, "You (human)")
@@ -218,10 +226,16 @@ defmodule MurmurWeb.WorkspaceLive do
 
     case Tasks.update_task(task, %{status: status_atom}) do
       {:ok, updated} ->
+        signal =
+          TaskUpdated.new!(
+            %{task: updated},
+            subject: TaskUpdated.subject(socket.assigns.workspace.id, updated.id)
+          )
+
         Phoenix.PubSub.broadcast(
           Murmur.PubSub,
           Topics.workspace_tasks(socket.assigns.workspace.id),
-          {:task_updated, updated}
+          signal
         )
 
         {:noreply, socket}
@@ -275,7 +289,10 @@ defmodule MurmurWeb.WorkspaceLive do
   # --- PubSub Handlers ---
 
   @impl true
-  def handle_info({:message_completed, session_id, response}, socket) do
+  def handle_info(%Jido.Signal{type: "murmur.message.completed", data: data}, socket) do
+    session_id = data.session_id
+    response = data.response
+
     # Try to reload full history from agent thread to capture thinking/tool calls.
     # Falls back to appending the response text if thread hasn't been populated
     # (e.g. when using a mock LLM adapter in tests).
@@ -315,9 +332,11 @@ defmodule MurmurWeb.WorkspaceLive do
   end
 
   @impl true
-  def handle_info({:request_failed, session_id, reason}, socket) do
+  def handle_info(%Jido.Signal{type: "murmur.request.failed", data: data}, socket) do
+    session_id = data.session_id
+    reason = data.reason
     error_msg = %{
-      id: ID.generate!(),
+      id: Uniq.UUID.uuid7(),
       role: "assistant",
       content: "⚠️ Error: #{inspect(reason)}",
       sender_name: nil
@@ -334,7 +353,10 @@ defmodule MurmurWeb.WorkspaceLive do
   end
 
   @impl true
-  def handle_info({:new_message, session_id, message}, socket) do
+  def handle_info(%Jido.Signal{type: "murmur.message.received", data: data}, socket) do
+    session_id = data.session_id
+    message = data.message
+
     socket =
       update(socket, :messages, fn msgs ->
         Map.update(msgs, session_id, [message], &(&1 ++ [message]))
@@ -358,7 +380,9 @@ defmodule MurmurWeb.WorkspaceLive do
   end
 
   @impl true
-  def handle_info({:agent_signal, session_id, %{type: "ai.llm.delta", data: data}}, socket) do
+  def handle_info(%Jido.Signal{type: "ai.llm.delta", data: data} = signal, socket) do
+    session_id = extract_session_id(signal)
+
     case data do
       %{delta: delta, chunk_type: :content} when is_binary(delta) and delta != "" ->
         {:noreply, update_streaming(socket, session_id, :content, delta)}
@@ -372,7 +396,8 @@ defmodule MurmurWeb.WorkspaceLive do
   end
 
   @impl true
-  def handle_info({:agent_signal, session_id, %{type: "ai.tool.result", data: data}}, socket) do
+  def handle_info(%Jido.Signal{type: "ai.tool.result", data: data} = signal, socket) do
+    session_id = extract_session_id(signal)
     tool_call = %{
       name: data[:tool_name] || data["tool_name"] || "tool",
       result: format_tool_result(data[:result] || data["result"]),
@@ -390,7 +415,8 @@ defmodule MurmurWeb.WorkspaceLive do
   end
 
   @impl true
-  def handle_info({:agent_signal, session_id, %{type: "ai.usage", data: data}}, socket) do
+  def handle_info(%Jido.Signal{type: "ai.usage", data: data} = signal, socket) do
+    session_id = extract_session_id(signal)
     usage = %{
       input_tokens: data[:input_tokens] || data["input_tokens"] || 0,
       output_tokens: data[:output_tokens] || data["output_tokens"] || 0,
@@ -411,12 +437,17 @@ defmodule MurmurWeb.WorkspaceLive do
   end
 
   @impl true
-  def handle_info({:agent_signal, _session_id, _signal}, socket) do
+  def handle_info(%Jido.Signal{type: "ai." <> _}, socket) do
     {:noreply, socket}
   end
 
   @impl true
-  def handle_info({:artifact_update, session_id, name, data, mode}, socket) do
+  def handle_info(%Jido.Signal{type: "artifact." <> _name, data: data} = signal, socket) do
+    session_id = extract_session_id(signal)
+    artifact_name = data[:name] || data["name"]
+    artifact_data = data[:data] || data["data"]
+    mode = data[:mode] || data["mode"] || :replace
+
     socket =
       update(socket, :artifacts, fn artifacts ->
         session_artifacts = Map.get(artifacts, session_id, %{})
@@ -424,11 +455,11 @@ defmodule MurmurWeb.WorkspaceLive do
         updated =
           case mode do
             :append ->
-              existing = Map.get(session_artifacts, name, [])
-              Map.put(session_artifacts, name, existing ++ List.wrap(data))
+              existing = Map.get(session_artifacts, artifact_name, [])
+              Map.put(session_artifacts, artifact_name, existing ++ List.wrap(artifact_data))
 
             _replace ->
-              Map.put(session_artifacts, name, data)
+              Map.put(session_artifacts, artifact_name, artifact_data)
           end
 
         Map.put(artifacts, session_id, updated)
@@ -436,7 +467,7 @@ defmodule MurmurWeb.WorkspaceLive do
 
     socket =
       if is_nil(socket.assigns.active_artifact) do
-        assign(socket, :active_artifact, %{session_id: session_id, name: name})
+        assign(socket, :active_artifact, %{session_id: session_id, name: artifact_name})
       else
         socket
       end
@@ -445,12 +476,12 @@ defmodule MurmurWeb.WorkspaceLive do
   end
 
   @impl true
-  def handle_info({:task_created, task}, socket) do
+  def handle_info(%Jido.Signal{type: "task.created", data: %{task: task}}, socket) do
     {:noreply, update(socket, :tasks, &(&1 ++ [task]))}
   end
 
   @impl true
-  def handle_info({:task_updated, task}, socket) do
+  def handle_info(%Jido.Signal{type: "task.updated", data: %{task: task}}, socket) do
     {:noreply,
      update(socket, :tasks, fn tasks ->
        Enum.map(tasks, fn t -> if t.id == task.id, do: task, else: t end)
@@ -487,13 +518,19 @@ defmodule MurmurWeb.WorkspaceLive do
         topic = Topics.agent_messages(workspace_id, target_session.id)
 
         inter_msg = %{
-          id: ID.generate!(),
+          id: Uniq.UUID.uuid7(),
           role: "user",
           content: message,
           sender_name: sender_name
         }
 
-        Phoenix.PubSub.broadcast(Murmur.PubSub, topic, {:new_message, target_session.id, inter_msg})
+        signal =
+          MessageReceived.new!(
+            %{session_id: target_session.id, message: inter_msg},
+            subject: MessageReceived.subject(workspace_id, target_session.id)
+          )
+
+        Phoenix.PubSub.broadcast(Murmur.PubSub, topic, signal)
         Runner.send_message(target_session, message)
     end
   end
@@ -674,6 +711,17 @@ defmodule MurmurWeb.WorkspaceLive do
 
   # --- Helpers ---
 
+  defp extract_session_id(%Jido.Signal{subject: "/agents/" <> session_id}), do: session_id
+
+  defp extract_session_id(%Jido.Signal{subject: subject}) when is_binary(subject) do
+    case Regex.run(~r{/agents/([^/]+)$}, subject) do
+      [_, session_id] -> session_id
+      _ -> nil
+    end
+  end
+
+  defp extract_session_id(_), do: nil
+
   defp find_session(socket, session_id) do
     Enum.find(socket.assigns.agent_sessions, &(&1.id == session_id))
   end
@@ -687,7 +735,7 @@ defmodule MurmurWeb.WorkspaceLive do
     topic = Topics.agent_messages(workspace_id, target_session.id)
 
     user_msg = %{
-      id: ID.generate!(),
+      id: Uniq.UUID.uuid7(),
       role: "user",
       content: content,
       sender_name: "You"
@@ -745,7 +793,7 @@ defmodule MurmurWeb.WorkspaceLive do
     content = extract_response_content(response)
 
     assistant_msg = %{
-      id: ID.generate!(),
+      id: Uniq.UUID.uuid7(),
       role: "assistant",
       content: content,
       sender_name: nil

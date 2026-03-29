@@ -82,7 +82,7 @@ defmodule Murmur.Agents.Tools.AddTaskTest do
 
       {:ok, _} = AddTask.run(params, context)
 
-      assert_receive {:task_created, task}
+      assert_receive %Jido.Signal{type: "task.created", data: %{task: task}}
       assert task.title == "Broadcast me"
     end
 
@@ -95,7 +95,7 @@ defmodule Murmur.Agents.Tools.AddTaskTest do
 
       {:ok, _} = AddTask.run(params, context)
 
-      assert_receive {:new_message, _session_id, msg}
+      assert_receive %Jido.Signal{type: "murmur.message.received", data: %{message: msg}}
       assert msg.content =~ "task"
       assert msg.content =~ "For Bob"
     end
@@ -109,7 +109,7 @@ defmodule Murmur.Agents.Tools.AddTaskTest do
 
       {:ok, _} = AddTask.run(params, context)
 
-      refute_receive {:new_message, _, _}, 100
+      refute_receive %Jido.Signal{type: "murmur.message.received"}, 100
     end
 
     test "does not notify when assigning to human", %{workspace: workspace} do

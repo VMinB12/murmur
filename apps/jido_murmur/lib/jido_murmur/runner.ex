@@ -14,6 +14,7 @@ defmodule JidoMurmur.Runner do
 
   alias JidoMurmur.Catalog
   alias JidoMurmur.PendingQueue
+  alias JidoMurmur.Signals.MessageCompleted
 
   require Logger
 
@@ -119,7 +120,7 @@ defmodule JidoMurmur.Runner do
           %{session_id: session.id, reason: reason}
         )
 
-        broadcast(topic, {:request_failed, session.id, reason})
+        broadcast(topic, request_failed_signal(session, reason))
     end
   catch
     :agent_gone -> :ok
@@ -135,7 +136,14 @@ defmodule JidoMurmur.Runner do
         )
 
         hibernate_agent(session.id)
-        broadcast(topic, {:message_completed, session.id, response})
+
+        signal =
+          MessageCompleted.new!(
+            %{session_id: session.id, response: response},
+            subject: MessageCompleted.subject(session.workspace_id, session.id)
+          )
+
+        broadcast(topic, signal)
 
       {:error, reason} ->
         :telemetry.execute(
@@ -144,7 +152,7 @@ defmodule JidoMurmur.Runner do
           %{session_id: session.id, reason: reason}
         )
 
-        broadcast(topic, {:request_failed, session.id, reason})
+        broadcast(topic, request_failed_signal(session, reason))
     end
   end
 
@@ -192,5 +200,14 @@ defmodule JidoMurmur.Runner do
 
   defp broadcast(topic, message) do
     Phoenix.PubSub.broadcast(JidoMurmur.pubsub(), topic, message)
+  end
+
+  defp request_failed_signal(session, reason) do
+    Jido.Signal.new!(
+      "murmur.request.failed",
+      %{session_id: session.id, reason: reason},
+      source: "/jido_murmur/runner",
+      subject: "/workspaces/#{session.workspace_id}/agents/#{session.id}"
+    )
   end
 end

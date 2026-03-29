@@ -15,8 +15,8 @@ defmodule JidoMurmur.TellAction do
       message: [type: :string, required: true, doc: "The message to send to the target agent"]
     ]
 
-  alias Jido.Signal.ID
   alias JidoMurmur.Runner
+  alias JidoMurmur.Signals.MessageReceived
   alias JidoMurmur.Workspaces
 
   @max_hops 5
@@ -57,13 +57,19 @@ defmodule JidoMurmur.TellAction do
       topic = JidoMurmur.Topics.agent_messages(target_session.workspace_id, target_session.id)
 
       inter_msg = %{
-        id: ID.generate!(),
+        id: Uniq.UUID.uuid7(),
         role: "user",
         content: message,
         sender_name: String.replace(message, ~r/^\[([^\]]+)\]:.*/, "\\1")
       }
 
-      Phoenix.PubSub.broadcast(JidoMurmur.pubsub(), topic, {:new_message, target_session.id, inter_msg})
+      signal =
+        MessageReceived.new!(
+          %{session_id: target_session.id, message: inter_msg},
+          subject: MessageReceived.subject(target_session.workspace_id, target_session.id)
+        )
+
+      Phoenix.PubSub.broadcast(JidoMurmur.pubsub(), topic, signal)
 
       Runner.send_message(target_session, message)
       :ok

@@ -69,7 +69,7 @@ defmodule JidoTasks.Tools.AddTaskTest do
       params = %{title: "Broadcast test", assignee: "human"}
       {:ok, _result} = AddTask.run(params, context)
 
-      assert_receive {:task_created, task}
+      assert_receive %Jido.Signal{type: "task.created", data: %{task: task}}
       assert task.title == "Broadcast test"
     end
   end

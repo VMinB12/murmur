@@ -65,7 +65,7 @@ defmodule Murmur.Agents.TellActionTest do
 
       # Wait for the background Runner Task to finish
       bob_id = bob.id
-      assert_receive {:message_completed, ^bob_id, _}, 5000
+      assert_receive %Jido.Signal{type: "murmur.message.completed", data: %{session_id: ^bob_id}}, 5000
     end
 
     # FR-010: Messages prefixed with sender name
@@ -79,11 +79,11 @@ defmodule Murmur.Agents.TellActionTest do
       TellAction.run(params, context)
 
       bob_id = bob.id
-      assert_receive {:new_message, ^bob_id, msg}, 5000
+      assert_receive %Jido.Signal{type: "murmur.message.received", data: %{session_id: ^bob_id, message: msg}}, 5000
       assert msg.content =~ "[Alice]: Can you help?"
 
       # Wait for the background Runner Task to finish
-      assert_receive {:message_completed, ^bob_id, _}, 5000
+      assert_receive %Jido.Signal{type: "murmur.message.completed", data: %{session_id: ^bob_id}}, 5000
     end
 
     # FR-011: Tell triggers Runner which processes via LLM mock
@@ -97,7 +97,7 @@ defmodule Murmur.Agents.TellActionTest do
       {:ok, _} = TellAction.run(params, context)
 
       bob_id = bob.id
-      assert_receive {:message_completed, ^bob_id, "Mock tell response"}, 5000
+      assert_receive %Jido.Signal{type: "murmur.message.completed", data: %{session_id: ^bob_id, response: "Mock tell response"}}, 5000
     end
   end
 
@@ -147,7 +147,7 @@ defmodule Murmur.Agents.TellActionTest do
 
       # Wait for the background Runner Task to finish
       bob_id = bob.id
-      assert_receive {:message_completed, ^bob_id, _}, 5000
+      assert_receive %Jido.Signal{type: "murmur.message.completed", data: %{session_id: ^bob_id}}, 5000
     end
   end
 

@@ -93,7 +93,7 @@ defmodule MurmurWeb.WorkspaceLiveIntegrationTest do
 
       # Wait for mock completion to flow through Runner → PubSub
       session_id = session.id
-      assert_receive {:message_completed, ^session_id, _}, 5000
+      assert_receive %Jido.Signal{type: "murmur.message.completed", data: %{session_id: ^session_id}}, 5000
 
       # Re-render to pick up the message the LiveView received
       html = render(view)
@@ -122,7 +122,7 @@ defmodule MurmurWeb.WorkspaceLiveIntegrationTest do
       |> render_submit()
 
       session_id = session.id
-      assert_receive {:message_completed, ^session_id, _}, 5000
+      assert_receive %Jido.Signal{type: "murmur.message.completed", data: %{session_id: ^session_id}}, 5000
 
       # Remount (simulates page refresh)
       {:ok, view2, _html2} = live(conn, ~p"/workspaces/#{workspace.id}")

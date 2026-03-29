@@ -13,6 +13,8 @@ defmodule MurmurWeb.WorkspaceLiveTaskBoardTest do
   import Phoenix.LiveViewTest
 
   alias JidoMurmur.Workspaces
+  alias JidoTasks.Signals.TaskCreated
+  alias JidoTasks.Signals.TaskUpdated
   alias JidoTasks.Tasks
   alias Murmur.LLM.MockBehaviour, as: Mock
 
@@ -121,7 +123,13 @@ defmodule MurmurWeb.WorkspaceLiveTaskBoardTest do
       {:ok, task} =
         Tasks.create_task(workspace.id, %{title: "Agent task", assignee: "Alice"}, "Bob")
 
-      send(view.pid, {:task_created, task})
+      send(
+        view.pid,
+        TaskCreated.new!(
+          %{task: task},
+          subject: TaskCreated.subject(workspace.id, task.id)
+        )
+      )
 
       # Task should appear
       assert render(view) =~ "Agent task"
@@ -136,7 +144,14 @@ defmodule MurmurWeb.WorkspaceLiveTaskBoardTest do
 
       # Simulate a status update
       {:ok, updated} = Tasks.update_task(task, %{status: :done})
-      send(view.pid, {:task_updated, updated})
+
+      send(
+        view.pid,
+        TaskUpdated.new!(
+          %{task: updated},
+          subject: TaskUpdated.subject(workspace.id, updated.id)
+        )
+      )
 
       # The updated status should be reflected
       html = render(view)

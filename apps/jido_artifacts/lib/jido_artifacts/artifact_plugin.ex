@@ -25,7 +25,7 @@ defmodule JidoArtifacts.ArtifactPlugin do
   require Logger
 
   @impl Jido.Plugin
-  def handle_signal(%{type: "artifact." <> _name, data: data} = _signal, context) do
+  def handle_signal(%{type: "artifact." <> _name, data: data} = signal, context) do
     session_id = context.agent.id
     workspace_id = get_in(context, [:agent, :state, :workspace_id])
     topic = Artifact.artifact_topic(workspace_id, session_id)
@@ -42,11 +42,15 @@ defmodule JidoArtifacts.ArtifactPlugin do
       Logger.warning("jido_artifacts: scope :workspace is not yet implemented, treating as :agent")
     end
 
-    Phoenix.PubSub.broadcast(
-      JidoArtifacts.pubsub(),
-      topic,
-      {:artifact_update, session_id, artifact_name, artifact_data, mode}
-    )
+    # Broadcast the original signal with subject populated
+    broadcast_signal =
+      if signal.subject do
+        signal
+      else
+        %{signal | subject: "/agents/#{session_id}"}
+      end
+
+    Phoenix.PubSub.broadcast(JidoArtifacts.pubsub(), topic, broadcast_signal)
 
     store_params = build_store_params(artifact_name, artifact_data, mode, merge_result)
     {:ok, {:override, {StoreArtifact, store_params}}}

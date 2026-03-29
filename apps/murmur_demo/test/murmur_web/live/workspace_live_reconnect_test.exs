@@ -11,6 +11,7 @@ defmodule MurmurWeb.WorkspaceLiveReconnectTest do
 
   import Phoenix.LiveViewTest
 
+  alias JidoMurmur.Signals.MessageCompleted
   alias JidoMurmur.Workspaces
 
   setup do
@@ -107,7 +108,13 @@ defmodule MurmurWeb.WorkspaceLiveReconnectTest do
       {:ok, view, _html} = live(conn, ~p"/workspaces/#{workspace.id}")
 
       # Simulate a completed response arriving
-      send(view.pid, {:message_completed, session.id, "I am Alice"})
+      send(
+        view.pid,
+        MessageCompleted.new!(
+          %{session_id: session.id, response: "I am Alice"},
+          subject: MessageCompleted.subject(workspace.id, session.id)
+        )
+      )
 
       html = render(view)
       assert html =~ "I am Alice"

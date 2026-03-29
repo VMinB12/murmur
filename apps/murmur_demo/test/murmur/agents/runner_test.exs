@@ -52,7 +52,7 @@ defmodule Murmur.Agents.RunnerTest do
 
       # Wait for the background Runner Task to finish
       session_id = session.id
-      assert_receive {:message_completed, ^session_id, _}, 5000
+      assert_receive %Jido.Signal{type: "murmur.message.completed", data: %{session_id: ^session_id}}, 5000
     end
 
     test "returns :agent_not_running when agent process is dead" do
@@ -75,7 +75,7 @@ defmodule Murmur.Agents.RunnerTest do
       Runner.send_message(session, "Say hi")
 
       session_id = session.id
-      assert_receive {:message_completed, ^session_id, "Hello from mock"}, 5000
+      assert_receive %Jido.Signal{type: "murmur.message.completed", data: %{session_id: ^session_id, response: "Hello from mock"}}, 5000
     end
 
     test "PendingQueue is empty after processing completes", %{session: session} do
@@ -83,7 +83,7 @@ defmodule Murmur.Agents.RunnerTest do
       Runner.send_message(session, "Say hi")
 
       session_id = session.id
-      assert_receive {:message_completed, ^session_id, _}, 5000
+      assert_receive %Jido.Signal{type: "murmur.message.completed", data: %{session_id: ^session_id}}, 5000
 
       # Give drain loop time to finish
       Process.sleep(100)
@@ -95,7 +95,7 @@ defmodule Murmur.Agents.RunnerTest do
       Runner.send_message(session, "Say hi")
 
       session_id = session.id
-      assert_receive {:request_failed, ^session_id, :api_error}, 5000
+      assert_receive %Jido.Signal{type: "murmur.request.failed", data: %{session_id: ^session_id, reason: :api_error}}, 5000
     end
 
     test "LLM await timeout broadcasts request_failed", %{session: session} do
@@ -103,7 +103,7 @@ defmodule Murmur.Agents.RunnerTest do
       Runner.send_message(session, "Say hi")
 
       session_id = session.id
-      assert_receive {:request_failed, ^session_id, :timeout}, 5000
+      assert_receive %Jido.Signal{type: "murmur.request.failed", data: %{session_id: ^session_id, reason: :timeout}}, 5000
     end
   end
 
@@ -118,7 +118,7 @@ defmodule Murmur.Agents.RunnerTest do
 
       # Should get at least one completion (messages may be combined by drain)
       session_id = session.id
-      assert_receive {:message_completed, ^session_id, _}, 5000
+      assert_receive %Jido.Signal{type: "murmur.message.completed", data: %{session_id: ^session_id}}, 5000
 
       # All messages should be processed — queue empty
       Process.sleep(200)
@@ -141,7 +141,7 @@ defmodule Murmur.Agents.RunnerTest do
       Process.sleep(10)
 
       session_id = session.id
-      assert_receive {:message_completed, ^session_id, "Got it"}, 5000
+      assert_receive %Jido.Signal{type: "murmur.message.completed", data: %{session_id: ^session_id, response: "Got it"}}, 5000
     end
   end
 
@@ -156,7 +156,7 @@ defmodule Murmur.Agents.RunnerTest do
       Runner.send_message(session, "what messages have you received?")
 
       session_id = session.id
-      assert_receive {:message_completed, ^session_id, _}, 5000
+      assert_receive %Jido.Signal{type: "murmur.message.completed", data: %{session_id: ^session_id}}, 5000
 
       # Queue drained
       refute PendingQueue.pending?(session.id)
@@ -177,10 +177,10 @@ defmodule Murmur.Agents.RunnerTest do
 
       # Collect completions
       session_id = session.id
-      assert_receive {:message_completed, ^session_id, _}, 5000
+      assert_receive %Jido.Signal{type: "murmur.message.completed", data: %{session_id: ^session_id}}, 5000
 
       # No failures
-      refute_receive {:request_failed, ^session_id, _}, 500
+      refute_receive %Jido.Signal{type: "murmur.request.failed"}, 500
 
       # Queue empty
       Process.sleep(200)
@@ -194,7 +194,7 @@ defmodule Murmur.Agents.RunnerTest do
       Runner.send_message(session, "say hi")
 
       session_id = session.id
-      assert_receive {:message_completed, ^session_id, _}, 5000
+      assert_receive %Jido.Signal{type: "murmur.message.completed", data: %{session_id: ^session_id}}, 5000
 
       refute PendingQueue.pending?(session.id)
     end

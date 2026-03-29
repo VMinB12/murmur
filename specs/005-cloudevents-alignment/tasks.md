@@ -19,9 +19,9 @@
 
 **Purpose**: Verify signal framework availability and prepare for typed module creation
 
-- [ ] T001 Verify `use Jido.Signal` macro is available for typed signal definitions by checking `deps/jido_signal/lib/jido/signal.ex` for the `__using__/1` macro
-- [ ] T002 [P] Create `apps/jido_murmur/lib/jido_murmur/signals/` directory
-- [ ] T003 [P] Create `apps/jido_tasks/lib/jido_tasks/signals/` directory
+- [x] T001 Verify `use Jido.Signal` macro is available for typed signal definitions by checking `deps/jido_signal/lib/jido/signal.ex` for the `__using__/1` macro
+- [x] T002 [P] Create `apps/jido_murmur/lib/jido_murmur/signals/` directory
+- [x] T003 [P] Create `apps/jido_tasks/lib/jido_tasks/signals/` directory
 
 ---
 
@@ -33,17 +33,17 @@
 
 ### Tests for Foundational Phase
 
-- [ ] T004 [P] Create `apps/jido_murmur/test/jido_murmur/signals/message_completed_test.exs` with tests for: valid signal creation with correct type/source/subject, schema validation rejects missing session_id or response
-- [ ] T005 [P] Create `apps/jido_murmur/test/jido_murmur/signals/message_received_test.exs` with tests for: valid signal creation, schema validation rejects missing session_id or message
-- [ ] T006 [P] Create `apps/jido_tasks/test/jido_tasks/signals/task_created_test.exs` with tests for: valid signal creation with `type: "task.created"`, subject includes workspace and task ID
-- [ ] T007 [P] Create `apps/jido_tasks/test/jido_tasks/signals/task_updated_test.exs` with tests for: valid signal creation with `type: "task.updated"`, subject includes workspace and task ID
+- [x] T004 [P] Create `apps/jido_murmur/test/jido_murmur/signals/message_completed_test.exs` with tests for: valid signal creation with correct type/source/subject, schema validation rejects missing session_id or response
+- [x] T005 [P] Create `apps/jido_murmur/test/jido_murmur/signals/message_received_test.exs` with tests for: valid signal creation, schema validation rejects missing session_id or message
+- [x] T006 [P] Create `apps/jido_tasks/test/jido_tasks/signals/task_created_test.exs` with tests for: valid signal creation with `type: "task.created"`, subject includes workspace and task ID
+- [x] T007 [P] Create `apps/jido_tasks/test/jido_tasks/signals/task_updated_test.exs` with tests for: valid signal creation with `type: "task.updated"`, subject includes workspace and task ID
 
 ### Implementation for Foundational Phase
 
-- [ ] T008 [P] [US4] Create `apps/jido_murmur/lib/jido_murmur/signals/message_completed.ex` — `use Jido.Signal` with type `"murmur.message.completed"`, source `"/jido_murmur/runner"`, data schema: `session_id` (required string), `response` (required term), subject pattern: `"/workspaces/#{wid}/agents/#{sid}"`
-- [ ] T009 [P] [US4] Create `apps/jido_murmur/lib/jido_murmur/signals/message_received.ex` — `use Jido.Signal` with type `"murmur.message.received"`, source `"/jido_murmur/tell_action"`, data schema: `session_id` (required string), `message` (required map), subject pattern: `"/workspaces/#{wid}/agents/#{sid}"`
-- [ ] T010 [P] [US4] Create `apps/jido_tasks/lib/jido_tasks/signals/task_created.ex` — `use Jido.Signal` with type `"task.created"`, source `"/jido_tasks/tools/add_task"`, data schema: `task` (required), subject pattern: `"/workspaces/#{wid}/tasks/#{tid}"`
-- [ ] T011 [P] [US4] Create `apps/jido_tasks/lib/jido_tasks/signals/task_updated.ex` — `use Jido.Signal` with type `"task.updated"`, source `"/jido_tasks/tools/update_task"`, data schema: `task` (required), subject pattern: `"/workspaces/#{wid}/tasks/#{tid}"`
+- [x] T008 [P] [US4] Create `apps/jido_murmur/lib/jido_murmur/signals/message_completed.ex` — `use Jido.Signal` with type `"murmur.message.completed"`, source `"/jido_murmur/runner"`, data schema: `session_id` (required string), `response` (required term), subject pattern: `"/workspaces/#{wid}/agents/#{sid}"`
+- [x] T009 [P] [US4] Create `apps/jido_murmur/lib/jido_murmur/signals/message_received.ex` — `use Jido.Signal` with type `"murmur.message.received"`, source `"/jido_murmur/tell_action"`, data schema: `session_id` (required string), `message` (required map), subject pattern: `"/workspaces/#{wid}/agents/#{sid}"`
+- [x] T010 [P] [US4] Create `apps/jido_tasks/lib/jido_tasks/signals/task_created.ex` — `use Jido.Signal` with type `"task.created"`, source `"/jido_tasks/tools/add_task"`, data schema: `task` (required), subject pattern: `"/workspaces/#{wid}/tasks/#{tid}"`
+- [x] T011 [P] [US4] Create `apps/jido_tasks/lib/jido_tasks/signals/task_updated.ex` — `use Jido.Signal` with type `"task.updated"`, source `"/jido_tasks/tools/update_task"`, data schema: `task` (required), subject pattern: `"/workspaces/#{wid}/tasks/#{tid}"`
 
 **Checkpoint**: All 4 typed signal modules compile. Schema validation works. Type strings and source URIs are canonical. Tests pass.
 
@@ -57,16 +57,16 @@
 
 ### Tests for User Story 1
 
-- [ ] T012 [P] [US1] Add subject-field-specific tests to `apps/jido_murmur/test/jido_murmur/signals/message_completed_test.exs` verifying subject is `"/workspaces/#{wid}/agents/#{sid}"` when workspace_id and session_id are provided
-- [ ] T013 [P] [US1] Add subject-field-specific tests to `apps/jido_tasks/test/jido_tasks/signals/task_created_test.exs` verifying subject is `"/workspaces/#{wid}/tasks/#{tid}"`
+- [x] T012 [P] [US1] Add subject-field-specific tests to `apps/jido_murmur/test/jido_murmur/signals/message_completed_test.exs` verifying subject is `"/workspaces/#{wid}/agents/#{sid}"` when workspace_id and session_id are provided
+- [x] T013 [P] [US1] Add subject-field-specific tests to `apps/jido_tasks/test/jido_tasks/signals/task_created_test.exs` verifying subject is `"/workspaces/#{wid}/tasks/#{tid}"`
 
 ### Implementation for User Story 1
 
-- [ ] T014 [US1] Update `apps/jido_murmur/lib/jido_murmur/streaming_plugin.ex` — when broadcasting streaming signals from jido_ai, populate `subject` field with `"/agents/#{session_id}"` on signals that lack it
-- [ ] T015 [US1] Update `apps/jido_murmur/lib/jido_murmur/runner.ex` — when creating message_completed signal, populate `subject` with `"/workspaces/#{workspace_id}/agents/#{session_id}"`
-- [ ] T016 [US1] Update `apps/jido_murmur/lib/jido_murmur/tell_action.ex` — when creating new_message signal, populate `subject` with `"/workspaces/#{workspace_id}/agents/#{session_id}"`
-- [ ] T017 [P] [US1] Update `apps/jido_tasks/lib/jido_tasks/tools/add_task.ex` — when creating task_created signal, populate `subject` with `"/workspaces/#{workspace_id}/tasks/#{task_id}"`
-- [ ] T018 [P] [US1] Update `apps/jido_tasks/lib/jido_tasks/tools/update_task.ex` — when creating task_updated signal, populate `subject` with `"/workspaces/#{workspace_id}/tasks/#{task_id}"`
+- [x] T014 [US1] Update `apps/jido_murmur/lib/jido_murmur/streaming_plugin.ex` — when broadcasting streaming signals from jido_ai, populate `subject` field with `"/agents/#{session_id}"` on signals that lack it
+- [x] T015 [US1] Update `apps/jido_murmur/lib/jido_murmur/runner.ex` — when creating message_completed signal, populate `subject` with `"/workspaces/#{workspace_id}/agents/#{session_id}"`
+- [x] T016 [US1] Update `apps/jido_murmur/lib/jido_murmur/tell_action.ex` — when creating new_message signal, populate `subject` with `"/workspaces/#{workspace_id}/agents/#{session_id}"`
+- [x] T017 [P] [US1] Update `apps/jido_tasks/lib/jido_tasks/tools/add_task.ex` — when creating task_created signal, populate `subject` with `"/workspaces/#{workspace_id}/tasks/#{task_id}"`
+- [x] T018 [P] [US1] Update `apps/jido_tasks/lib/jido_tasks/tools/update_task.ex` — when creating task_updated signal, populate `subject` with `"/workspaces/#{workspace_id}/tasks/#{task_id}"`
 
 **Checkpoint**: All emitted signals carry meaningful `subject` fields. Entity routing possible from subject alone.
 
@@ -82,23 +82,23 @@
 
 ### Tests for User Story 2
 
-- [ ] T019 [P] [US2] Create `apps/jido_murmur/test/jido_murmur/signal_broadcast_test.exs` testing that `runner.ex` broadcasts `%Jido.Signal{type: "murmur.message.completed"}` instead of `{:message_completed, ...}` tuple
-- [ ] T020 [P] [US2] Create `apps/jido_tasks/test/jido_tasks/signal_broadcast_test.exs` testing that `add_task.ex` broadcasts `%Jido.Signal{type: "task.created"}` and `update_task.ex` broadcasts `%Jido.Signal{type: "task.updated"}`
+- [x] T019 [P] [US2] Create `apps/jido_murmur/test/jido_murmur/signal_broadcast_test.exs` testing that `runner.ex` broadcasts `%Jido.Signal{type: "murmur.message.completed"}` instead of `{:message_completed, ...}` tuple
+- [x] T020 [P] [US2] Create `apps/jido_tasks/test/jido_tasks/signal_broadcast_test.exs` testing that `add_task.ex` broadcasts `%Jido.Signal{type: "task.created"}` and `update_task.ex` broadcasts `%Jido.Signal{type: "task.updated"}`
 
 ### Implementation for User Story 2 — Producer Side (broadcast replacements)
 
-- [ ] T021 [US2] Migrate `apps/jido_murmur/lib/jido_murmur/runner.ex` — replace `{:message_completed, session_id, response}` broadcast with `%Jido.Signal{type: "murmur.message.completed", ...}` per contracts/signal-envelope.md
-- [ ] T022 [US2] Migrate `apps/jido_murmur/lib/jido_murmur/tell_action.ex` — replace `{:new_message, session_id, msg}` broadcast with `%Jido.Signal{type: "murmur.message.received", ...}`
-- [ ] T023 [US2] Migrate `apps/jido_murmur/lib/jido_murmur/streaming_plugin.ex` — replace `{:agent_signal, session_id, signal}` wrapper with direct `%Jido.Signal{}` broadcast (the inner signal is already a Signal struct)
-- [ ] T024 [P] [US2] Migrate `apps/jido_tasks/lib/jido_tasks/tools/add_task.ex` — replace `{:task_created, task}` broadcast with `%Jido.Signal{type: "task.created", ...}`
-- [ ] T025 [P] [US2] Migrate `apps/jido_tasks/lib/jido_tasks/tools/update_task.ex` — replace `{:task_updated, task}` broadcast with `%Jido.Signal{type: "task.updated", ...}`
+- [x] T021 [US2] Migrate `apps/jido_murmur/lib/jido_murmur/runner.ex` — replace `{:message_completed, session_id, response}` broadcast with `%Jido.Signal{type: "murmur.message.completed", ...}` per contracts/signal-envelope.md
+- [x] T022 [US2] Migrate `apps/jido_murmur/lib/jido_murmur/tell_action.ex` — replace `{:new_message, session_id, msg}` broadcast with `%Jido.Signal{type: "murmur.message.received", ...}`
+- [x] T023 [US2] Migrate `apps/jido_murmur/lib/jido_murmur/streaming_plugin.ex` — replace `{:agent_signal, session_id, signal}` wrapper with direct `%Jido.Signal{}` broadcast (the inner signal is already a Signal struct)
+- [x] T024 [P] [US2] Migrate `apps/jido_tasks/lib/jido_tasks/tools/add_task.ex` — replace `{:task_created, task}` broadcast with `%Jido.Signal{type: "task.created", ...}`
+- [x] T025 [P] [US2] Migrate `apps/jido_tasks/lib/jido_tasks/tools/update_task.ex` — replace `{:task_updated, task}` broadcast with `%Jido.Signal{type: "task.updated", ...}`
 
 ### Implementation for User Story 2 — Consumer Side (handler updates)
 
-- [ ] T026 [US2] Update `apps/murmur_demo/lib/murmur_web/live/workspace_live.ex` — replace ALL tuple `handle_info/2` patterns with `%Jido.Signal{}` struct matching per contracts/signal-envelope.md: match on `type` field instead of tuple atoms
-- [ ] T027 [US2] Update artifact handler in `workspace_live.ex` — replace `{:artifact_update, sid, name, data, mode}` pattern with `%Jido.Signal{type: "artifact." <> _name}` pattern (artifact broadcasts from spec 003 or existing code)
-- [ ] T028 [US2] Update streaming handler in `workspace_live.ex` — replace `{:agent_signal, _sid, signal}` pattern with direct `%Jido.Signal{type: "ai." <> _}` matching (no more wrapper tuple)
-- [ ] T029 [US2] Grep entire codebase for remaining tuple patterns: `{:task_created`, `{:task_updated`, `{:message_completed`, `{:new_message`, `{:agent_signal`, `{:artifact_update` — verify zero matches in broadcast or handler code
+- [x] T026 [US2] Update `apps/murmur_demo/lib/murmur_web/live/workspace_live.ex` — replace ALL tuple `handle_info/2` patterns with `%Jido.Signal{}` struct matching per contracts/signal-envelope.md: match on `type` field instead of tuple atoms
+- [x] T027 [US2] Update artifact handler in `workspace_live.ex` — replace `{:artifact_update, sid, name, data, mode}` pattern with `%Jido.Signal{type: "artifact." <> _name}` pattern (artifact broadcasts from spec 003 or existing code)
+- [x] T028 [US2] Update streaming handler in `workspace_live.ex` — replace `{:agent_signal, _sid, signal}` pattern with direct `%Jido.Signal{type: "ai." <> _}` matching (no more wrapper tuple)
+- [x] T029 [US2] Grep entire codebase for remaining tuple patterns: `{:task_created`, `{:task_updated`, `{:message_completed`, `{:new_message`, `{:agent_signal`, `{:artifact_update` — verify zero matches in broadcast or handler code
 
 **Checkpoint**: Zero tuple broadcasts remain. All handlers use `%Jido.Signal{}` matching. Full test suite passes. SC-004 met.
 
@@ -110,8 +110,8 @@
 
 **Independent Test**: Grep for `Signal.ID.generate!()` and verify all remaining uses are in actual signal contexts.
 
-- [ ] T030 [US3] Search codebase for `Signal.ID.generate!()` usage in `apps/jido_murmur/` and `apps/jido_tasks/` — identify call sites that are non-signal contexts (message IDs, tracking IDs)
-- [ ] T031 [US3] Replace non-signal `Signal.ID.generate!()` calls with `Uniq.UUID.uuid7()` in identified files (expected: `tell_action.ex` message ID, any tracking ID generation)
+- [x] T030 [US3] Search codebase for `Signal.ID.generate!()` usage in `apps/jido_murmur/` and `apps/jido_tasks/` — identify call sites that are non-signal contexts (message IDs, tracking IDs)
+- [x] T031 [US3] Replace non-signal `Signal.ID.generate!()` calls with `Uniq.UUID.uuid7()` in identified files (expected: `tell_action.ex` message ID, any tracking ID generation)
 
 **Checkpoint**: `Signal.ID.generate!()` only used in signal construction. Non-signal IDs use `Uniq.UUID.uuid7()`.
 
@@ -121,8 +121,8 @@
 
 **Goal**: Create developer reference document listing all signal types across the ecosystem.
 
-- [ ] T032 [US5] Create `docs/signal-catalog.md` with table of all signal types per contracts/signal-envelope.md Signal Type Registry: type, source, subject pattern, data fields, handling plugins, PubSub topics
-- [ ] T033 [US5] Add "How to add a new signal type" section to `docs/signal-catalog.md` with step-by-step guide: create typed module, register in catalog, update handlers
+- [x] T032 [US5] Create `docs/signal-catalog.md` with table of all signal types per contracts/signal-envelope.md Signal Type Registry: type, source, subject pattern, data fields, handling plugins, PubSub topics
+- [x] T033 [US5] Add "How to add a new signal type" section to `docs/signal-catalog.md` with step-by-step guide: create typed module, register in catalog, update handlers
 
 **Checkpoint**: Developers can discover all signal types from the catalog document. SC-003 met.
 
@@ -132,10 +132,10 @@
 
 **Purpose**: Integration verification and final validation
 
-- [ ] T034 Run full umbrella test suite (`mix test`) from repo root — verify all existing tests pass with zero regressions
-- [ ] T035 Run `mix precommit` from repo root to verify Credo, Dialyxir, and formatting compliance
-- [ ] T036 Verify SC-001: grep for signals without `subject` field population in production code — should find zero
-- [ ] T037 Verify SC-002: grep for tuple-pattern `handle_info` matching on PubSub messages — should find zero
+- [x] T034 Run full umbrella test suite (`mix test`) from repo root — verify all existing tests pass with zero regressions
+- [x] T035 Run `mix precommit` from repo root to verify Credo, Dialyxir, and formatting compliance
+- [x] T036 Verify SC-001: grep for signals without `subject` field population in production code — should find zero
+- [x] T037 Verify SC-002: grep for tuple-pattern `handle_info` matching on PubSub messages — should find zero
 
 ---
 

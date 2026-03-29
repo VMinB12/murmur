@@ -89,7 +89,7 @@ defmodule Murmur.Agents.Tools.UpdateTaskTest do
 
       {:ok, _} = UpdateTask.run(params, context)
 
-      assert_receive {:task_updated, updated}
+      assert_receive %Jido.Signal{type: "task.updated", data: %{task: updated}}
       assert updated.status == :done
     end
   end

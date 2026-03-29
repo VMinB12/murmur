@@ -58,9 +58,9 @@ defmodule Murmur.Agents.EdgeCaseTest do
       session_id = session.id
 
       # Should get completion(s), never busy rejections
-      assert_receive {:message_completed, ^session_id, _}, 5000
+      assert_receive %Jido.Signal{type: "murmur.message.completed", data: %{session_id: ^session_id}}, 5000
 
-      refute_receive {:request_failed, ^session_id, {:rejected, :busy, _}}, 500
+      refute_receive %Jido.Signal{type: "murmur.request.failed"}, 500
 
       # All messages processed
       Process.sleep(200)
@@ -126,7 +126,7 @@ defmodule Murmur.Agents.EdgeCaseTest do
 
       # Wait for the background Runner Task to finish
       bob_id = bob.id
-      assert_receive {:message_completed, ^bob_id, _}, 5000
+      assert_receive %Jido.Signal{type: "murmur.message.completed", data: %{session_id: ^bob_id}}, 5000
     end
 
     test "hop count of 4 succeeds (just under limit)", %{workspace: workspace, bob: bob} do
@@ -137,7 +137,7 @@ defmodule Murmur.Agents.EdgeCaseTest do
 
       # Wait for the background Runner Task to finish
       bob_id = bob.id
-      assert_receive {:message_completed, ^bob_id, _}, 5000
+      assert_receive %Jido.Signal{type: "murmur.message.completed", data: %{session_id: ^bob_id}}, 5000
     end
 
     test "hop count of 5 is rejected (at limit)", %{workspace: workspace} do

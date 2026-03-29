@@ -50,14 +50,14 @@ defmodule Murmur.Agents.ReconnectTest do
       Runner.send_message(session, "Say hello")
 
       session_id = session.id
-      assert_receive {:message_completed, ^session_id, _response}, 5000
+      assert_receive %Jido.Signal{type: "murmur.message.completed", data: %{session_id: ^session_id}}, 5000
     end
 
     test "agent process stays alive after request completes", %{session: session} do
       Runner.send_message(session, "Say hi")
 
       session_id = session.id
-      assert_receive {:message_completed, ^session_id, _}, 5000
+      assert_receive %Jido.Signal{type: "murmur.message.completed", data: %{session_id: ^session_id}}, 5000
 
       pid = Murmur.Jido.whereis(session.id)
       assert pid
@@ -71,7 +71,7 @@ defmodule Murmur.Agents.ReconnectTest do
       Runner.send_message(session, "Remember the number 42")
 
       session_id = session.id
-      assert_receive {:message_completed, ^session_id, _}, 5000
+      assert_receive %Jido.Signal{type: "murmur.message.completed", data: %{session_id: ^session_id}}, 5000
 
       # Agent should still be queryable
       pid = Murmur.Jido.whereis(session.id)
@@ -85,10 +85,10 @@ defmodule Murmur.Agents.ReconnectTest do
       Runner.send_message(session, "First message")
 
       session_id = session.id
-      assert_receive {:message_completed, ^session_id, _}, 5000
+      assert_receive %Jido.Signal{type: "murmur.message.completed", data: %{session_id: ^session_id}}, 5000
 
       Runner.send_message(session, "Second message")
-      assert_receive {:message_completed, ^session_id, _}, 5000
+      assert_receive %Jido.Signal{type: "murmur.message.completed", data: %{session_id: ^session_id}}, 5000
 
       # Agent still alive
       pid = Murmur.Jido.whereis(session.id)

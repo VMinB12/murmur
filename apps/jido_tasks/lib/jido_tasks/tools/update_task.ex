@@ -16,6 +16,7 @@ defmodule JidoTasks.Tools.UpdateTask do
       description: [type: :string, doc: "New or updated description (max 2000 chars)"]
     ]
 
+  alias JidoTasks.Signals.TaskUpdated
   alias JidoTasks.Tasks
 
   @valid_statuses ~w(todo in_progress done aborted)
@@ -72,10 +73,16 @@ defmodule JidoTasks.Tools.UpdateTask do
   end
 
   defp broadcast_task_updated(workspace_id, task) do
+    signal =
+      TaskUpdated.new!(
+        %{task: task},
+        subject: TaskUpdated.subject(workspace_id, task.id)
+      )
+
     Phoenix.PubSub.broadcast(
       JidoTasks.pubsub(),
       JidoMurmur.Topics.workspace_tasks(workspace_id),
-      {:task_updated, task}
+      signal
     )
   end
 end

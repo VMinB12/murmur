@@ -17,6 +17,8 @@ defmodule MurmurWeb.WorkspaceLiveTest do
   import Phoenix.LiveViewTest
 
   alias JidoMurmur.Catalog
+  alias JidoMurmur.Signals.MessageCompleted
+  alias JidoMurmur.Signals.MessageReceived
   alias JidoMurmur.Workspaces
   alias Murmur.LLM.MockBehaviour, as: Mock
 
@@ -34,6 +36,40 @@ defmodule MurmurWeb.WorkspaceLiveTest do
 
     {:ok, workspace} = Workspaces.create_workspace(%{"name" => "Test Workspace"})
     %{workspace: workspace}
+  end
+
+  # --- Signal test helpers ---
+
+  defp build_message_completed(session_id, workspace_id, response) do
+    MessageCompleted.new!(
+      %{session_id: session_id, response: response},
+      subject: MessageCompleted.subject(workspace_id, session_id)
+    )
+  end
+
+  defp build_request_failed(session_id, workspace_id, reason) do
+    Jido.Signal.new!(
+      "murmur.request.failed",
+      %{session_id: session_id, reason: reason},
+      source: "/jido_murmur/runner",
+      subject: "/workspaces/#{workspace_id}/agents/#{session_id}"
+    )
+  end
+
+  defp build_ai_signal(session_id, type, data) do
+    Jido.Signal.new!(
+      type,
+      data,
+      source: "/jido_ai",
+      subject: "/agents/#{session_id}"
+    )
+  end
+
+  defp build_message_received(session_id, workspace_id, message) do
+    MessageReceived.new!(
+      %{session_id: session_id, message: message},
+      subject: MessageReceived.subject(workspace_id, session_id)
+    )
   end
 
   # --- User Story 2: Build a team (acceptance scenarios) ---
@@ -192,7 +228,10 @@ defmodule MurmurWeb.WorkspaceLiveTest do
       Phoenix.PubSub.broadcast!(
         Murmur.PubSub,
         topic,
-        {:message_completed, session.id, "Hello from Alice"}
+        MessageCompleted.new!(
+          %{session_id: session.id, response: "Hello from Alice"},
+          subject: MessageCompleted.subject(workspace.id, session.id)
+        )
       )
 
       html = render(view)
@@ -345,7 +384,7 @@ defmodule MurmurWeb.WorkspaceLiveTest do
       {:ok, view, _html} = live(conn, ~p"/workspaces/#{workspace.id}")
 
       # Simulate PubSub message delivery
-      send(view.pid, {:message_completed, session.id, "Hello! How can I help?"})
+      send(view.pid, build_message_completed(session.id, workspace.id, "Hello! How can I help?"))
 
       html = render(view)
       assert html =~ "Hello! How can I help?"
@@ -363,7 +402,7 @@ defmodule MurmurWeb.WorkspaceLiveTest do
       render(view)
 
       # Complete the message — should return to idle
-      send(view.pid, {:message_completed, session.id, "Done"})
+      send(view.pid, build_message_completed(session.id, workspace.id, "Done"))
       html = render(view)
 
       # Loading indicator should be gone
@@ -377,7 +416,7 @@ defmodule MurmurWeb.WorkspaceLiveTest do
     } do
       {:ok, view, _html} = live(conn, ~p"/workspaces/#{workspace.id}")
 
-      send(view.pid, {:request_failed, session.id, :timeout})
+      send(view.pid, build_request_failed(session.id, workspace.id, :timeout))
 
       html = render(view)
       assert html =~ "Error"
@@ -404,8 +443,8 @@ defmodule MurmurWeb.WorkspaceLiveTest do
     } do
       {:ok, view, _html} = live(conn, ~p"/workspaces/#{workspace.id}")
 
-      send(view.pid, {:agent_signal, session.id, %{type: "ai.llm.delta", data: %{delta: "Hello", chunk_type: :content}}})
-      send(view.pid, {:agent_signal, session.id, %{type: "ai.llm.delta", data: %{delta: " world", chunk_type: :content}}})
+      send(view.pid, build_ai_signal(session.id, "ai.llm.delta", %{delta: "Hello", chunk_type: :content}))
+      send(view.pid, build_ai_signal(session.id, "ai.llm.delta", %{delta: " world", chunk_type: :content}))
 
       html = render(view)
       assert html =~ "Hello world"
@@ -420,12 +459,12 @@ defmodule MurmurWeb.WorkspaceLiveTest do
 
       send(
         view.pid,
-        {:agent_signal, session.id, %{type: "ai.llm.delta", data: %{delta: "partial...", chunk_type: :content}}}
+        build_ai_signal(session.id, "ai.llm.delta", %{delta: "partial...", chunk_type: :content})
       )
 
       assert render(view) =~ "partial..."
 
-      send(view.pid, {:message_completed, session.id, "Full response"})
+      send(view.pid, build_message_completed(session.id, workspace.id, "Full response"))
       html = render(view)
 
       # Streaming area should be cleared, full message shown
@@ -441,8 +480,7 @@ defmodule MurmurWeb.WorkspaceLiveTest do
 
       send(
         view.pid,
-        {:agent_signal, session.id,
-         %{type: "ai.tool.result", data: %{tool_name: "search_web", result: {:ok, "3 results", []}}}}
+        build_ai_signal(session.id, "ai.tool.result", %{tool_name: "search_web", result: {:ok, "3 results", []}})
       )
 
       html = render(view)
@@ -459,14 +497,10 @@ defmodule MurmurWeb.WorkspaceLiveTest do
 
       send(
         view.pid,
-        {:agent_signal, session.id,
-         %{
-           type: "ai.usage",
-           data: %{input_tokens: 100, output_tokens: 50, total_tokens: 150, model: "gpt-5-mini", duration_ms: 1200}
-         }}
+        build_ai_signal(session.id, "ai.usage", %{input_tokens: 100, output_tokens: 50, total_tokens: 150, model: "gpt-5-mini", duration_ms: 1200})
       )
 
-      send(view.pid, {:message_completed, session.id, "Done"})
+      send(view.pid, build_message_completed(session.id, workspace.id, "Done"))
 
       html = render(view)
       assert html =~ "100 in"
@@ -483,23 +517,15 @@ defmodule MurmurWeb.WorkspaceLiveTest do
 
       send(
         view.pid,
-        {:agent_signal, session.id,
-         %{
-           type: "ai.usage",
-           data: %{input_tokens: 100, output_tokens: 50, total_tokens: 150, model: "gpt-5-mini", duration_ms: 500}
-         }}
+        build_ai_signal(session.id, "ai.usage", %{input_tokens: 100, output_tokens: 50, total_tokens: 150, model: "gpt-5-mini", duration_ms: 500})
       )
 
       send(
         view.pid,
-        {:agent_signal, session.id,
-         %{
-           type: "ai.usage",
-           data: %{input_tokens: 200, output_tokens: 80, total_tokens: 280, model: "gpt-5-mini", duration_ms: 700}
-         }}
+        build_ai_signal(session.id, "ai.usage", %{input_tokens: 200, output_tokens: 80, total_tokens: 280, model: "gpt-5-mini", duration_ms: 700})
       )
 
-      send(view.pid, {:message_completed, session.id, "Final answer"})
+      send(view.pid, build_message_completed(session.id, workspace.id, "Final answer"))
 
       html = render(view)
       assert html =~ "300 in"
@@ -536,7 +562,7 @@ defmodule MurmurWeb.WorkspaceLiveTest do
         sender_name: "Alice"
       }
 
-      send(view.pid, {:new_message, session.id, inter_msg})
+      send(view.pid, build_message_received(session.id, workspace.id, inter_msg))
 
       html = render(view)
       assert html =~ "[Alice]: Can you help?"
@@ -589,7 +615,7 @@ defmodule MurmurWeb.WorkspaceLiveTest do
     } do
       {:ok, view, _html} = live(conn, ~p"/workspaces/#{workspace.id}")
 
-      send(view.pid, {:message_completed, alice.id, "Alice says hi"})
+      send(view.pid, build_message_completed(alice.id, workspace.id, "Alice says hi"))
 
       _html = render(view)
       # The message should appear in Alice's column only
@@ -761,7 +787,7 @@ defmodule MurmurWeb.WorkspaceLiveTest do
       assert html =~ "Hello!"
 
       # Message was routed to Alice (first agent), so it should be in her messages
-      send(view.pid, {:message_completed, alice.id, "Hi from Alice"})
+      send(view.pid, build_message_completed(alice.id, workspace.id, "Hi from Alice"))
       html = render(view)
       assert html =~ "Hi from Alice"
     end
@@ -780,7 +806,7 @@ defmodule MurmurWeb.WorkspaceLiveTest do
 
       # The actual content sent should be "Write tests" (stripped @mention)
       # Bob should get the message
-      send(view.pid, {:message_completed, bob.id, "Tests written!"})
+      send(view.pid, build_message_completed(bob.id, workspace.id, "Tests written!"))
       html = render(view)
       assert html =~ "Tests written!"
     end
@@ -794,8 +820,8 @@ defmodule MurmurWeb.WorkspaceLiveTest do
       {:ok, view, _html} = live(conn, ~p"/workspaces/#{workspace.id}")
       view |> element("#view-unified-btn") |> render_click()
 
-      send(view.pid, {:message_completed, alice.id, "Hello from Alice"})
-      send(view.pid, {:message_completed, bob.id, "Hello from Bob"})
+      send(view.pid, build_message_completed(alice.id, workspace.id, "Hello from Alice"))
+      send(view.pid, build_message_completed(bob.id, workspace.id, "Hello from Bob"))
 
       html = render(view)
       assert html =~ "Hello from Alice"

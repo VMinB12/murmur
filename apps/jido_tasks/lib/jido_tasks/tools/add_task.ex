@@ -18,9 +18,10 @@ defmodule JidoTasks.Tools.AddTask do
       ]
     ]
 
-  alias Jido.Signal.ID
   alias JidoMurmur.Runner
+  alias JidoMurmur.Signals.MessageReceived
   alias JidoMurmur.Workspaces
+  alias JidoTasks.Signals.TaskCreated
   alias JidoTasks.Tasks
 
   @impl true
@@ -65,10 +66,16 @@ defmodule JidoTasks.Tools.AddTask do
   end
 
   defp broadcast_task_created(workspace_id, task) do
+    signal =
+      TaskCreated.new!(
+        %{task: task},
+        subject: TaskCreated.subject(workspace_id, task.id)
+      )
+
     Phoenix.PubSub.broadcast(
       JidoTasks.pubsub(),
       JidoMurmur.Topics.workspace_tasks(workspace_id),
-      {:task_created, task}
+      signal
     )
   end
 
@@ -90,13 +97,19 @@ defmodule JidoTasks.Tools.AddTask do
         topic = JidoMurmur.Topics.agent_messages(workspace_id, target_session.id)
 
         inter_msg = %{
-          id: ID.generate!(),
+          id: Uniq.UUID.uuid7(),
           role: "user",
           content: message,
           sender_name: sender_name
         }
 
-        Phoenix.PubSub.broadcast(JidoTasks.pubsub(), topic, {:new_message, target_session.id, inter_msg})
+        signal =
+          MessageReceived.new!(
+            %{session_id: target_session.id, message: inter_msg},
+            subject: MessageReceived.subject(workspace_id, target_session.id)
+          )
+
+        Phoenix.PubSub.broadcast(JidoTasks.pubsub(), topic, signal)
         Runner.send_message(target_session, message)
     end
   end

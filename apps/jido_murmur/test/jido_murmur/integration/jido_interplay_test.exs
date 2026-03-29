@@ -67,7 +67,7 @@ defmodule JidoMurmur.Integration.JidoInterplayTest do
       assert :queued = Runner.send_message(session, "Test plugin interplay")
 
       # The agent should complete (mock LLM responds immediately)
-      assert_receive {:message_completed, _session_id, _response}, 10_000
+      assert_receive %Jido.Signal{type: "murmur.message.completed"}, 10_000
     end
 
     test "custom plugin does not interfere with package plugin initialization", %{session: session} do
@@ -182,7 +182,7 @@ defmodule JidoMurmur.Integration.JidoInterplayTest do
       LLM.Mock.set_response(%{content: "ETS storage response"})
       assert :queued = Runner.send_message(session, "Test with ETS storage")
 
-      assert_receive {:message_completed, _session_id, _response}, 10_000
+      assert_receive %Jido.Signal{type: "murmur.message.completed"}, 10_000
     end
 
     test "ETS storage adapter returns native Jido types", %{session: session} do

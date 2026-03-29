@@ -34,12 +34,13 @@ defmodule Murmur.Agents.ArtifactPluginTest do
   end
 
   describe "handle_signal/2" do
-    test "broadcasts artifact_update via PubSub" do
+    test "broadcasts artifact signal via PubSub" do
       signal = build_signal("papers", [%{id: 1, title: "Test"}], :replace)
 
       ArtifactPlugin.handle_signal(signal, build_context())
 
-      assert_receive {:artifact_update, @session_id, "papers", [%{id: 1, title: "Test"}], :replace}
+      assert_receive %Jido.Signal{type: "artifact.papers", data: data}
+      assert data[:name] == "papers" or data["name"] == "papers"
     end
 
     test "returns override to StoreArtifact action with replace mode" do

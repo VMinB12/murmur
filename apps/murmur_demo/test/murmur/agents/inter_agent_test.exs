@@ -76,7 +76,7 @@ defmodule Murmur.Agents.InterAgentTest do
       Runner.send_message(bob, "[Alice]: What is 2+2?")
 
       bob_id = bob.id
-      assert_receive {:message_completed, ^bob_id, "Mock agent response"}, 5000
+      assert_receive %Jido.Signal{type: "murmur.message.completed", data: %{session_id: ^bob_id, response: "Mock agent response"}}, 5000
     end
   end
 
@@ -91,7 +91,7 @@ defmodule Murmur.Agents.InterAgentTest do
 
       bob_id = bob.id
       # Should receive at least one completion
-      assert_receive {:message_completed, ^bob_id, _}, 5000
+      assert_receive %Jido.Signal{type: "murmur.message.completed", data: %{session_id: ^bob_id}}, 5000
 
       # All messages should be processed
       Process.sleep(200)
@@ -108,14 +108,14 @@ defmodule Murmur.Agents.InterAgentTest do
       bob_id = bob.id
 
       # Both should receive completions independently
-      assert_receive {:message_completed, ^alice_id, _}, 5000
-      assert_receive {:message_completed, ^bob_id, _}, 5000
+      assert_receive %Jido.Signal{type: "murmur.message.completed", data: %{session_id: ^alice_id}}, 5000
+      assert_receive %Jido.Signal{type: "murmur.message.completed", data: %{session_id: ^bob_id}}, 5000
     end
   end
 
   describe "inter-agent message via TellAction appears in PubSub" do
     # FR-010: Messages prefixed with sender name
-    test "tell message to Bob broadcasts :new_message with sender prefix", %{
+    test "tell message to Bob broadcasts message_received signal with sender prefix", %{
       workspace: workspace,
       bob: bob
     } do
@@ -125,11 +125,11 @@ defmodule Murmur.Agents.InterAgentTest do
       {:ok, _} = TellAction.run(params, context)
 
       bob_id = bob.id
-      assert_receive {:new_message, ^bob_id, msg}, 5000
+      assert_receive %Jido.Signal{type: "murmur.message.received", data: %{session_id: ^bob_id, message: msg}}, 5000
       assert msg.content =~ "[Alice]"
 
       # Wait for the background Runner Task to finish
-      assert_receive {:message_completed, ^bob_id, _}, 5000
+      assert_receive %Jido.Signal{type: "murmur.message.completed", data: %{session_id: ^bob_id}}, 5000
     end
   end
 
@@ -143,9 +143,9 @@ defmodule Murmur.Agents.InterAgentTest do
       bob_id = bob.id
 
       # Collect events — should never see a busy rejection
-      assert_receive {:message_completed, ^bob_id, _}, 5000
+      assert_receive %Jido.Signal{type: "murmur.message.completed", data: %{session_id: ^bob_id}}, 5000
 
-      refute_receive {:request_failed, ^bob_id, {:rejected, :busy, _}}, 500
+      refute_receive %Jido.Signal{type: "murmur.request.failed"}, 500
       refute PendingQueue.pending?(bob.id)
     end
   end

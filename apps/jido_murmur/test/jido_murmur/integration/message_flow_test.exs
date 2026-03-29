@@ -61,7 +61,7 @@ defmodule JidoMurmur.Integration.MessageFlowTest do
     assert :queued = Runner.send_message(session, "Hello from integration test")
 
     # Wait for the message_completed event (the mock LLM responds immediately)
-    assert_receive {:message_completed, _session_id, _response}, 10_000
+    assert_receive %Jido.Signal{type: "murmur.message.completed"}, 10_000
   end
 
   test "agent helper subscribe works for all topics", %{session: session} do

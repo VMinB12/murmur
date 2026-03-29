@@ -586,24 +586,38 @@ AgentObs's Phoenix handler translates metadata keys to OpenInference span attrib
 | `:agent_id` (= session UUID) | `metadata` | Available in span details |
 | `:model` | `llm.model_name` | Model column in traces table |
 
-### Cross-Agent Causation: Span Links
+### Cross-Agent Causation: Metadata Attributes
 
-When agent A's TellAction triggers agent B, we want to record _who triggered whom_ without nesting them in a single trace tree. OpenTelemetry **span links** are designed for exactly this — they express "this span is related to that other span" without implying parent-child.
+When agent A's TellAction triggers agent B, we want to record _who triggered whom_ without nesting them in a single trace tree.
 
-The implementation in `TellAction`:
+> **Note on OTel span links:** OpenTelemetry defines "span links" for expressing cross-trace relationships. However, **Arize Phoenix does not render span links in its UI** — the data is ingested but not displayed. We therefore use a simpler metadata-based approach that Phoenix _does_ show.
+
+The approach: when `TellAction` delivers a message to agent B, include the sender's identity and trace ID in the message metadata. Agent B's tracer can then set these as span attributes on its root span:
 
 ```elixir
-# In TellAction.run/2, before calling Runner.send_message:
-# 1. Read the current span context (agent A's active span)
-# 2. Pass it along as metadata that agent B's tracer can pick up as a link
-
-current_span = OpenTelemetry.Tracer.current_span_ctx()
-# Store in the message metadata for agent B to reference
+# In TellAction.run/2, attach causation metadata to the message:
+inter_msg = %{
+  id: ID.generate!(),
+  role: "user",
+  content: prefixed_message,
+  sender_name: sender_name,
+  sender_trace_id: Jido.Tracing.Context.current_trace_id()  # agent A's trace
+}
 ```
 
-Agent B's tracer can then attach this as a span link on its root span, creating a navigable cross-reference in Phoenix.
+In `Murmur.ObsTracer`, the enrichment picks up the sender info and sets searchable attributes:
 
-> **Note:** Span links require direct OpenTelemetry API usage. AgentObs doesn't expose this natively, so this is a Phase 2 enhancement. The workspace-level grouping via `session.id` is the primary correlation mechanism and works out of the box.
+```elixir
+# These appear in Phoenix's span detail view as searchable metadata
+metadata
+|> Map.put(:triggered_by_agent, sender_name)
+|> Map.put(:triggered_by_trace_id, sender_trace_id)
+```
+
+This gives developers:
+- **Visibility:** see "triggered by: researcher" on agent B's trace detail
+- **Navigation:** copy the `triggered_by_trace_id` value to search for agent A's trace
+- **No unsupported features:** uses only standard span attributes that Phoenix renders
 
 ### What Phoenix Shows
 
@@ -636,13 +650,13 @@ This cache can be populated in `AgentHelper.start_agent/2` when the agent proces
 | Phase | Scope | Effort |
 |-------|-------|--------|
 | **Phase 1** | Basic workspace grouping: `session.id` = workspace_id, `agent.name` = display_name, tags. All traces for a workspace appear together in Phoenix Sessions tab. | Small — ~100 LOC wrapper module + config |
-| **Phase 2** | Cross-agent span links: TellAction propagates sender span context to target agent. Target's root span includes a span link to sender's tool call span. | Medium — requires OTel API usage in TellAction + tracer |
+| **Phase 2** | Cross-agent causation metadata: TellAction passes sender name + trace ID to target agent. Target's root span includes `triggered_by_agent` and `triggered_by_trace_id` attributes visible in Phoenix span detail. | Small — minor changes to TellAction + tracer wrapper |
 | **Phase 3** | Workspace-level dashboards: aggregate token usage, cost, and latency per workspace. Custom Phoenix annotations or Grafana dashboards consuming the same OTLP data. | Medium — mostly configuration/queries, no code changes |
 
 ### Summary
 
 The chosen stack (AgentObs + Arize Phoenix) supports multi-agent trace grouping natively through OpenInference's `session.id` attribute and Phoenix's Sessions UI. The workspace concept maps directly to sessions — set `session.id` to the workspace UUID and all agents in that workspace are grouped together automatically.
 
-Individual agent identity is preserved via `agent.name` and tags, allowing developers to filter down to one agent's traces within a workspace. Cross-agent causation (who triggered whom) can be expressed via OTel span links as a follow-up enhancement.
+Individual agent identity is preserved via `agent.name` and tags, allowing developers to filter down to one agent's traces within a workspace. Cross-agent causation (who triggered whom) is expressed via metadata attributes (`triggered_by_agent`, `triggered_by_trace_id`) that are visible and searchable in Phoenix's span detail view.
 
 The only code required is a thin tracer wrapper (~100 LOC) that enriches span metadata with workspace and agent identity before delegating to `AgentObs.JidoTracer`.

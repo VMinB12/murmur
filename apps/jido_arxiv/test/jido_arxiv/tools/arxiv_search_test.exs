@@ -150,6 +150,7 @@ defmodule JidoArxiv.Tools.ArxivSearchTest do
   end
 
   describe "run/2 with malformed XML" do
+    @tag :capture_log
     test "returns empty list for invalid XML" do
       Req.Test.stub(ArxivSearch, fn conn ->
         Plug.Conn.send_resp(conn, 200, "not xml at all")

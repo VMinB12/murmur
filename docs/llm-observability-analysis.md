@@ -381,3 +381,268 @@ There is **no Jido-native alternative** — the tracer behaviour was designed fo
 ### Next Step
 
 Run `/speckit.specify` with the observability feature description to create a formal spec, then proceed through the normal speckit workflow to implementation.
+
+---
+
+## 10. Multi-Agent Trace Grouping
+
+### Requirements
+
+1. **Per-workspace grouping** — filter and view all agent traces belonging to a workspace together in Phoenix
+2. **Linked traces** — each agent has its own independent root trace, but traces within the same workspace are correlated so a developer can view all agent activity for a workspace in one place
+3. **Individual agent drilldown** — still see each agent's full trace tree (LLM calls, tool calls) in isolation
+4. **Cross-agent causation visibility** — when agent A "tells" agent B something, the relationship is discoverable (which agent triggered which)
+
+### How the Multi-Agent System Works Today
+
+```
+Workspace (UUID)
+  ├── AgentSession "researcher"  (session_id = UUID-1)
+  │     └── AgentServer GenServer (registered as UUID-1)
+  │           └── LLM calls, tool calls, signals
+  ├── AgentSession "writer"      (session_id = UUID-2)
+  │     └── AgentServer GenServer (registered as UUID-2)
+  │           └── LLM calls, tool calls, signals
+  └── AgentSession "reviewer"    (session_id = UUID-3)
+        └── AgentServer GenServer (registered as UUID-3)
+              └── LLM calls, tool calls, signals
+```
+
+Key facts:
+- **Agent ID = Session ID** — a binary UUID, used as the process registry key, DB primary key, and PubSub topic component
+- **Workspace ID** — groups agents; all PubSub topics follow `workspace:{wid}:agent:{sid}:...`
+- **TellAction** — fire-and-forget inter-agent messaging. Agent A's tool call sends a message to agent B's queue via `Runner.send_message/2`. Agent B processes it asynchronously in its own drain loop
+- **No shared trace context** — currently each agent's Jido tracing context is process-local (stored in process dictionary). When TellAction fires, no trace ID is propagated to the target agent
+
+### OpenInference + Phoenix: Available Grouping Mechanisms
+
+Phoenix and OpenInference provide three complementary mechanisms that map well to our needs:
+
+#### 1. Projects (= environment/service separation)
+
+A **project** in Phoenix is a top-level container for traces. Set via the OTel resource `service.name` attribute:
+
+```elixir
+config :opentelemetry,
+  resource: [service: [name: "murmur"]]
+```
+
+All traces from this service appear under the "murmur" project. This is already handled by the basic AgentObs setup and doesn't need per-workspace customization.
+
+#### 2. Sessions (= workspace grouping)
+
+OpenInference defines `session.id` as a reserved span attribute. Phoenix has a dedicated **Sessions** tab that:
+- Groups all traces sharing the same `session.id`
+- Shows a timeline of interactions
+- Provides a chat-like UI for input/output sequences
+- Supports searching/filtering across session content
+
+**This is the primary mechanism for workspace grouping.** By setting `session.id` to the `workspace_id`, all agent traces within that workspace are grouped together in the Phoenix Sessions view.
+
+#### 3. Tags + Metadata (= agent identity within a session)
+
+OpenInference supports:
+- `tag.tags` — list of strings for categorizing spans (e.g., `["workspace:abc123", "agent:researcher"]`)
+- `agent.name` — the name of the agent a span represents
+- `metadata` — arbitrary JSON string for additional context
+- `user.id` — identifies the triggering user
+
+These allow filtering within a session to see only one agent's traces, or to identify which agent produced which trace.
+
+### Proposed Architecture
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                   Arize Phoenix UI                      │
+│                                                         │
+│  Project: "murmur"                                      │
+│  ┌───────────────────────────────────────────────────┐  │
+│  │ Sessions tab → filter by workspace_id             │  │
+│  │                                                    │  │
+│  │  Session: workspace-uuid-abc                       │  │
+│  │  ├── Trace: "researcher" agent                     │  │
+│  │  │     ├── gpt-5-mini (LLM)                       │  │
+│  │  │     ├── tell → writer (TOOL)                    │  │
+│  │  │     └── gpt-5-mini (LLM)                       │  │
+│  │  ├── Trace: "writer" agent                         │  │
+│  │  │     ├── gpt-5-mini (LLM)                       │  │
+│  │  │     ├── create_artifact (TOOL)                  │  │
+│  │  │     └── gpt-5-mini (LLM)                       │  │
+│  │  └── Trace: "reviewer" agent                       │  │
+│  │        └── gpt-5-mini (LLM)                        │  │
+│  └───────────────────────────────────────────────────┘  │
+│                                                         │
+│  Traces tab → filter by tag "agent:researcher"          │
+│  or search by agent.name                                │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Implementation: What Needs to Change
+
+The core idea: **inject `workspace_id` and agent identity into the OTel span attributes** so Phoenix can group and filter them. This requires a thin wrapper around the tracer, not changes to application code.
+
+#### Option A: Custom Tracer Wrapper (Recommended)
+
+Create a tracer module that wraps `AgentObs.JidoTracer`, enriching every span with workspace and agent metadata before delegating:
+
+```elixir
+defmodule Murmur.ObsTracer do
+  @behaviour Jido.Observe.Tracer
+
+  @impl true
+  def span_start(event_prefix, metadata) do
+    enriched = metadata
+    |> put_session_id()      # workspace_id → session.id
+    |> put_agent_identity()  # agent display name → agent.name + tags
+    |> put_causation_link()  # if triggered by another agent, record it
+
+    AgentObs.JidoTracer.span_start(event_prefix, enriched)
+  end
+
+  @impl true
+  def span_stop(span_ctx, measurements) do
+    AgentObs.JidoTracer.span_stop(span_ctx, measurements)
+  end
+
+  @impl true
+  def span_exception(span_ctx, kind, reason, stacktrace) do
+    AgentObs.JidoTracer.span_exception(span_ctx, kind, reason, stacktrace)
+  end
+
+  # --- Enrichment ---
+
+  defp put_session_id(metadata) do
+    # Jido already passes :agent_id (= session.id) in metadata.
+    # Look up the workspace_id for this agent session and set it as
+    # the OpenInference session.id so Phoenix groups by workspace.
+    case lookup_workspace_id(metadata[:agent_id]) do
+      nil -> metadata
+      workspace_id -> Map.put(metadata, :session_id, workspace_id)
+    end
+  end
+
+  defp put_agent_identity(metadata) do
+    case lookup_display_name(metadata[:agent_id]) do
+      nil -> metadata
+      name ->
+        metadata
+        |> Map.put(:agent_name, name)
+        |> Map.update(:tags, [agent_tag(name)], &[agent_tag(name) | &1])
+    end
+  end
+
+  defp put_causation_link(metadata) do
+    # If this span was triggered by a TellAction, the hop_count
+    # and sender_name are available in the tool context.
+    # Record them as metadata for cross-agent correlation.
+    metadata
+  end
+
+  defp agent_tag(name), do: "agent:#{name}"
+
+  defp lookup_workspace_id(nil), do: nil
+  defp lookup_workspace_id(agent_id) do
+    # Cache this lookup (ETS or process dictionary) to avoid
+    # hitting the DB on every span. Agent sessions are long-lived.
+    case JidoMurmur.Workspaces.get_agent_session(agent_id) do
+      %{workspace_id: wid} -> wid
+      _ -> nil
+    end
+  end
+
+  defp lookup_display_name(nil), do: nil
+  defp lookup_display_name(agent_id) do
+    case JidoMurmur.Workspaces.get_agent_session(agent_id) do
+      %{display_name: name} -> name
+      _ -> nil
+    end
+  end
+end
+```
+
+Configuration:
+
+```elixir
+# Use our wrapper instead of AgentObs.JidoTracer directly
+config :jido, :observability,
+  tracer: Murmur.ObsTracer
+```
+
+#### Option B: Telemetry Handler (Alternative)
+
+Instead of wrapping the tracer, attach a `:telemetry` handler that adds OTel span attributes after AgentObs creates the span. This is more decoupled but requires lower-level OTel API calls and is harder to ensure the attributes land on the correct span.
+
+**Recommendation: Option A** — simpler, more reliable, keeps all enrichment in one place.
+
+### How AgentObs Maps Our Metadata to OpenInference
+
+AgentObs's Phoenix handler translates metadata keys to OpenInference span attributes:
+
+| Our Metadata Key | OpenInference Attribute | Phoenix UI Feature |
+|---|---|---|
+| `:session_id` (= workspace_id) | `session.id` | Sessions tab grouping |
+| `:agent_name` | `agent.name` | Shown on spans, searchable |
+| `:tags` | `tag.tags` | Filterable labels like `agent:researcher` |
+| `:agent_id` (= session UUID) | `metadata` | Available in span details |
+| `:model` | `llm.model_name` | Model column in traces table |
+
+### Cross-Agent Causation: Span Links
+
+When agent A's TellAction triggers agent B, we want to record _who triggered whom_ without nesting them in a single trace tree. OpenTelemetry **span links** are designed for exactly this — they express "this span is related to that other span" without implying parent-child.
+
+The implementation in `TellAction`:
+
+```elixir
+# In TellAction.run/2, before calling Runner.send_message:
+# 1. Read the current span context (agent A's active span)
+# 2. Pass it along as metadata that agent B's tracer can pick up as a link
+
+current_span = OpenTelemetry.Tracer.current_span_ctx()
+# Store in the message metadata for agent B to reference
+```
+
+Agent B's tracer can then attach this as a span link on its root span, creating a navigable cross-reference in Phoenix.
+
+> **Note:** Span links require direct OpenTelemetry API usage. AgentObs doesn't expose this natively, so this is a Phase 2 enhancement. The workspace-level grouping via `session.id` is the primary correlation mechanism and works out of the box.
+
+### What Phoenix Shows
+
+With this setup, a developer can:
+
+| View | What They See |
+|------|---------------|
+| **Sessions tab** | All sessions listed by workspace_id. Click one to see all agent traces in that workspace as a timeline |
+| **Session detail** | Chat-like UI showing inputs/outputs across all agents in the workspace, ordered by time |
+| **Traces tab** | All root traces. Filter by `tag.tags contains "agent:researcher"` to see one agent's traces |
+| **Trace detail** | Full span tree for one agent invocation: agent → LLM → tool → LLM |
+| **Search** | Search across all spans by `agent.name`, `session.id`, message content, model name |
+
+### Caching Strategy for Metadata Lookups
+
+The enrichment in `Murmur.ObsTracer` looks up `workspace_id` and `display_name` from the agent session. Since these are stable for the lifetime of a session, we should cache aggressively:
+
+```elixir
+# Simple ETS cache populated on agent session creation/startup
+:ets.insert(:obs_session_cache, {agent_id, workspace_id, display_name})
+
+# Lookup is O(1), no DB hit per span
+:ets.lookup(:obs_session_cache, agent_id)
+```
+
+This cache can be populated in `AgentHelper.start_agent/2` when the agent process starts and cleaned up on termination.
+
+### Implementation Phases
+
+| Phase | Scope | Effort |
+|-------|-------|--------|
+| **Phase 1** | Basic workspace grouping: `session.id` = workspace_id, `agent.name` = display_name, tags. All traces for a workspace appear together in Phoenix Sessions tab. | Small — ~100 LOC wrapper module + config |
+| **Phase 2** | Cross-agent span links: TellAction propagates sender span context to target agent. Target's root span includes a span link to sender's tool call span. | Medium — requires OTel API usage in TellAction + tracer |
+| **Phase 3** | Workspace-level dashboards: aggregate token usage, cost, and latency per workspace. Custom Phoenix annotations or Grafana dashboards consuming the same OTLP data. | Medium — mostly configuration/queries, no code changes |
+
+### Summary
+
+The chosen stack (AgentObs + Arize Phoenix) supports multi-agent trace grouping natively through OpenInference's `session.id` attribute and Phoenix's Sessions UI. The workspace concept maps directly to sessions — set `session.id` to the workspace UUID and all agents in that workspace are grouped together automatically.
+
+Individual agent identity is preserved via `agent.name` and tags, allowing developers to filter down to one agent's traces within a workspace. Cross-agent causation (who triggered whom) can be expressed via OTel span links as a follow-up enhancement.
+
+The only code required is a thin tracer wrapper (~100 LOC) that enriches span metadata with workspace and agent identity before delegating to `AgentObs.JidoTracer`.

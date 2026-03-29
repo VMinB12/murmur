@@ -11,6 +11,7 @@
 2. [Igniter Adoption](#2-should-we-adopt-igniter-for-our-packages)
 3. [CloudEvents & jido_signal Alignment](#3-are-we-properly-leveraging-jido_signal-and-cloudevents)
 4. [Additional Improvement Opportunities](#4-additional-improvement-opportunities)
+5. [Artifact System Design Review](#5-artifact-system-design-review)
 
 ---
 
@@ -128,13 +129,14 @@ jido_murmur_web ──depends──→ jido_artifacts (for topic helpers)
 
 **Migration steps:**
 
-1. Create `apps/jido_artifacts/` with the 3 modules + tests
-2. Update jido_murmur to depend on `jido_artifacts` and remove the 3 original modules
-3. Update jido_arxiv to depend on `jido_artifacts` instead of jido_murmur
-4. Update jido_murmur_web to depend on `jido_artifacts` for topic helpers
-5. Update murmur_demo agent profiles to use `JidoArtifacts.ArtifactPlugin`
-6. Update config to include `:jido_artifacts` pubsub setting
-7. Run full test suite
+1. Apply API changes from Section 5 first (metadata, ctx usage, scope concept)
+2. Create `apps/jido_artifacts/` with the updated modules + tests
+3. Update jido_murmur to depend on `jido_artifacts` and remove the 3 original modules
+4. Update jido_arxiv to depend on `jido_artifacts` instead of jido_murmur
+5. Update jido_murmur_web to depend on `jido_artifacts` for topic helpers
+6. Update murmur_demo agent profiles to use `JidoArtifacts.ArtifactPlugin`
+7. Update config to include `:jido_artifacts` pubsub setting
+8. Run full test suite
 
 ---
 
@@ -609,6 +611,7 @@ This aligns with the Igniter adoption — the install task could generate the te
 | Topic | Recommendation | Priority | Effort | Risk |
 |-------|---------------|----------|--------|------|
 | Artifact extraction | **Yes, extract `jido_artifacts` now** | High | Medium | Low |
+| Artifact API changes | **Yes** — metadata, ctx, scope (Section 5) | High | Medium | Low |
 | Igniter adoption | **Yes, adopt now** (optional dep, guard pattern) | High | Medium | Low |
 | CloudEvents Phase 1 | **Yes** — subject, standardize PubSub, fix ID usage | High | Low-Medium | Low |
 | CloudEvents Phase 2 | **Yes** — typed signals before v1.0 | Medium | Medium | Low |
@@ -624,6 +627,7 @@ This aligns with the Igniter adoption — the install task could generate the te
 ### Recommended Execution Order
 
 1. **Now (pre-publish):**
+   - Artifact API changes: metadata wrapper, `emit/4` ctx usage, scope concept (Section 5)
    - Extract `jido_artifacts` package (Section 1) — artifacts are the core tool→UI contract, every future domain tool will need this
    - Add Igniter as optional dep, convert install tasks (Section 2)
    - Set `subject` on artifact signals, replace `Signal.ID.generate!()` for non-signals (Section 3, Phase 1, items 1 & 3)
@@ -635,8 +639,224 @@ This aligns with the Igniter adoption — the install task could generate the te
    - Thread workspace_id through plugins (Section 4.2)
    - Define typed signal modules (Section 3, Phase 2)
    - Write SIGNALS.md catalog (Section 4.7)
+   - Shared artifact implementation if needed (Section 5.5)
 
 3. **Post-v1.0 (as needed):**
    - Agent profile behaviour (Section 4.5)
    - Telemetry in jido_tasks (Section 4.3)
    - Test helper consolidation (Section 4.8)
+
+---
+
+## 5. Artifact System Design Review
+
+A detailed review of the current artifact implementation, covering API design, data model, persistence, and scope. These decisions should be resolved **before** the `jido_artifacts` extraction (Section 1) since they affect the published API surface.
+
+See also: [artifact-persistence.md](artifact-persistence.md), [artifact-panel-ui.md](artifact-panel-ui.md)
+
+### 5.1 Unbounded Append Growth
+
+**Problem:** `StoreArtifact` does `existing ++ List.wrap(data)` with no limit. Repeated tool calls grow artifacts indefinitely, bloating the checkpoint JSONB payload and slowing down hibernate/thaw serialization.
+
+**Decision: Provide lifecycle callbacks, don't enforce a hard limit.**
+
+Truncating at a fixed N would constrain downstream use cases. A code analysis tool might need 500 findings, while a search tool might cap at 50. Instead, give tool authors control over artifact lifecycle through two mechanisms:
+
+1. **Add a `:max_items` option to `emit/4`** (optional, nil by default):
+
+   ```elixir
+   Artifact.emit(ctx, "papers", papers, mode: :append, max_items: 50)
+   ```
+
+   When set, `StoreArtifact` keeps only the last N items. When nil, no truncation. This puts the decision in the tool author's hands at the call site where they know their data best.
+
+2. **Add a `:clear` mode** alongside `:replace` and `:append`:
+
+   ```elixir
+   Artifact.emit(ctx, "papers", nil, mode: :clear)
+   ```
+
+   This lets tools explicitly remove artifacts (e.g., "clear previous search results before new search"). Currently the only way to remove artifact data is to `:replace` with an empty value, which is semantically ambiguous.
+
+3. **Document guidelines for tool authors** — Recommend `:max_items` for append-mode artifacts in the package docs. Make it clear that without a limit, append grows indefinitely.
+
+The framework stays unopinionated — no global default, no forced truncation — but provides the primitives for tool authors to manage growth as their use case demands.
+
+### 5.2 Schemaless Artifact Data
+
+**Decision: Postpone.** The renderer registry already maps artifact names to renderer modules. Adding a validation layer now would be premature — with only two artifact types, the cost of maintaining schemas exceeds the benefit. Revisit when the artifact type count grows enough that malformed data becomes a real debugging problem.
+
+### 5.3 Artifact Metadata
+
+**Decision: Yes, add a metadata envelope around artifact data.**
+
+Currently artifacts are stored as raw data (`"papers" => [%{id: ..., title: ...}, ...]`). This makes it impossible to know when an artifact was last updated, which agent produced it, or what version it is.
+
+**New storage format in `agent.state.artifacts`:**
+
+```elixir
+%{
+  "papers" => %{
+    data: [%{id: "2301.07041", title: "...", ...}, ...],
+    updated_at: ~U[2026-03-29 14:30:00Z],
+    source: "/sessions/session_123",
+    version: 3
+  },
+  "displayed_paper" => %{
+    data: %{id: "2301.07041", pdf_url: "..."},
+    updated_at: ~U[2026-03-29 14:31:00Z],
+    source: "/sessions/session_123",
+    version: 1
+  }
+}
+```
+
+**Impact on renderers:** All existing renderers currently access data directly (`assigns.data`). After this change, the ArtifactPanel dispatcher must unwrap: the renderer receives `artifact.data`, not the raw value. This is a one-line change in the dispatcher and is backward-compatible if done during extraction.
+
+**Implementation in `StoreArtifact`:**
+
+```elixir
+def run(%{artifact_name: name, artifact_data: data, artifact_mode: mode} = params, ctx) do
+  current_artifacts = get_in(ctx, [:state, :artifacts]) || %{}
+  existing = Map.get(current_artifacts, name)
+  max_items = params[:max_items]
+
+  updated_data =
+    case mode do
+      :clear -> nil
+      :append ->
+        prev = if existing, do: existing.data, else: []
+        appended = prev ++ List.wrap(data)
+        if max_items, do: Enum.take(appended, -max_items), else: appended
+      _replace -> data
+    end
+
+  updated_artifact =
+    if updated_data == nil do
+      current_artifacts |> Map.delete(name)
+    else
+      version = if existing, do: existing.version + 1, else: 1
+      source = get_in(ctx, [:state, :__agent_id__]) || "unknown"
+
+      Map.put(current_artifacts, name, %{
+        data: updated_data,
+        updated_at: DateTime.utc_now(),
+        source: source,
+        version: version
+      })
+    end
+
+  {:ok, %{artifacts: updated_artifact}}
+end
+```
+
+### 5.4 Using the Context Parameter in `emit/4`
+
+**Decision: Yes, use `ctx` to populate CloudEvents fields on the signal.**
+
+Currently `emit(_ctx, name, data, opts)` discards ctx. The action context contains `%{state: agent.state}`, where the agent state contains the agent's ID (which is the session ID in our system). This should feed into the signal's `source` and `subject` fields for proper CloudEvents compliance.
+
+**Updated `emit/4`:**
+
+```elixir
+def emit(ctx, name, data, opts \\ []) do
+  mode = Keyword.get(opts, :mode, :replace)
+  max_items = Keyword.get(opts, :max_items)
+
+  # Extract agent identity from action context for CloudEvents fields
+  agent_id = get_in(ctx, [:state, :__agent_id__])
+
+  signal =
+    Jido.Signal.new!(
+      "artifact.#{name}",
+      %{name: name, data: data, mode: mode, max_items: max_items},
+      source: "/jido_artifacts/#{name}",
+      subject: if(agent_id, do: "/agents/#{agent_id}")
+    )
+
+  %Directive.Emit{signal: signal}
+end
+```
+
+If agent identity isn't available in the context (e.g., standalone action execution outside an agent), the fields degrade gracefully to nil and the signal is still valid.
+
+Note: The exact path to the agent ID depends on what Jido puts in the action context. If `ctx[:state][:__agent_id__]` isn't available, the agent module could set it during `on_before_cmd` or it could be threaded through the existing `runtime_context` mechanism. This needs verification against the actual Jido agent cmd flow at implementation time.
+
+### 5.5 Shared Artifacts (Cross-Agent Scope)
+
+**Question:** Should we build a SharedArtifact abstraction for data shared across agents, or is this too use-case-specific to abstract?
+
+**Decision: Don't build a SharedArtifact abstraction. Instead, introduce a `scope` concept and let the persistence layer differ by scope.**
+
+The examples of shared data are diverse:
+- Task board: structured records with status lifecycle and assignment, queried/filtered by multiple agents and users
+- Collaborative document: real-time co-editing, OT/CRDTs, conflict resolution
+- Shared knowledge base: append-only factual store, read by all agents
+
+These have fundamentally different requirements. A "SharedArtifact" abstraction that tries to unify them would either be so generic it's useless (just a KV store) or so constrained it blocks legitimate patterns (imposing a single persistence/querying model on all of them).
+
+**What to do instead:** Extend the artifact signal with a `scope` field that declares where the artifact lives:
+
+```elixir
+# Agent-scoped (default, current behavior):
+Artifact.emit(ctx, "papers", papers, mode: :append, scope: :agent)
+
+# Workspace-scoped (visible to all agents + user):
+Artifact.emit(ctx, "task_board_summary", summary, mode: :replace, scope: :workspace)
+```
+
+The `scope` field flows through the signal to the ArtifactPlugin. The plugin can then dispatch to different persistence backends:
+
+| Scope | Persistence | PubSub Topic | Owner |
+|-------|-------------|-------------|-------|
+| `:agent` (default) | `agent.state.artifacts` via StoreArtifact (current) | `agent_artifacts:#{session_id}` | Single agent |
+| `:workspace` | Consumer-provided callback or DB table (Phase 3) | `workspace_artifacts:#{workspace_id}` | Workspace |
+
+For Phase 1 (now): Only `:agent` scope is implemented. The `scope` field exists in the signal data but `:workspace` returns an error or is ignored.
+
+For Phase 3 (later): When shared artifacts are needed, the plugin dispatches `:workspace`-scoped artifacts to a different persistence path. The consumer provides a callback or we provide a DB-backed implementation (the workspace-scoped table from [artifact-persistence.md](artifact-persistence.md)).
+
+This approach:
+- **Doesn't over-abstract** — No generic "SharedArtifact" behaviour that tries to be all things
+- **Is forward-compatible** — The scope field reserves the concept in the signal contract now
+- **Leaves room for diverse implementations** — A task board can use its own Ecto table, a collab doc can use a GenServer with CRDTs, both can declare scope: :workspace
+- **Doesn't confuse tool authors** — The API is the same `Artifact.emit/4` with one extra option
+
+**Important note on tasks:** The current task system (jido_tasks) already implements its own persistence and broadcast path. That's correct — tasks have lifecycle requirements (status transitions, assignment, querying) that artifact state storage can't serve. The scope concept doesn't absorb tasks; it handles simpler shared state like "workspace summary" or "team progress dashboard."
+
+### 5.6 Persistence Timing
+
+**Noted but do not implement yet.** Artifacts persist at the end of the LLM turn (when `hibernate_agent/1` is called), not immediately on emit. This matches message persistence behavior and is acceptable for Phase 1. For high-value artifacts where crash-loss is impactful, the workspace-scoped DB path (Phase 3) provides immediate persistence.
+
+### 5.7 Artifact Querying and Queryability
+
+**Clarification:** Most artifact usage follows a "display all at once" pattern — the UI renders the current state of each artifact as a whole. This is different from tasks, which need filtering, sorting, and status queries.
+
+This confirms that agent state is the right persistence model for artifacts. The checkpoint loads the full artifacts map on mount; the renderer displays it. No query API is needed.
+
+The task board remains correctly separate — its querying, filtering, and status lifecycle requirements are genuinely different from the artifact pattern.
+
+### 5.8 Summary of API Changes Before Extraction
+
+These changes should be applied to the current jido_murmur artifact modules, then extracted as the `jido_artifacts` package:
+
+| Change | Module | Description |
+|--------|--------|-------------|
+| Add metadata envelope | `StoreArtifact` | Wrap stored data in `%{data:, updated_at:, source:, version:}` |
+| Use ctx in emit | `Artifact` | Populate CloudEvents `source`/`subject` from action context |
+| Add `:max_items` option | `Artifact`, `StoreArtifact` | Optional bounded append, tool author decides |
+| Add `:clear` mode | `Artifact`, `StoreArtifact` | Explicit artifact removal |
+| Add `:scope` field | `Artifact`, `ArtifactPlugin` | `:agent` (default) or `:workspace` (reserved for Phase 3) |
+| Unwrap metadata in renderer | `ArtifactPanel` | Dispatcher passes `artifact.data` to renderers, not raw artifact |
+
+**Updated `emit/4` signature:**
+
+```elixir
+@spec emit(map(), String.t(), term(), keyword()) :: Directive.Emit.t()
+def emit(ctx, name, data, opts \\ [])
+
+# Options:
+#   :mode       - :replace (default), :append, or :clear
+#   :max_items  - integer | nil (only for :append mode)
+#   :scope      - :agent (default) | :workspace (reserved)
+```

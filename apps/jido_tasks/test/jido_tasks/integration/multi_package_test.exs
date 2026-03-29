@@ -26,6 +26,8 @@ defmodule JidoTasks.Integration.MultiPackageTest do
       tools = [AddTask, UpdateTask, ListTasks, ArxivSearch, DisplayPaper]
 
       for tool <- tools do
+        Code.ensure_loaded!(tool)
+
         assert function_exported?(tool, :run, 2),
                "#{inspect(tool)} must export run/2"
       end

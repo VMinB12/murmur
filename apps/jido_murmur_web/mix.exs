@@ -16,6 +16,7 @@ defmodule JidoMurmurWeb.MixProject do
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
       deps: deps(),
+      test_coverage: [threshold: 80],
       description: "Pre-built LiveView components for jido_murmur multi-agent chat",
       package: package(),
       source_url: @source_url
@@ -44,7 +45,8 @@ defmodule JidoMurmurWeb.MixProject do
   defp package do
     [
       licenses: ["Apache-2.0"],
-      links: %{"GitHub" => @source_url}
+      links: %{"GitHub" => @source_url},
+      files: ~w(lib priv/templates .formatter.exs mix.exs README.md LICENSE)
     ]
   end
 end

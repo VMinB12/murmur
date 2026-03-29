@@ -239,15 +239,15 @@
 
 **Purpose**: Quality gates, documentation, and publishing readiness
 
-- [ ] T098 [P] Configure per-package coverage reporting and verify 80% line coverage per package
-- [ ] T099 [P] Write README.md for jido_murmur at apps/jido_murmur/README.md
-- [ ] T100 [P] Write README.md for jido_murmur_web at apps/jido_murmur_web/README.md
-- [ ] T101 [P] Write README.md for jido_tasks at apps/jido_tasks/README.md
-- [ ] T102 [P] Write README.md for jido_arxiv at apps/jido_arxiv/README.md
-- [ ] T103 Update umbrella root README.md with project overview and architecture diagram
-- [ ] T104 [P] Add Hex publishing metadata (description, licenses, links, source_url) to each package mix.exs
-- [ ] T105 Run quickstart.md validation — simulate consumer integration steps against the packages
-- [ ] T106 Run mix precommit from umbrella root and fix any remaining issues
+- [x] T098 [P] Configure per-package coverage reporting and verify 80% line coverage per package
+- [x] T099 [P] Write README.md for jido_murmur at apps/jido_murmur/README.md
+- [x] T100 [P] Write README.md for jido_murmur_web at apps/jido_murmur_web/README.md
+- [x] T101 [P] Write README.md for jido_tasks at apps/jido_tasks/README.md
+- [x] T102 [P] Write README.md for jido_arxiv at apps/jido_arxiv/README.md
+- [x] T103 Update umbrella root README.md with project overview and architecture diagram
+- [x] T104 [P] Add Hex publishing metadata (description, licenses, links, source_url) to each package mix.exs
+- [x] T105 Run quickstart.md validation — simulate consumer integration steps against the packages
+- [x] T106 Run mix precommit from umbrella root and fix any remaining issues
 
 ---
 

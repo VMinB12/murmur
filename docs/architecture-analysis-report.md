@@ -654,33 +654,85 @@ A detailed review of the current artifact implementation, covering API design, d
 
 See also: [artifact-persistence.md](artifact-persistence.md), [artifact-panel-ui.md](artifact-panel-ui.md)
 
-### 5.1 Unbounded Append Growth
+### 5.1 Merge Strategy: Replace `mode` with a Developer-Controlled `merge` Callback
 
-**Problem:** `StoreArtifact` does `existing ++ List.wrap(data)` with no limit. Repeated tool calls grow artifacts indefinitely, bloating the checkpoint JSONB payload and slowing down hibernate/thaw serialization.
+**Problem:** `StoreArtifact` currently has hardcoded `:replace` and `:append` modes. `:append` does `existing ++ List.wrap(data)` with no limit, growing indefinitely. Adding `:max_items` or `:clear` as additional options leads to a combinatorial API that still can't cover every use case (prepend, dedup-by-ID, merge-by-key, windowed retention, etc.).
 
-**Decision: Provide lifecycle callbacks, don't enforce a hard limit.**
+**Decision: Drop the `mode` parameter entirely. Replace it with a `merge` callback.**
 
-Truncating at a fixed N would constrain downstream use cases. A code analysis tool might need 500 findings, while a search tool might cap at 50. Instead, give tool authors control over artifact lifecycle through two mechanisms:
+The `merge` option accepts a function `(existing_data, new_data) -> merged_data` that gives the tool author full control over how new data combines with existing data. The framework provides built-in helpers for common patterns.
 
-1. **Add a `:max_items` option to `emit/4`** (optional, nil by default):
+**API:**
 
-   ```elixir
-   Artifact.emit(ctx, "papers", papers, mode: :append, max_items: 50)
-   ```
+```elixir
+# Default: replace (no merge option needed)
+Artifact.emit(ctx, "displayed_paper", paper)
 
-   When set, `StoreArtifact` keeps only the last N items. When nil, no truncation. This puts the decision in the tool author's hands at the call site where they know their data best.
+# Append:
+Artifact.emit(ctx, "papers", papers, merge: &Artifact.Merge.append/2)
 
-2. **Add a `:clear` mode** alongside `:replace` and `:append`:
+# Append with limit (keep last 50):
+Artifact.emit(ctx, "papers", papers, merge: &Artifact.Merge.append_max(50)/2)
 
-   ```elixir
-   Artifact.emit(ctx, "papers", nil, mode: :clear)
-   ```
+# Prepend:
+Artifact.emit(ctx, "papers", papers, merge: &Artifact.Merge.prepend/2)
 
-   This lets tools explicitly remove artifacts (e.g., "clear previous search results before new search"). Currently the only way to remove artifact data is to `:replace` with an empty value, which is semantically ambiguous.
+# Dedup by ID field:
+Artifact.emit(ctx, "papers", papers, merge: &Artifact.Merge.upsert_by(:id)/2)
 
-3. **Document guidelines for tool authors** — Recommend `:max_items` for append-mode artifacts in the package docs. Make it clear that without a limit, append grows indefinitely.
+# Clear (remove artifact):
+Artifact.emit(ctx, "papers", nil, merge: fn _, _ -> nil end)
 
-The framework stays unopinionated — no global default, no forced truncation — but provides the primitives for tool authors to manage growth as their use case demands.
+# Custom:
+Artifact.emit(ctx, "results", new_results, merge: fn existing, new ->
+  (existing ++ new) |> Enum.uniq_by(& &1.id) |> Enum.take(-100)
+end)
+```
+
+**Built-in merge helpers** (in `Artifact.Merge` module):
+
+```elixir
+defmodule Artifact.Merge do
+  def append(existing, new), do: existing ++ List.wrap(new)
+  def prepend(existing, new), do: List.wrap(new) ++ existing
+
+  def append_max(max) do
+    fn existing, new -> Enum.take(existing ++ List.wrap(new), -max) end
+  end
+
+  def prepend_max(max) do
+    fn existing, new -> Enum.take(List.wrap(new) ++ existing, max) end
+  end
+
+  def upsert_by(key) do
+    fn existing, new ->
+      index = Map.new(existing, &{Map.get(&1, key), &1})
+      merged = Enum.reduce(List.wrap(new), index, fn item, acc ->
+        Map.put(acc, Map.get(item, key), item)
+      end)
+      Map.values(merged)
+    end
+  end
+end
+```
+
+**How `StoreArtifact` uses it:**
+
+When no `merge` is provided, the new data replaces the existing data (current `:replace` behavior). When `merge` is provided, it receives the existing artifact data and the new data, and the return value becomes the new artifact data. If the merge function returns `nil`, the artifact is deleted (replacing the need for a `:clear` mode).
+
+**Why this is better than `mode` + `max_items`:**
+
+- **One primitive instead of three** — `merge` replaces `:mode`, `:max_items`, and `:clear` with a single concept
+- **Fully extensible** — Tool authors aren't limited to framework-provided modes. They can implement any merge strategy: windowed retention, dedup, priority-based eviction, etc.
+- **Composable** — Merge functions can be composed: `fn e, n -> e |> append(n) |> Enum.take(-50) end`
+- **Serializable concern** — The merge function is only used at emit-time in the action. It flows through the signal as a flag (`:has_merge`) and the actual function reference is resolved by `StoreArtifact` from the signal data. This avoids serializing anonymous functions in signals.
+
+**Serialization note:** Anonymous functions can't be serialized in signals. The `merge` option is applied in `emit/4` to produce a serializable signal. Two approaches:
+
+1. **Eager merge in `emit/4`** — `emit` accepts `merge` but doesn't put the function in the signal. Instead, it sets a `merge_result` field in the signal data that `StoreArtifact` uses directly. This means the tool action applies the merge before the signal is emitted, using the current artifact state from `ctx`.
+2. **Named merge strategies** — The signal carries an atom like `:append` or `{:append_max, 50}`, and `StoreArtifact` resolves it to the built-in function. Custom functions use approach 1.
+
+Approach 1 is simpler and avoids any serialization issues. The tool action has access to current state via `ctx[:state][:artifacts]`, so it can apply the merge eagerly.
 
 ### 5.2 Schemaless Artifact Data
 
@@ -716,39 +768,38 @@ Currently artifacts are stored as raw data (`"papers" => [%{id: ..., title: ...}
 **Implementation in `StoreArtifact`:**
 
 ```elixir
-def run(%{artifact_name: name, artifact_data: data, artifact_mode: mode} = params, ctx) do
+def run(%{artifact_name: name, artifact_data: data} = params, ctx) do
   current_artifacts = get_in(ctx, [:state, :artifacts]) || %{}
   existing = Map.get(current_artifacts, name)
-  max_items = params[:max_items]
 
-  updated_data =
-    case mode do
-      :clear -> nil
-      :append ->
-        prev = if existing, do: existing.data, else: []
-        appended = prev ++ List.wrap(data)
-        if max_items, do: Enum.take(appended, -max_items), else: appended
-      _replace -> data
+  # If signal carries a pre-merged result (from eager merge in emit/4), use it directly.
+  # Otherwise, default merge is replace (new data replaces existing).
+  merged_data =
+    case params do
+      %{merge_result: result} -> result
+      _ -> data
     end
 
-  updated_artifact =
-    if updated_data == nil do
-      current_artifacts |> Map.delete(name)
+  updated_artifacts =
+    if merged_data == nil do
+      Map.delete(current_artifacts, name)
     else
       version = if existing, do: existing.version + 1, else: 1
       source = get_in(ctx, [:state, :__agent_id__]) || "unknown"
 
       Map.put(current_artifacts, name, %{
-        data: updated_data,
+        data: merged_data,
         updated_at: DateTime.utc_now(),
         source: source,
         version: version
       })
     end
 
-  {:ok, %{artifacts: updated_artifact}}
+  {:ok, %{artifacts: updated_artifacts}}
 end
 ```
+
+Note: The merge function is applied eagerly in `emit/4` (see Section 5.4), not in `StoreArtifact`. This avoids serializing anonymous functions in signals. `StoreArtifact` receives the already-merged result via `:merge_result` in the signal data.
 
 ### 5.4 Using the Context Parameter in `emit/4`
 
@@ -760,16 +811,27 @@ Currently `emit(_ctx, name, data, opts)` discards ctx. The action context contai
 
 ```elixir
 def emit(ctx, name, data, opts \\ []) do
-  mode = Keyword.get(opts, :mode, :replace)
-  max_items = Keyword.get(opts, :max_items)
+  merge_fn = Keyword.get(opts, :merge)
 
   # Extract agent identity from action context for CloudEvents fields
   agent_id = get_in(ctx, [:state, :__agent_id__])
 
+  # Eager merge: apply the merge function now using current artifact state.
+  # This avoids serializing anonymous functions in the signal.
+  signal_data =
+    if merge_fn do
+      existing_artifacts = get_in(ctx, [:state, :artifacts]) || %{}
+      existing = get_in(existing_artifacts, [name, :data])
+      merged = merge_fn.(existing, data)
+      %{name: name, data: data, merge_result: merged}
+    else
+      %{name: name, data: data}
+    end
+
   signal =
     Jido.Signal.new!(
       "artifact.#{name}",
-      %{name: name, data: data, mode: mode, max_items: max_items},
+      signal_data,
       source: "/jido_artifacts/#{name}",
       subject: if(agent_id, do: "/agents/#{agent_id}")
     )
@@ -799,10 +861,10 @@ These have fundamentally different requirements. A "SharedArtifact" abstraction 
 
 ```elixir
 # Agent-scoped (default, current behavior):
-Artifact.emit(ctx, "papers", papers, mode: :append, scope: :agent)
+Artifact.emit(ctx, "papers", papers, merge: &Artifact.Merge.append/2, scope: :agent)
 
 # Workspace-scoped (visible to all agents + user):
-Artifact.emit(ctx, "task_board_summary", summary, mode: :replace, scope: :workspace)
+Artifact.emit(ctx, "task_board_summary", summary, scope: :workspace)
 ```
 
 The `scope` field flows through the signal to the ArtifactPlugin. The plugin can then dispatch to different persistence backends:
@@ -844,8 +906,7 @@ These changes should be applied to the current jido_murmur artifact modules, the
 |--------|--------|-------------|
 | Add metadata envelope | `StoreArtifact` | Wrap stored data in `%{data:, updated_at:, source:, version:}` |
 | Use ctx in emit | `Artifact` | Populate CloudEvents `source`/`subject` from action context |
-| Add `:max_items` option | `Artifact`, `StoreArtifact` | Optional bounded append, tool author decides |
-| Add `:clear` mode | `Artifact`, `StoreArtifact` | Explicit artifact removal |
+| Replace `mode` with `merge` callback | `Artifact`, `StoreArtifact` | Single `merge: fn/2` option replaces `:mode`, `:max_items`, and `:clear`. Default is replace. Built-in helpers in `Artifact.Merge` for append, bounded append, prepend, dedup. Eager merge in `emit/4` avoids serialization issues. |
 | Add `:scope` field | `Artifact`, `ArtifactPlugin` | `:agent` (default) or `:workspace` (reserved for Phase 3) |
 | Unwrap metadata in renderer | `ArtifactPanel` | Dispatcher passes `artifact.data` to renderers, not raw artifact |
 
@@ -856,7 +917,6 @@ These changes should be applied to the current jido_murmur artifact modules, the
 def emit(ctx, name, data, opts \\ [])
 
 # Options:
-#   :mode       - :replace (default), :append, or :clear
-#   :max_items  - integer | nil (only for :append mode)
-#   :scope      - :agent (default) | :workspace (reserved)
+#   :merge  - fn(existing, new) -> merged (default: replace, i.e. returns new data)
+#   :scope  - :agent (default) | :workspace (reserved)
 ```

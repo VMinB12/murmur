@@ -1,4 +1,4 @@
-defmodule JidoMurmur.PendingQueueTest do
+defmodule Murmur.Agents.PendingQueueTest do
   use ExUnit.Case, async: true
 
   alias JidoMurmur.PendingQueue

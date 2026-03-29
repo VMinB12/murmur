@@ -12,8 +12,8 @@ defmodule JidoMurmur.RunnerTest do
     Application.put_env(:jido_murmur, :skip_hibernate, true)
 
     on_exit(fn ->
-      Application.delete_env(:jido_murmur, :llm_adapter)
-      Application.delete_env(:jido_murmur, :skip_hibernate)
+      Application.put_env(:jido_murmur, :llm_adapter, JidoMurmur.LLM.Mock)
+      Application.put_env(:jido_murmur, :skip_hibernate, true)
     end)
 
     :ok

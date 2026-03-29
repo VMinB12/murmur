@@ -55,6 +55,18 @@ end
 
 Ecto.Adapters.SQL.Sandbox.mode(repo, :manual)
 
+# Ensure profiles only contain modules available in jido_murmur's test context.
+# When running in the umbrella, config.exs may set profiles to demo-app modules
+# (e.g. Murmur.Agents.Profiles.GeneralAgent) that aren't compiled here.
+profiles = Application.get_env(:jido_murmur, :profiles, [])
+
+valid_profiles =
+  Enum.filter(profiles, fn mod ->
+    Code.ensure_loaded?(mod) && function_exported?(mod, :name, 0)
+  end)
+
+Application.put_env(:jido_murmur, :profiles, valid_profiles)
+
 # Start TestJido if needed
 jido_mod = JidoMurmur.jido_mod()
 

@@ -1,4 +1,4 @@
-defmodule JidoMurmur.UITurnTest do
+defmodule Murmur.Agents.UITurnTest do
   use ExUnit.Case, async: true
 
   alias JidoMurmur.UITurn

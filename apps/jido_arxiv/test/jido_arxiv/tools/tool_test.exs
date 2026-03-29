@@ -1,7 +1,7 @@
 defmodule JidoArxiv.Tools.ToolTest do
   use ExUnit.Case, async: true
 
-  alias ArxivSearch
+  alias JidoArxiv.Tools.ArxivSearch
   alias JidoArxiv.Tools.DisplayPaper
 
   describe "DisplayPaper" do

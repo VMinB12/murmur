@@ -1,4 +1,4 @@
-defmodule JidoMurmur.CatalogTest do
+defmodule Murmur.Agents.CatalogTest do
   @moduledoc """
   Tests for the agent catalog.
 

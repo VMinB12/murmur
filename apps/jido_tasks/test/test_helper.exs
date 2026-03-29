@@ -29,7 +29,7 @@ unless pubsub && Process.whereis(pubsub) do
 end
 
 # Also configure jido_murmur repo/pubsub to use jido_tasks test infrastructure
-Application.put_env(:jido_murmur, :repo, JidoTasks.TestRepo)
+Application.put_env(:jido_murmur, :repo, repo)
 Application.put_env(:jido_murmur, :pubsub, JidoTasks.TestPubSub)
 Application.put_env(:jido_murmur, :jido_mod, JidoTasks.TestJido)
 Application.put_env(:jido_murmur, :otp_app, :jido_tasks)

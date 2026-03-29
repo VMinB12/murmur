@@ -1,4 +1,4 @@
-defmodule JidoMurmur.Actions.StoreArtifactTest do
+defmodule Murmur.Agents.Actions.StoreArtifactTest do
   @moduledoc """
   Tests for the StoreArtifact action.
 

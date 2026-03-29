@@ -1,4 +1,4 @@
-defmodule JidoMurmur.ArtifactPluginTest do
+defmodule Murmur.Agents.ArtifactPluginTest do
   @moduledoc """
   Tests for the ArtifactPlugin.
 

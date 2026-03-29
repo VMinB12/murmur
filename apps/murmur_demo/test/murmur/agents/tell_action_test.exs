@@ -1,4 +1,4 @@
-defmodule JidoMurmur.TellActionTest do
+defmodule Murmur.Agents.TellActionTest do
   @moduledoc """
   Tests for the TellAction inter-agent communication tool.
 

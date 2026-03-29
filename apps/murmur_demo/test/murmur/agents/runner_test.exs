@@ -1,4 +1,4 @@
-defmodule JidoMurmur.RunnerTest do
+defmodule Murmur.Agents.RunnerTest do
   @moduledoc """
   Tests for the Runner module's core mechanics.
 

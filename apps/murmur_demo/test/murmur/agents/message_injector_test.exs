@@ -1,4 +1,4 @@
-defmodule JidoMurmur.MessageInjectorTest do
+defmodule Murmur.Agents.MessageInjectorTest do
   @moduledoc """
   Tests for the MessageInjector request transformer.
 

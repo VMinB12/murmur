@@ -14,6 +14,9 @@ config :jido_murmur, JidoMurmur.TestRepo,
 # jido_murmur package — use mock LLM adapter in tests
 config :jido_murmur, :llm_adapter, JidoMurmur.LLM.Mock
 
+# Skip hibernate (checkpoint persistence) in test — sandbox teardown causes noise
+config :jido_murmur, :skip_hibernate, true
+
 # jido_tasks test repo configuration (for isolated package tests)
 config :jido_tasks, JidoTasks.TestRepo,
   username: "postgres",
@@ -45,12 +48,6 @@ config :murmur_demo, MurmurWeb.Endpoint,
   http: [ip: {127, 0, 0, 1}, port: 4002],
   secret_key_base: "vlHcXXv+itjrdV2bB7djTx5qptibFxdal7XJsLZhatmeaCo4mRyEO5ltddLjdMnC",
   server: false
-
-# Use mock LLM adapter in tests (no real API calls)
-config :murmur_demo, :llm_adapter, Murmur.Agents.LLM.Mock
-
-# Skip hibernate (checkpoint persistence) in test — sandbox teardown causes noise
-config :murmur_demo, :skip_hibernate, true
 
 # Initialize plugs at runtime for faster test compilation
 config :phoenix, :plug_init_mode, :runtime

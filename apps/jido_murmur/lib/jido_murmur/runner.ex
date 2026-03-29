@@ -61,7 +61,11 @@ defmodule JidoMurmur.Runner do
         try do
           run_loop(session)
         after
-          :ets.delete(@active_table, session.id)
+          try do
+            :ets.delete(@active_table, session.id)
+          rescue
+            ArgumentError -> :ok
+          end
         end
       end)
     end
@@ -78,6 +82,9 @@ defmodule JidoMurmur.Runner do
         process_batch(session, Enum.join(messages, "\n\n"))
         run_loop(session)
     end
+  rescue
+    # ETS table may be gone if TableOwner shut down (e.g. during test teardown)
+    ArgumentError -> :ok
   end
 
   defp process_batch(session, combined) do

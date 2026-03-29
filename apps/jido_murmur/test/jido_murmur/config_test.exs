@@ -1,5 +1,7 @@
 defmodule JidoMurmur.ConfigTest do
-  use ExUnit.Case, async: true
+  # Cannot be async — tests mutate global Application env which races with
+  # other async tests that read :jido_murmur config (e.g. EctoTest).
+  use ExUnit.Case, async: false
 
   alias JidoMurmur.Config
 

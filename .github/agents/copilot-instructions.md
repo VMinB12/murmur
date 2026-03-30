@@ -1,6 +1,6 @@
 # murmur Development Guidelines
 
-Auto-generated from all feature plans. Last updated: 2026-03-29
+Auto-generated from all feature plans. Last updated: 2026-03-30
 
 ## Active Technologies
 - Elixir ≥ 1.15 on OTP + Phoenix 1.8, Phoenix LiveView 1.1, Jido 2.0, Jido.AI 2.0, Jido.Action, Jido.Signal, ReqLLM, Ecto SQL 3.13, Postgrex (001-multi-agent-chat)
@@ -15,6 +15,8 @@ Auto-generated from all feature plans. Last updated: 2026-03-29
 - N/A — signals are ephemeral PubSub messages (005-cloudevents-alignment)
 - Elixir >= 1.15 on OTP + phoenix_pubsub ~> 2.0, telemetry ~> 1.0 (already in tree), ecto_sql (for jido_tasks context) (006-platform-improvements)
 - PostgreSQL via Ecto SQL (jido_tasks context module) (006-platform-improvements)
+- Elixir ≥ 1.15 on OTP + `opentelemetry_api ~> 1.5`, `req_llm ~> 1.0`, `agent_obs ~> 0.1.4`, `:telemetry ~> 1.3` (007-llm-otel-tracing)
+- ETS (in-memory span context), no database changes (007-llm-otel-tracing)
 
 - Elixir ≥ 1.15 on OTP + Phoenix 1.8, Phoenix LiveView 1.1, Jido 2.0, Ecto SQL 3.13, Postgrex (001-multi-agent-chat)
 
@@ -34,9 +36,9 @@ tests/
 Elixir ≥ 1.15 on OTP: Follow standard conventions
 
 ## Recent Changes
+- 007-llm-otel-tracing: Added Elixir ≥ 1.15 on OTP + `opentelemetry_api ~> 1.5`, `req_llm ~> 1.0`, `agent_obs ~> 0.1.4`, `:telemetry ~> 1.3`
 - 006-platform-improvements: Added Elixir >= 1.15 on OTP + phoenix_pubsub ~> 2.0, telemetry ~> 1.0 (already in tree), ecto_sql (for jido_tasks context)
 - 005-cloudevents-alignment: Added Elixir >= 1.15 on OTP + jido_signal ~> 2.0 (provides `use Jido.Signal`), uniq (UUID7, transitive), phoenix_pubsub ~> 2.0
-- 004-igniter-adoption: Added Elixir >= 1.15 on OTP + igniter ~> 0.7 (optional, runtime: false), sourceror (transitive via igniter)
 
 
 <!-- MANUAL ADDITIONS START -->

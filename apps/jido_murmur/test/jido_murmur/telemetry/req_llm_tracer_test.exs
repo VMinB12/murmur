@@ -764,6 +764,61 @@ defmodule JidoMurmur.Telemetry.ReqLLMTracerTest do
 
       assert :ets.lookup(@table, request_id) == []
     end
+
+    test "resolves agent_id from $callers via Jido Registry with suffixed key" do
+      request_id = "us5-callers-#{System.unique_integer([:positive])}"
+      agent_id = "agent-callers-#{System.unique_integer([:positive])}"
+      workspace_id = "ws-callers-#{System.unique_integer([:positive])}"
+
+      # Populate ObsTracer.Cache with the BASE agent_id (no suffix)
+      ObsCache.put(agent_id, workspace_id, "CallerAgent")
+
+      jido_mod = Application.fetch_env!(:jido_murmur, :jido_mod)
+      registry = Module.concat(jido_mod, Registry)
+
+      # In production, the ReAct worker is registered with a suffixed key
+      # like "session_id/react_worker", not the bare session_id.
+      suffixed_key = "#{agent_id}/react_worker"
+      test_pid = self()
+
+      react_worker =
+        start_supervised!(
+          {Agent, fn ->
+            Registry.register(registry, suffixed_key, [])
+            send(test_pid, :registered)
+            :ok
+          end},
+          id: :fake_react_worker
+        )
+
+      assert_receive :registered
+
+      # In production, the LLM Task is spawned from within the react_worker
+      # process. The react_worker PID ends up in $callers.
+      task =
+        Task.async(fn ->
+          Process.put(:"$callers", [react_worker])
+
+          :telemetry.execute(
+            [:req_llm, :request, :start],
+            %{system_time: System.system_time()},
+            start_metadata(request_id)
+          )
+        end)
+
+      Task.await(task)
+
+      # Should find the suffixed key, strip the suffix, and resolve via ObsCache
+      assert [{^request_id, _span, agent_context}] = :ets.lookup(@table, request_id)
+      assert agent_context == %{workspace_id: workspace_id, display_name: "CallerAgent"}
+
+      # Clean up
+      :telemetry.execute(
+        [:req_llm, :request, :stop],
+        %{duration: 1_000_000},
+        stop_metadata(request_id)
+      )
+    end
   end
 
   # --- Foundation helper tests (T010-T013) ---

@@ -326,8 +326,14 @@ defmodule JidoMurmur.Telemetry.ReqLLMTracer do
   defp resolve_agent_context do
     agent_id =
       case Logger.metadata()[:agent_id] do
-        nil -> Process.get(:jido_agent_id)
-        id -> id
+        nil ->
+          case Process.get(:jido_agent_id) do
+            nil -> resolve_agent_id_from_ancestors()
+            id -> id
+          end
+
+        id ->
+          id
       end
 
     case agent_id do
@@ -335,7 +341,11 @@ defmodule JidoMurmur.Telemetry.ReqLLMTracer do
         nil
 
       id ->
-        case ObsCache.lookup(id) do
+        # The registry key may have a path suffix (e.g. "session_id/react_worker").
+        # ObsCache stores data under the base session ID only.
+        base_id = id |> String.split("/") |> hd()
+
+        case ObsCache.lookup(base_id) do
           {workspace_id, display_name} ->
             %{workspace_id: workspace_id, display_name: display_name}
 
@@ -343,6 +353,39 @@ defmodule JidoMurmur.Telemetry.ReqLLMTracer do
             nil
         end
     end
+  rescue
+    _ -> nil
+  end
+
+  # Walk $callers and $ancestors to find a PID registered in the Jido agent
+  # registry. In production, LLM calls happen in a Task spawned from the
+  # AgentServer via Task.Supervisor.start_child. The AgentServer PID ends up
+  # in $callers (the calling process), while $ancestors holds the supervisor.
+  defp resolve_agent_id_from_ancestors do
+    registry = jido_registry()
+    if registry, do: find_agent_in_ancestry(registry)
+  rescue
+    _ -> nil
+  end
+
+  defp find_agent_in_ancestry(registry) do
+    (Process.get(:"$callers", []) ++ Process.get(:"$ancestors", []))
+    |> Enum.find_value(fn
+      pid when is_pid(pid) -> agent_id_for_pid(registry, pid)
+      _ -> nil
+    end)
+  end
+
+  defp agent_id_for_pid(registry, pid) do
+    case Registry.keys(registry, pid) do
+      [agent_id | _] -> agent_id
+      _ -> nil
+    end
+  end
+
+  defp jido_registry do
+    jido_mod = Application.get_env(:jido_murmur, :jido_mod)
+    if jido_mod, do: Module.concat(jido_mod, Registry)
   rescue
     _ -> nil
   end

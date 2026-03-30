@@ -402,27 +402,39 @@ defmodule MurmurWeb.WorkspaceLive do
   @impl true
   def handle_info(%Jido.Signal{type: "ai.llm.response"} = signal, socket) do
     session_id = extract_session_id(signal)
-    tool_calls = LLMResponse.extract_tool_calls(signal)
 
-    if tool_calls != [] do
-      pending = Enum.map(tool_calls, &build_pending_tool_call/1)
-      {:noreply, append_streaming_tool_calls(socket, session_id, pending)}
-    else
+    # Ignore stale signals that arrive after the request has completed
+    if Map.get(socket.assigns.agent_statuses, session_id) == :idle do
       {:noreply, socket}
+    else
+      tool_calls = LLMResponse.extract_tool_calls(signal)
+
+      if tool_calls != [] do
+        pending = Enum.map(tool_calls, &build_pending_tool_call/1)
+        {:noreply, append_streaming_tool_calls(socket, session_id, pending)}
+      else
+        {:noreply, socket}
+      end
     end
   end
 
   @impl true
   def handle_info(%Jido.Signal{type: "ai.tool.result", data: data} = signal, socket) do
     session_id = extract_session_id(signal)
-    call_id = data[:call_id] || data["call_id"]
-    tool_name = data[:tool_name] || data["tool_name"] || "tool"
-    result = data[:result] || data["result"]
-    formatted_result = format_tool_result(result)
-    status = tool_result_status(result)
 
-    completed = %{id: call_id, name: tool_name, result: formatted_result, status: status}
-    {:noreply, merge_tool_result(socket, session_id, completed)}
+    # Ignore stale signals that arrive after the request has completed
+    if Map.get(socket.assigns.agent_statuses, session_id) == :idle do
+      {:noreply, socket}
+    else
+      call_id = data[:call_id] || data["call_id"]
+      tool_name = data[:tool_name] || data["tool_name"] || "tool"
+      result = data[:result] || data["result"]
+      formatted_result = format_tool_result(result)
+      status = tool_result_status(result)
+
+      completed = %{id: call_id, name: tool_name, result: formatted_result, status: status}
+      {:noreply, merge_tool_result(socket, session_id, completed)}
+    end
   end
 
   @impl true

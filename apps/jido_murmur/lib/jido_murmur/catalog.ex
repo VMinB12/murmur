@@ -6,7 +6,7 @@ defmodule JidoMurmur.Catalog do
 
       config :jido_murmur, profiles: [MyApp.Agents.GeneralAgent, MyApp.Agents.ArxivAgent]
 
-  Each profile module must implement `name/0`, `description/0`, and `catalog_meta/0`.
+  Each profile module must implement `name/0` and `description/0`.
   """
 
   @color_palette ~w(blue emerald violet amber rose cyan fuchsia lime)
@@ -66,8 +66,7 @@ defmodule JidoMurmur.Catalog do
   def list_profiles do
     profile_modules()
     |> Enum.map(fn mod ->
-      meta = mod.catalog_meta()
-      %{id: mod.name(), description: mod.description(), color: meta.color}
+      %{id: mod.name(), description: mod.description()}
     end)
   end
 
@@ -78,8 +77,7 @@ defmodule JidoMurmur.Catalog do
         raise "Unknown agent profile: #{id}"
 
       mod ->
-        meta = mod.catalog_meta()
-        %{id: id, agent_module: mod, description: mod.description(), color: meta.color}
+        %{id: id, agent_module: mod, description: mod.description()}
     end
   end
 
@@ -104,18 +102,10 @@ defmodule JidoMurmur.Catalog do
     Map.get(@color_map, color, @color_map["blue"])
   end
 
-  @doc "Returns color classes for the given agent, reading from catalog_meta when available."
-  def agent_color(profile_id, agent_name) do
-    color =
-      case profile_id && find_module(profile_id) do
-        nil ->
-          idx = :erlang.phash2({:agent_color, agent_name}, length(@color_palette))
-          Enum.at(@color_palette, idx)
-
-        mod ->
-          mod.catalog_meta().color
-      end
-
+  @doc "Returns color classes for the given agent, using name-based hashing for unique colors."
+  def agent_color(_profile_id, agent_name) do
+    idx = :erlang.phash2({:agent_color, agent_name}, length(@color_palette))
+    color = Enum.at(@color_palette, idx)
     color_classes(color)
   end
 end

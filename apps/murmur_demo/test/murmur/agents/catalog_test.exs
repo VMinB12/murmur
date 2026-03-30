@@ -23,7 +23,6 @@ defmodule Murmur.Agents.CatalogTest do
       for profile <- Catalog.list_profiles() do
         assert Map.has_key?(profile, :id)
         assert Map.has_key?(profile, :description)
-        assert Map.has_key?(profile, :color)
         assert is_binary(profile.id)
         assert is_binary(profile.description)
       end
@@ -48,7 +47,6 @@ defmodule Murmur.Agents.CatalogTest do
       assert profile.id == "general_agent"
       assert is_atom(profile.agent_module)
       assert is_binary(profile.description)
-      assert is_binary(profile.color)
     end
 
     test "raises for unknown profile id" do
@@ -87,15 +85,15 @@ defmodule Murmur.Agents.CatalogTest do
       assert function_exported?(ArxivAgent, :await, 2)
     end
 
-    test "all profile modules export catalog_meta/0 with required fields" do
+    test "all profile modules export name/0 and description/0" do
       for mod <- [GeneralAgent, ArxivAgent] do
         Code.ensure_loaded!(mod)
 
-        assert function_exported?(mod, :catalog_meta, 0),
-               "#{inspect(mod)} must export catalog_meta/0"
+        assert function_exported?(mod, :name, 0),
+               "#{inspect(mod)} must export name/0"
 
-        meta = mod.catalog_meta()
-        assert is_binary(meta.color), "#{inspect(mod)}.catalog_meta().color must be a string"
+        assert function_exported?(mod, :description, 0),
+               "#{inspect(mod)} must export description/0"
       end
     end
 

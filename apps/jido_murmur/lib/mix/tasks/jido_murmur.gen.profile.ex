@@ -63,9 +63,6 @@ if Code.ensure_loaded?(Igniter) do
           system_prompt: \\"\\"\\"
           You are a helpful #{underscore_name |> String.replace("_", " ")}.
           \\"\\"\\"
-
-        @impl JidoMurmur.AgentProfile
-        def catalog_meta, do: %{color: "blue"}
       """
 
       Igniter.Project.Module.create_module(igniter, module, contents)

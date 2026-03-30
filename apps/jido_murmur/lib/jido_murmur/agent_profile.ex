@@ -15,5 +15,4 @@ defmodule JidoMurmur.AgentProfile do
   @callback description() :: String.t() | nil
   @callback plugins() :: [module()]
   @callback actions() :: [module()]
-  @callback catalog_meta() :: map()
 end

@@ -17,7 +17,4 @@ defmodule Murmur.Agents.Profiles.GeneralAgent do
     system_prompt: """
     You are a helpful assistant. Be concise and accurate in your responses.
     """
-
-  @impl JidoMurmur.AgentProfile
-  def catalog_meta, do: %{color: "blue"}
 end

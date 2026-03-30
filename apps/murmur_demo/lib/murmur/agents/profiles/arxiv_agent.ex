@@ -24,7 +24,4 @@ defmodule Murmur.Agents.Profiles.ArxivAgent do
     Be proactive in suggesting to display papers that might be relevant.
     When presenting search results, briefly summarize each paper's key contribution.
     """
-
-  @impl JidoMurmur.AgentProfile
-  def catalog_meta, do: %{color: "violet"}
 end

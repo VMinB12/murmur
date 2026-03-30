@@ -478,6 +478,9 @@ defmodule MurmurWeb.WorkspaceLiveTest do
     } do
       {:ok, view, _html} = live(conn, ~p"/workspaces/#{workspace.id}")
 
+      # Agent must be busy for tool result signals to be processed
+      send(view.pid, {:status_change, session.id, :busy})
+
       send(
         view.pid,
         build_ai_signal(session.id, "ai.tool.result", %{tool_name: "search_web", result: {:ok, "3 results", []}})

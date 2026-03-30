@@ -8,6 +8,7 @@ defmodule Murmur.Umbrella.MixProject do
       elixir: "~> 1.15",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
+      dialyzer: [plt_add_apps: [:mix, :eex]],
       aliases: aliases(),
       listeners: [Phoenix.CodeReloader]
     ]

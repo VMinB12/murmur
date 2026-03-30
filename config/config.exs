@@ -56,7 +56,7 @@ config :jido_tasks,
 # Configure Elixir's Logger
 config :logger, :default_formatter,
   format: "$time $metadata[$level] $message\n",
-  metadata: [:request_id]
+  metadata: [:request_id, :agent_id]
 
 config :murmur_demo, Murmur.Jido, max_tasks: 1000, agent_pools: []
 
@@ -76,6 +76,8 @@ config :murmur_demo,
 
 # Use Jason for JSON parsing in Phoenix
 config :phoenix, :json_library, Jason
+
+config :req_llm, telemetry: [payloads: :raw]
 
 # Configure tailwind (the version is required)
 config :tailwind,

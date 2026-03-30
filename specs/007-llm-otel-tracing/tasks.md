@@ -25,9 +25,9 @@
 
 **Purpose**: Enable raw telemetry payloads and validate existing handler still works
 
-- [ ] T001 Add `config :req_llm, telemetry: [payloads: :raw]` to `config/config.exs`
-- [ ] T002 [P] Add `config :req_llm, telemetry: [payloads: :none]` to `config/prod.exs` to disable raw payloads in production
-- [ ] T003 Verify existing 17 tests still pass after config change by running `mix test apps/jido_murmur/test/jido_murmur/telemetry/req_llm_tracer_test.exs`
+- [x] T001 Add `config :req_llm, telemetry: [payloads: :raw]` to `config/config.exs`
+- [x] T002 [P] Add `config :req_llm, telemetry: [payloads: :none]` to `config/prod.exs` to disable raw payloads in production
+- [x] T003 Verify existing 17 tests still pass after config change by running `mix test apps/jido_murmur/test/jido_murmur/telemetry/req_llm_tracer_test.exs`
 
 **Checkpoint**: Config in place, existing functionality preserved
 
@@ -39,16 +39,16 @@
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T004 Implement `flatten_input_messages/1` private function in `apps/jido_murmur/lib/jido_murmur/telemetry/req_llm_tracer.ex` — takes a list of message maps from `request_payload`, returns a flat map of OpenInference attributes (`"llm.input_messages.{N}.message.role"` → role, `"llm.input_messages.{N}.message.content"` → content text)
-- [ ] T005 [P] Implement `flatten_output_messages/1` private function in `apps/jido_murmur/lib/jido_murmur/telemetry/req_llm_tracer.ex` — takes a list of output message maps from `response_payload`, returns a flat map of OpenInference attributes (`"llm.output_messages.{N}.message.role"` → role, `"llm.output_messages.{N}.message.content"` → content text)
-- [ ] T006 [P] Implement `flatten_tool_calls/2` private function in `apps/jido_murmur/lib/jido_murmur/telemetry/req_llm_tracer.ex` — takes a message index and a list of tool call maps, returns flat attributes (`"llm.{input|output}_messages.{N}.message.tool_calls.{M}.tool_call.function.name"` and `".arguments"` as JSON string)
-- [ ] T007 [P] Implement `extract_content/1` private helper in `apps/jido_murmur/lib/jido_murmur/telemetry/req_llm_tracer.ex` — normalizes message content from either plain string or `[%{type: :text, text: "..."}]` content part list to a single string
-- [ ] T008 [P] Implement `extract_input_value/1` and `extract_output_value/1` private functions in `apps/jido_murmur/lib/jido_murmur/telemetry/req_llm_tracer.ex` — extract the last user message content and last assistant message content respectively for `input.value` and `output.value` attributes
-- [ ] T009 Expand ETS entry schema in `apps/jido_murmur/lib/jido_murmur/telemetry/req_llm_tracer.ex` — change ETS value from `{request_id, span_ctx}` to `{request_id, span_ctx, agent_context}` where `agent_context` is a map of `%{workspace_id, display_name}` or `nil`, to support cross-process session/agent enrichment
-- [ ] T010 Write unit tests for `flatten_input_messages/1` in `apps/jido_murmur/test/jido_murmur/telemetry/req_llm_tracer_test.exs` — test with: single user message, multi-message conversation (system + user + assistant), empty message list, messages with content part lists
-- [ ] T011 [P] Write unit tests for `flatten_output_messages/1` in `apps/jido_murmur/test/jido_murmur/telemetry/req_llm_tracer_test.exs` — test with: single assistant response, assistant response with tool calls, empty output
-- [ ] T012 [P] Write unit tests for `flatten_tool_calls/2` in `apps/jido_murmur/test/jido_murmur/telemetry/req_llm_tracer_test.exs` — test with: single tool call, multiple tool calls, tool call with map arguments (JSON encoded)
-- [ ] T013 [P] Write unit test for `extract_content/1` in `apps/jido_murmur/test/jido_murmur/telemetry/req_llm_tracer_test.exs` — test with: plain string, content part list, nil content, empty string
+- [x] T004 Implement `flatten_input_messages/1` private function in `apps/jido_murmur/lib/jido_murmur/telemetry/req_llm_tracer.ex` — takes a list of message maps from `request_payload`, returns a flat map of OpenInference attributes (`"llm.input_messages.{N}.message.role"` → role, `"llm.input_messages.{N}.message.content"` → content text)
+- [x] T005 [P] Implement `flatten_output_messages/1` private function in `apps/jido_murmur/lib/jido_murmur/telemetry/req_llm_tracer.ex` — takes a list of output message maps from `response_payload`, returns a flat map of OpenInference attributes (`"llm.output_messages.{N}.message.role"` → role, `"llm.output_messages.{N}.message.content"` → content text)
+- [x] T006 [P] Implement `flatten_tool_calls/2` private function in `apps/jido_murmur/lib/jido_murmur/telemetry/req_llm_tracer.ex` — takes a message index and a list of tool call maps, returns flat attributes (`"llm.{input|output}_messages.{N}.message.tool_calls.{M}.tool_call.function.name"` and `".arguments"` as JSON string)
+- [x] T007 [P] Implement `extract_content/1` private helper in `apps/jido_murmur/lib/jido_murmur/telemetry/req_llm_tracer.ex` — normalizes message content from either plain string or `[%{type: :text, text: "..."}]` content part list to a single string
+- [x] T008 [P] Implement `extract_input_value/1` and `extract_output_value/1` private functions in `apps/jido_murmur/lib/jido_murmur/telemetry/req_llm_tracer.ex` — extract the last user message content and last assistant message content respectively for `input.value` and `output.value` attributes
+- [x] T009 Expand ETS entry schema in `apps/jido_murmur/lib/jido_murmur/telemetry/req_llm_tracer.ex` — change ETS value from `{request_id, span_ctx}` to `{request_id, span_ctx, agent_context}` where `agent_context` is a map of `%{workspace_id, display_name}` or `nil`, to support cross-process session/agent enrichment
+- [x] T010 Write unit tests for `flatten_input_messages/1` in `apps/jido_murmur/test/jido_murmur/telemetry/req_llm_tracer_test.exs` — test with: single user message, multi-message conversation (system + user + assistant), empty message list, messages with content part lists
+- [x] T011 [P] Write unit tests for `flatten_output_messages/1` in `apps/jido_murmur/test/jido_murmur/telemetry/req_llm_tracer_test.exs` — test with: single assistant response, assistant response with tool calls, empty output
+- [x] T012 [P] Write unit tests for `flatten_tool_calls/2` in `apps/jido_murmur/test/jido_murmur/telemetry/req_llm_tracer_test.exs` — test with: single tool call, multiple tool calls, tool call with map arguments (JSON encoded)
+- [x] T013 [P] Write unit test for `extract_content/1` in `apps/jido_murmur/test/jido_murmur/telemetry/req_llm_tracer_test.exs` — test with: plain string, content part list, nil content, empty string
 
 **Checkpoint**: Foundation ready — all flattening helpers tested and ETS schema expanded
 
@@ -62,13 +62,13 @@
 
 ### Tests for User Story 1
 
-- [ ] T014 [US1] Write integration test in `apps/jido_murmur/test/jido_murmur/telemetry/req_llm_tracer_test.exs` — simulate a `:start` event with `request_payload` containing `messages: [%{role: "system", content: "You are helpful"}, %{role: "user", content: "Hello"}]`, verify span attributes include `"llm.input_messages.0.message.role" => "system"`, `"llm.input_messages.0.message.content" => "You are helpful"`, `"llm.input_messages.1.message.role" => "user"`, `"llm.input_messages.1.message.content" => "Hello"`, and `"input.value" => "Hello"`
+- [x] T014 [US1] Write integration test in `apps/jido_murmur/test/jido_murmur/telemetry/req_llm_tracer_test.exs` — simulate a `:start` event with `request_payload` containing `messages: [%{role: "system", content: "You are helpful"}, %{role: "user", content: "Hello"}]`, verify span attributes include `"llm.input_messages.0.message.role" => "system"`, `"llm.input_messages.0.message.content" => "You are helpful"`, `"llm.input_messages.1.message.role" => "user"`, `"llm.input_messages.1.message.content" => "Hello"`, and `"input.value" => "Hello"`
 
 ### Implementation for User Story 1
 
-- [ ] T015 [US1] Update `handle_event([:req_llm, :request, :start], ...)` in `apps/jido_murmur/lib/jido_murmur/telemetry/req_llm_tracer.ex` — extract `messages` from `metadata[:request_payload]`, call `flatten_input_messages/1`, merge resulting attributes into span start attributes, add `"input.value"` from `extract_input_value/1`
-- [ ] T016 [US1] Update `handle_event([:req_llm, :request, :stop], ...)` in `apps/jido_murmur/lib/jido_murmur/telemetry/req_llm_tracer.ex` — extract output messages from `metadata[:response_payload]`, call `flatten_output_messages/1`, merge into stop attributes, add `"output.value"` from `extract_output_value/1`
-- [ ] T017 [US1] Write end-to-end test in `apps/jido_murmur/test/jido_murmur/telemetry/req_llm_tracer_test.exs` — simulate full start→stop cycle with `request_payload` containing messages and `response_payload` containing assistant response, verify both input and output message attributes are set on the span
+- [x] T015 [US1] Update `handle_event([:req_llm, :request, :start], ...)` in `apps/jido_murmur/lib/jido_murmur/telemetry/req_llm_tracer.ex` — extract `messages` from `metadata[:request_payload]`, call `flatten_input_messages/1`, merge resulting attributes into span start attributes, add `"input.value"` from `extract_input_value/1`
+- [x] T016 [US1] Update `handle_event([:req_llm, :request, :stop], ...)` in `apps/jido_murmur/lib/jido_murmur/telemetry/req_llm_tracer.ex` — extract output messages from `metadata[:response_payload]`, call `flatten_output_messages/1`, merge into stop attributes, add `"output.value"` from `extract_output_value/1`
+- [x] T017 [US1] Write end-to-end test in `apps/jido_murmur/test/jido_murmur/telemetry/req_llm_tracer_test.exs` — simulate full start→stop cycle with `request_payload` containing messages and `response_payload` containing assistant response, verify both input and output message attributes are set on the span
 
 **Checkpoint**: Traces now show full conversation content. This is the MVP — independently verifiable in Phoenix UI.
 
@@ -82,12 +82,12 @@
 
 ### Tests for User Story 6
 
-- [ ] T018 [US6] Write cross-process streaming test in `apps/jido_murmur/test/jido_murmur/telemetry/req_llm_tracer_test.exs` — fire `:start` event with `request_payload` (messages) in process A, fire `:stop` event with `response_payload` (assistant response + tokens) in process B (spawned task), verify span has both input message attributes (from start) and output message attributes (from stop)
+- [x] T018 [US6] Write cross-process streaming test in `apps/jido_murmur/test/jido_murmur/telemetry/req_llm_tracer_test.exs` — fire `:start` event with `request_payload` (messages) in process A, fire `:stop` event with `response_payload` (assistant response + tokens) in process B (spawned task), verify span has both input message attributes (from start) and output message attributes (from stop)
 
 ### Implementation for User Story 6
 
-- [ ] T019 [US6] Ensure `request_payload` messages are stored alongside span context in ETS during `:start` handler in `apps/jido_murmur/lib/jido_murmur/telemetry/req_llm_tracer.ex` — the input message attributes are set at start time on the span, and the span_ctx is passed to stop via ETS, so stop only needs to add output attributes. Verify `:start` handler sets input attributes on `span_ctx` before storing in ETS
-- [ ] T020 [US6] Write test for streaming call that fails mid-stream in `apps/jido_murmur/test/jido_murmur/telemetry/req_llm_tracer_test.exs` — fire `:start` event in process A, fire `:exception` event in process B, verify span has input message attributes and error status with error message
+- [x] T019 [US6] Ensure `request_payload` messages are stored alongside span context in ETS during `:start` handler in `apps/jido_murmur/lib/jido_murmur/telemetry/req_llm_tracer.ex` — the input message attributes are set at start time on the span, and the span_ctx is passed to stop via ETS, so stop only needs to add output attributes. Verify `:start` handler sets input attributes on `span_ctx` before storing in ETS
+- [x] T020 [US6] Write test for streaming call that fails mid-stream in `apps/jido_murmur/test/jido_murmur/telemetry/req_llm_tracer_test.exs` — fire `:start` event in process A, fire `:exception` event in process B, verify span has input message attributes and error status with error message
 
 **Checkpoint**: Streaming traces are complete and reliable — identical attribute richness to non-streaming
 
@@ -101,8 +101,8 @@
 
 ### Implementation for User Story 2
 
-- [ ] T021 [US2] Verify token count attributes in `handle_event([:req_llm, :request, :stop], ...)` in `apps/jido_murmur/lib/jido_murmur/telemetry/req_llm_tracer.ex` — confirm existing `llm.token_count.prompt`, `llm.token_count.completion`, `llm.token_count.total`, `gen_ai.usage.input_tokens`, `gen_ai.usage.output_tokens` are correctly extracted from `metadata[:usage]`. This is largely already implemented — audit and fix any gaps
-- [ ] T022 [US2] Write test in `apps/jido_murmur/test/jido_murmur/telemetry/req_llm_tracer_test.exs` verifying token counts — simulate stop event with `usage: %{input_tokens: 150, output_tokens: 80}`, verify all five token attributes are correctly set including total = 230
+- [x] T021 [US2] Verify token count attributes in `handle_event([:req_llm, :request, :stop], ...)` in `apps/jido_murmur/lib/jido_murmur/telemetry/req_llm_tracer.ex` — confirm existing `llm.token_count.prompt`, `llm.token_count.completion`, `llm.token_count.total`, `gen_ai.usage.input_tokens`, `gen_ai.usage.output_tokens` are correctly extracted from `metadata[:usage]`. This is largely already implemented — audit and fix any gaps
+- [x] T022 [US2] Write test in `apps/jido_murmur/test/jido_murmur/telemetry/req_llm_tracer_test.exs` verifying token counts — simulate stop event with `usage: %{input_tokens: 150, output_tokens: 80}`, verify all five token attributes are correctly set including total = 230
 
 **Checkpoint**: Token usage visible on all traces
 
@@ -116,12 +116,12 @@
 
 ### Tests for User Story 3
 
-- [ ] T023 [US3] Write test for output tool calls in `apps/jido_murmur/test/jido_murmur/telemetry/req_llm_tracer_test.exs` — simulate stop event with `response_payload` containing an assistant message with `tool_calls: [%{function: %{name: "get_weather", arguments: %{city: "Amsterdam"}}}]`, verify `"llm.output_messages.0.message.tool_calls.0.tool_call.function.name" => "get_weather"` and `".arguments" => "{\"city\":\"Amsterdam\"}"` (JSON encoded)
-- [ ] T024 [P] [US3] Write test for input tool result messages in `apps/jido_murmur/test/jido_murmur/telemetry/req_llm_tracer_test.exs` — simulate start event with `request_payload` containing a tool role message `%{role: "tool", content: "{\"temp\": 18}", name: "get_weather"}`, verify `"llm.input_messages.N.message.role" => "tool"` and content is set
+- [x] T023 [US3] Write test for output tool calls in `apps/jido_murmur/test/jido_murmur/telemetry/req_llm_tracer_test.exs` — simulate stop event with `response_payload` containing an assistant message with `tool_calls: [%{function: %{name: "get_weather", arguments: %{city: "Amsterdam"}}}]`, verify `"llm.output_messages.0.message.tool_calls.0.tool_call.function.name" => "get_weather"` and `".arguments" => "{\"city\":\"Amsterdam\"}"` (JSON encoded)
+- [x] T024 [P] [US3] Write test for input tool result messages in `apps/jido_murmur/test/jido_murmur/telemetry/req_llm_tracer_test.exs` — simulate start event with `request_payload` containing a tool role message `%{role: "tool", content: "{\"temp\": 18}", name: "get_weather"}`, verify `"llm.input_messages.N.message.role" => "tool"` and content is set
 
 ### Implementation for User Story 3
 
-- [ ] T025 [US3] Integrate `flatten_tool_calls/2` into `flatten_input_messages/1` and `flatten_output_messages/1` in `apps/jido_murmur/lib/jido_murmur/telemetry/req_llm_tracer.ex` — when a message has `:tool_calls`, call `flatten_tool_calls/2` with the message index and merge attributes. Ensure arguments are JSON-encoded via `Jason.encode!/1`
+- [x] T025 [US3] Integrate `flatten_tool_calls/2` into `flatten_input_messages/1` and `flatten_output_messages/1` in `apps/jido_murmur/lib/jido_murmur/telemetry/req_llm_tracer.ex` — when a message has `:tool_calls`, call `flatten_tool_calls/2` with the message index and merge attributes. Ensure arguments are JSON-encoded via `Jason.encode!/1`
 
 **Checkpoint**: Tool call details visible in traces — agents' reasoning loop is inspectable
 
@@ -135,12 +135,12 @@
 
 ### Tests for User Story 4
 
-- [ ] T026 [US4] Write test for session enrichment in `apps/jido_murmur/test/jido_murmur/telemetry/req_llm_tracer_test.exs` — set process metadata with agent_id, populate `JidoMurmur.ObsTracer.Cache` with `{agent_id, workspace_id, display_name}`, fire `:start` event, verify span has `"session.id" => workspace_id`
+- [x] T026 [US4] Write test for session enrichment in `apps/jido_murmur/test/jido_murmur/telemetry/req_llm_tracer_test.exs` — set process metadata with agent_id, populate `JidoMurmur.ObsTracer.Cache` with `{agent_id, workspace_id, display_name}`, fire `:start` event, verify span has `"session.id" => workspace_id`
 
 ### Implementation for User Story 4
 
-- [ ] T027 [US4] Update `handle_event([:req_llm, :request, :start], ...)` in `apps/jido_murmur/lib/jido_murmur/telemetry/req_llm_tracer.ex` — read agent_id from current process metadata (via `Logger.metadata()[:agent_id]` or `Process.get(:jido_agent_id)`), look up `JidoMurmur.ObsTracer.Cache.lookup(agent_id)` to get `{workspace_id, display_name}`, add `"session.id" => workspace_id` to span attributes. Store `%{workspace_id: workspace_id, display_name: display_name}` as `agent_context` in ETS alongside span_ctx
-- [ ] T028 [US4] Write test for session enrichment on cross-process stop in `apps/jido_murmur/test/jido_murmur/telemetry/req_llm_tracer_test.exs` — verify that session.id set at start time survives the cross-process stop (already on span from start event)
+- [x] T027 [US4] Update `handle_event([:req_llm, :request, :start], ...)` in `apps/jido_murmur/lib/jido_murmur/telemetry/req_llm_tracer.ex` — read agent_id from current process metadata (via `Logger.metadata()[:agent_id]` or `Process.get(:jido_agent_id)`), look up `JidoMurmur.ObsTracer.Cache.lookup(agent_id)` to get `{workspace_id, display_name}`, add `"session.id" => workspace_id` to span attributes. Store `%{workspace_id: workspace_id, display_name: display_name}` as `agent_context` in ETS alongside span_ctx
+- [x] T028 [US4] Write test for session enrichment on cross-process stop in `apps/jido_murmur/test/jido_murmur/telemetry/req_llm_tracer_test.exs` — verify that session.id set at start time survives the cross-process stop (already on span from start event)
 
 **Checkpoint**: Traces are filterable by session/workspace
 
@@ -154,12 +154,12 @@
 
 ### Tests for User Story 5
 
-- [ ] T029 [US5] Write test for agent name enrichment in `apps/jido_murmur/test/jido_murmur/telemetry/req_llm_tracer_test.exs` — same cache setup as T026, verify span has `"llm.agent_name" => display_name` attribute
+- [x] T029 [US5] Write test for agent name enrichment in `apps/jido_murmur/test/jido_murmur/telemetry/req_llm_tracer_test.exs` — same cache setup as T026, verify span has `"llm.agent_name" => display_name` attribute
 
 ### Implementation for User Story 5
 
-- [ ] T030 [US5] Add `"llm.agent_name" => display_name` to start attributes in `apps/jido_murmur/lib/jido_murmur/telemetry/req_llm_tracer.ex` alongside the session.id enrichment from T027 — the cache lookup already provides `display_name`, just add the attribute
-- [ ] T031 [US5] Write test for missing agent context (graceful degradation) in `apps/jido_murmur/test/jido_murmur/telemetry/req_llm_tracer_test.exs` — fire `:start` event without process metadata set, verify span is created without `session.id` or `llm.agent_name` but is otherwise complete (no crash)
+- [x] T030 [US5] Add `"llm.agent_name" => display_name` to start attributes in `apps/jido_murmur/lib/jido_murmur/telemetry/req_llm_tracer.ex` alongside the session.id enrichment from T027 — the cache lookup already provides `display_name`, just add the attribute
+- [x] T031 [US5] Write test for missing agent context (graceful degradation) in `apps/jido_murmur/test/jido_murmur/telemetry/req_llm_tracer_test.exs` — fire `:start` event without process metadata set, verify span is created without `session.id` or `llm.agent_name` but is otherwise complete (no crash)
 
 **Checkpoint**: Agent identity visible on traces — multi-agent debugging enabled
 
@@ -169,11 +169,11 @@
 
 **Purpose**: Final validation, cleanup, and hardening
 
-- [ ] T032 [P] Run `mix compile --warnings-as-errors` for `apps/jido_murmur` and fix any warnings in `apps/jido_murmur/lib/jido_murmur/telemetry/req_llm_tracer.ex`
-- [ ] T033 [P] Run `mix credo --strict` and fix any issues in `apps/jido_murmur/lib/jido_murmur/telemetry/req_llm_tracer.ex`
-- [ ] T034 Run full test suite `mix test apps/jido_murmur/test/jido_murmur/telemetry/req_llm_tracer_test.exs` — all tests must pass
-- [ ] T035 Run `mix precommit` to validate complete project health
-- [ ] T036 Run quickstart.md validation — start Phoenix, send agent message, verify in Arize Phoenix UI that traces show input messages, output messages, token counts, tool calls, session ID, and agent name
+- [x] T032 [P] Run `mix compile --warnings-as-errors` for `apps/jido_murmur` and fix any warnings in `apps/jido_murmur/lib/jido_murmur/telemetry/req_llm_tracer.ex`
+- [x] T033 [P] Run `mix credo --strict` and fix any issues in `apps/jido_murmur/lib/jido_murmur/telemetry/req_llm_tracer.ex`
+- [x] T034 Run full test suite `mix test apps/jido_murmur/test/jido_murmur/telemetry/req_llm_tracer_test.exs` — all tests must pass
+- [x] T035 Run `mix precommit` to validate complete project health
+- [x] T036 Run quickstart.md validation — start Phoenix, send agent message, verify in Arize Phoenix UI that traces show input messages, output messages, token counts, tool calls, session ID, and agent name
 
 ---
 

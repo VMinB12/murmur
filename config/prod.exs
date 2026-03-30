@@ -22,5 +22,7 @@ config :murmur_demo, MurmurWeb.Endpoint,
     ]
   ]
 
+config :req_llm, telemetry: [payloads: :none]
+
 # Runtime production configuration, including reading
 # of environment variables, is done on config/runtime.exs.

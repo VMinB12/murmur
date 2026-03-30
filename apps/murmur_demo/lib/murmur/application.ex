@@ -5,6 +5,8 @@ defmodule Murmur.Application do
 
   use Application
 
+  alias JidoMurmur.Telemetry.ReqLLMTracer
+
   @impl true
   def start(_type, _args) do
     if Application.get_env(:murmur_demo, :log_filter, false) do
@@ -12,6 +14,7 @@ defmodule Murmur.Application do
     end
 
     Jido.Telemetry.setup()
+    ReqLLMTracer.attach()
     JidoTasks.Config.validate!()
 
     children = [

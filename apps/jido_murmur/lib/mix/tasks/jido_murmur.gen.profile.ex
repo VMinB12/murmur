@@ -46,7 +46,6 @@ if Code.ensure_loaded?(Igniter) do
 
       contents = """
         @moduledoc "#{name} agent profile."
-        @behaviour JidoMurmur.AgentProfile
 
         use Jido.AI.Agent,
           name: "#{underscore_name}",

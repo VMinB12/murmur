@@ -1,6 +1,5 @@
 defmodule Murmur.Agents.Profiles.GeneralAgent do
   @moduledoc "General-purpose AI assistant agent profile."
-  @behaviour JidoMurmur.AgentProfile
 
   use Jido.AI.Agent,
     name: "general_agent",

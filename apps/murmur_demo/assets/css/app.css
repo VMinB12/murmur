@@ -5,7 +5,7 @@
 @source "../css";
 @source "../js";
 @source "../../lib/murmur_web";
-@source "../../lib/murmur/agents/catalog.ex";
+@source "../../../jido_murmur/lib/jido_murmur/catalog.ex";
 
 /* A Tailwind plugin that makes "hero-#{ICON}" classes available.
    The heroicons installation itself is managed by your mix.exs */

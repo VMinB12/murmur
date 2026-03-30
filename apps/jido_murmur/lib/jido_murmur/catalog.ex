@@ -104,10 +104,18 @@ defmodule JidoMurmur.Catalog do
     Map.get(@color_map, color, @color_map["blue"])
   end
 
-  @doc "Returns color classes for the given agent, using name-based hashing for unique colors."
-  def agent_color(_profile_id, agent_name) do
-    idx = :erlang.phash2({:agent_color, agent_name}, length(@color_palette))
-    color = Enum.at(@color_palette, idx)
+  @doc "Returns color classes for the given agent, reading from catalog_meta when available."
+  def agent_color(profile_id, agent_name) do
+    color =
+      case profile_id && find_module(profile_id) do
+        nil ->
+          idx = :erlang.phash2({:agent_color, agent_name}, length(@color_palette))
+          Enum.at(@color_palette, idx)
+
+        mod ->
+          mod.catalog_meta().color
+      end
+
     color_classes(color)
   end
 end

@@ -303,10 +303,14 @@
                             class="w-3 h-3 text-base-content/50"
                           />
                           <span class="font-medium">{tc.name}</span>
-                          <%= if tc.status == :completed do %>
-                            <span class="text-success/70 text-[10px]">Completed</span>
-                          <% else %>
-                            <span class="text-error/70 text-[10px]">Error</span>
+                          <%= cond do %>
+                            <% tc.status == :completed -> %>
+                              <span class="text-success/70 text-[10px]">Completed</span>
+                            <% tc.status == :error -> %>
+                              <span class="text-error/70 text-[10px]">Error</span>
+                            <% true -> %>
+                              <span class="loading loading-dots loading-xs text-info/70"></span>
+                              <span class="text-info/70 text-[10px]">Running</span>
                           <% end %>
                           <.icon
                             name="hero-chevron-right"
@@ -677,10 +681,14 @@
                               class="w-3 h-3 text-base-content/50"
                             />
                             <span class="font-medium">{tc.name}</span>
-                            <%= if tc.status == :completed do %>
-                              <span class="text-success/70 text-[10px]">Completed</span>
-                            <% else %>
-                              <span class="text-error/70 text-[10px]">Error</span>
+                            <%= cond do %>
+                              <% tc.status == :completed -> %>
+                                <span class="text-success/70 text-[10px]">Completed</span>
+                              <% tc.status == :error -> %>
+                                <span class="text-error/70 text-[10px]">Error</span>
+                              <% true -> %>
+                                <span class="loading loading-dots loading-xs text-info/70"></span>
+                                <span class="text-info/70 text-[10px]">Running</span>
                             <% end %>
                             <.icon
                               name="hero-chevron-right"

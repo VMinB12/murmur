@@ -15,6 +15,7 @@ defmodule MurmurWeb.Components.Artifacts do
   alias MurmurWeb.Components.Artifacts.Generic
   alias MurmurWeb.Components.Artifacts.PaperList
   alias MurmurWeb.Components.Artifacts.PdfViewer
+  alias MurmurWeb.Components.Artifacts.SqlResults
 
   # --- Badge dispatcher ---
 
@@ -33,6 +34,12 @@ defmodule MurmurWeb.Components.Artifacts do
   def artifact_badge(%{name: "displayed_paper"} = assigns) do
     ~H"""
     <PdfViewer.badge data={@data} session_id={@session_id} active?={@active?} />
+    """
+  end
+
+  def artifact_badge(%{name: "sql_results"} = assigns) do
+    ~H"""
+    <SqlResults.badge data={@data} session_id={@session_id} active?={@active?} />
     """
   end
 
@@ -58,6 +65,12 @@ defmodule MurmurWeb.Components.Artifacts do
   def artifact_detail(%{name: "displayed_paper"} = assigns) do
     ~H"""
     <PdfViewer.detail data={@data} session_id={@session_id} />
+    """
+  end
+
+  def artifact_detail(%{name: "sql_results"} = assigns) do
+    ~H"""
+    <SqlResults.detail data={@data} session_id={@session_id} />
     """
   end
 

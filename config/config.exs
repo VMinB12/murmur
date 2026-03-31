@@ -43,10 +43,20 @@ config :jido_murmur,
   otp_app: :murmur_demo,
   profiles: [
     Murmur.Agents.Profiles.GeneralAgent,
-    Murmur.Agents.Profiles.ArxivAgent
+    Murmur.Agents.Profiles.ArxivAgent,
+    Murmur.Agents.Profiles.SqlAgent
   ],
   authorize: nil,
   artifact_renderers: %{}
+
+config :jido_sql,
+  ecto_repos: [JidoSql.Repo]
+
+# Configure jido_sql target database
+config :jido_sql,
+  repo: JidoSql.Repo,
+  max_rows: 50,
+  max_columns: 20
 
 # Configure jido_tasks package to use the demo app's modules
 config :jido_tasks,

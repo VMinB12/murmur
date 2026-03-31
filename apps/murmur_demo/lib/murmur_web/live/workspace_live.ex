@@ -188,6 +188,36 @@ defmodule MurmurWeb.WorkspaceLive do
     {:noreply, assign(socket, :active_artifact, nil)}
   end
 
+  def handle_event(
+        "reexecute_query",
+        %{"session-id" => session_id, "sql" => sql, "index" => index_str},
+        socket
+      ) do
+    index = String.to_integer(index_str)
+
+    {result_key, result_val} =
+      case JidoSql.QueryExecutor.execute(JidoSql.Repo, sql) do
+        {:ok, result} -> {"loaded_result", result}
+        {:error, msg} -> {"loaded_error", msg}
+      end
+
+    artifacts = socket.assigns.artifacts
+    session_artifacts = Map.get(artifacts, session_id, %{})
+    sql_results = session_artifacts["sql_results"] || []
+
+    updated_results =
+      List.update_at(sql_results, index, fn item ->
+        item
+        |> Map.put(result_key, result_val)
+        |> Map.delete(if(result_key == "loaded_result", do: "loaded_error", else: "loaded_result"))
+      end)
+
+    updated_session = Map.put(session_artifacts, "sql_results", updated_results)
+    updated_artifacts = Map.put(artifacts, session_id, updated_session)
+
+    {:noreply, assign(socket, :artifacts, updated_artifacts)}
+  end
+
   def handle_event("toggle_task_board", _params, socket) do
     {:noreply, assign(socket, :show_task_board, !socket.assigns.show_task_board)}
   end

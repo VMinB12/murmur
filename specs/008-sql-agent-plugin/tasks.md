@@ -19,13 +19,13 @@
 
 **Purpose**: Create the `jido_sql` umbrella app skeleton, Repo, and configuration
 
-- [ ] T001 Create `apps/jido_sql/mix.exs` declaring deps: `{:ecto_sql, "~> 3.0"}, {:postgrex, "~> 0.19"}, {:jido, in_umbrella: true}, {:jido_action, in_umbrella: true}, {:jido_artifacts, in_umbrella: true}`
-- [ ] T002 Create `apps/jido_sql/lib/jido_sql.ex` top-level module with `repo/0` config accessor reading from `:jido_sql, :repo`
-- [ ] T003 [P] Create `apps/jido_sql/lib/jido_sql/repo.ex` defining `JidoSql.Repo` with `use Ecto.Repo, otp_app: :jido_sql, adapter: Ecto.Adapters.Postgres`
-- [ ] T004 Add `config :jido_sql, repo: JidoSql.Repo` and `JidoSql.Repo` database config to `config/config.exs`, `config/dev.exs`, `config/test.exs`, and `config/runtime.exs` (using `SQL_AGENT_DATABASE_URL` env var)
-- [ ] T005 Add `JidoSql.Repo` to the application supervision tree in `apps/jido_sql/lib/jido_sql/application.ex`
-- [ ] T006 [P] Create `apps/jido_sql/test/test_helper.exs` with ExUnit configuration and Ecto sandbox setup for `JidoSql.Repo`
-- [ ] T007 Verify umbrella compiles: run `mix compile` from repo root with zero errors
+- [X] T001 Create `apps/jido_sql/mix.exs` declaring deps: `{:ecto_sql, "~> 3.0"}, {:postgrex, "~> 0.19"}, {:jido, in_umbrella: true}, {:jido_action, in_umbrella: true}, {:jido_artifacts, in_umbrella: true}`
+- [X] T002 Create `apps/jido_sql/lib/jido_sql.ex` top-level module with `repo/0` config accessor reading from `:jido_sql, :repo`
+- [X] T003 [P] Create `apps/jido_sql/lib/jido_sql/repo.ex` defining `JidoSql.Repo` with `use Ecto.Repo, otp_app: :jido_sql, adapter: Ecto.Adapters.Postgres`
+- [X] T004 Add `config :jido_sql, repo: JidoSql.Repo` and `JidoSql.Repo` database config to `config/config.exs`, `config/dev.exs`, `config/test.exs`, and `config/runtime.exs` (using `SQL_AGENT_DATABASE_URL` env var)
+- [X] T005 Add `JidoSql.Repo` to the application supervision tree in `apps/jido_sql/lib/jido_sql/application.ex`
+- [X] T006 [P] Create `apps/jido_sql/test/test_helper.exs` with ExUnit configuration and Ecto sandbox setup for `JidoSql.Repo`
+- [X] T007 Verify umbrella compiles: run `mix compile` from repo root with zero errors
 
 ---
 
@@ -35,9 +35,9 @@
 
 **⚠️ CRITICAL**: Both tools and schema introspection depend on the query executor.
 
-- [ ] T008 Create `apps/jido_sql/lib/jido_sql/query_executor.ex` with `execute/3` function: accepts `(repo, sql, opts)`, calls `Ecto.Adapters.SQL.query/4` with configurable timeout (default 15_000ms), returns `{:ok, %{columns: [...], rows: [[...]], total_rows: n}}` or `{:error, "message"}` per contracts/tools.md
-- [ ] T009 Add `truncate/3` function to `apps/jido_sql/lib/jido_sql/query_executor.ex`: accepts `(result, max_rows \\ 50, max_cols \\ 20)`, slices rows and columns, returns `%{columns: [...], rows: [[...]], truncated: bool, total_rows: n, total_columns: n}`
-- [ ] T010 Add `format_text_table/1` function to `apps/jido_sql/lib/jido_sql/query_executor.ex`: accepts truncated result, formats as pipe-separated text table with truncation indicator and row count summary
+- [X] T008 Create `apps/jido_sql/lib/jido_sql/query_executor.ex` with `execute/3` function: accepts `(repo, sql, opts)`, calls `Ecto.Adapters.SQL.query/4` with configurable timeout (default 15_000ms), returns `{:ok, %{columns: [...], rows: [[...]], total_rows: n}}` or `{:error, "message"}` per contracts/tools.md
+- [X] T009 Add `truncate/3` function to `apps/jido_sql/lib/jido_sql/query_executor.ex`: accepts `(result, max_rows \\ 50, max_cols \\ 20)`, slices rows and columns, returns `%{columns: [...], rows: [[...]], truncated: bool, total_rows: n, total_columns: n}`
+- [X] T010 Add `format_text_table/1` function to `apps/jido_sql/lib/jido_sql/query_executor.ex`: accepts truncated result, formats as pipe-separated text table with truncation indicator and row count summary
 
 **Checkpoint**: Query execution, truncation, and formatting available for tools and schema introspection.
 
@@ -49,12 +49,12 @@
 
 **Independent Test**: Start the agent and verify its instructions contain the connected database schema.
 
-- [ ] T011 [US2] Create `apps/jido_sql/lib/jido_sql/schema_introspection.ex` with `describe_schema/1` function: accepts repo, queries `information_schema.columns WHERE table_schema = 'public'`, groups by table, returns `{:ok, schema_text}` or `{:error, reason}` per research.md R3
-- [ ] T012 [US2] Add `describe_schema!/1` raising variant and `cache_schema/1` function to `apps/jido_sql/lib/jido_sql/schema_introspection.ex` that calls `describe_schema!/1` and stores result in `:persistent_term` under `{JidoSql, :schema}`
-- [ ] T013 [US2] Call `SchemaIntrospection.cache_schema/1` from `apps/jido_sql/lib/jido_sql/application.ex` after Repo starts, logging table/column counts on success and raising on failure
-- [ ] T014 [US2] Create `apps/jido_sql/lib/jido_sql/request_transformer.ex` implementing `Jido.AI.Reasoning.ReAct.RequestTransformer` behaviour: reads schema from `:persistent_term`, appends `"\n\nDatabase Schema:\n" <> schema_text` to the system message in `transform_request/4`
-- [ ] T015 [US2] Create `apps/murmur_demo/lib/murmur/agents/profiles/sql_agent.ex` with `use Jido.AI.Agent`: name `"sql_agent"`, description, model `:fast`, tools `[JidoSql.Tools.Query, JidoSql.Tools.Display]`, plugins `[JidoMurmur.StreamingPlugin, JidoArtifacts.ArtifactPlugin]`, `request_transformer: JidoSql.RequestTransformer`, system prompt describing SQL assistant role
-- [ ] T016 [US2] Register `Murmur.Agents.Profiles.SqlAgent` in `config/config.exs` under `:jido_murmur, :profiles` list
+- [X] T011 [US2] Create `apps/jido_sql/lib/jido_sql/schema_introspection.ex` with `describe_schema/1` function: accepts repo, queries `information_schema.columns WHERE table_schema = 'public'`, groups by table, returns `{:ok, schema_text}` or `{:error, reason}` per research.md R3
+- [X] T012 [US2] Add `describe_schema!/1` raising variant and `cache_schema/1` function to `apps/jido_sql/lib/jido_sql/schema_introspection.ex` that calls `describe_schema!/1` and stores result in `:persistent_term` under `{JidoSql, :schema}`
+- [X] T013 [US2] Call `SchemaIntrospection.cache_schema/1` from `apps/jido_sql/lib/jido_sql/application.ex` after Repo starts, logging table/column counts on success and raising on failure
+- [X] T014 [US2] Create `apps/jido_sql/lib/jido_sql/request_transformer.ex` implementing `Jido.AI.Reasoning.ReAct.RequestTransformer` behaviour: reads schema from `:persistent_term`, appends `"\n\nDatabase Schema:\n" <> schema_text` to the system message in `transform_request/4`
+- [X] T015 [US2] Create `apps/murmur_demo/lib/murmur/agents/profiles/sql_agent.ex` with `use Jido.AI.Agent`: name `"sql_agent"`, description, model `:fast`, tools `[JidoSql.Tools.Query, JidoSql.Tools.Display]`, plugins `[JidoMurmur.StreamingPlugin, JidoArtifacts.ArtifactPlugin]`, `request_transformer: JidoSql.RequestTransformer`, system prompt describing SQL assistant role
+- [X] T016 [US2] Register `Murmur.Agents.Profiles.SqlAgent` in `config/config.exs` under `:jido_murmur, :profiles` list
 
 **Checkpoint**: SQL agent starts, reads schema, and includes it in every LLM request. Agent visible in catalog.
 
@@ -66,8 +66,8 @@
 
 **Independent Test**: Send a chat message to the SQL agent and verify a query result table is displayed.
 
-- [ ] T017 [US1] Create `apps/jido_sql/lib/jido_sql/tools/query.ex` with `use Jido.Action, name: "sql_query", schema: [sql_query: [type: :string, required: true]]`: calls `QueryExecutor.execute/3` then `truncate/3` then `format_text_table/1`, returns `{:ok, %{result: formatted_text}}` or `{:error, message}` per contracts/tools.md
-- [ ] T018 [US1] Create `apps/jido_sql/lib/jido_sql/tools/display.ex` with `use Jido.Action, name: "sql_display", schema: [sql_query: [type: :string, required: true]]`: calls `QueryExecutor.execute/3` to validate the SQL works, then emits a deferred artifact via `Artifact.emit(ctx, "sql_results", %{sql: ..., label: ..., row_count: ..., column_count: ...}, mode: :merge, merge: {:append, :data})`, returns `{:ok, %{result: "Query result displayed to user (N rows)"}, directive}` or `{:error, message}` per contracts/tools.md
+- [X] T017 [US1] Create `apps/jido_sql/lib/jido_sql/tools/query.ex` with `use Jido.Action, name: "sql_query", schema: [sql_query: [type: :string, required: true]]`: calls `QueryExecutor.execute/3` then `truncate/3` then `format_text_table/1`, returns `{:ok, %{result: formatted_text}}` or `{:error, message}` per contracts/tools.md
+- [X] T018 [US1] Create `apps/jido_sql/lib/jido_sql/tools/display.ex` with `use Jido.Action, name: "sql_display", schema: [sql_query: [type: :string, required: true]]`: calls `QueryExecutor.execute/3` to validate the SQL works, then emits a deferred artifact via `Artifact.emit(ctx, "sql_results", %{sql: ..., label: ..., row_count: ..., column_count: ...}, mode: :merge, merge: {:append, :data})`, returns `{:ok, %{result: "Query result displayed to user (N rows)"}, directive}` or `{:error, message}` per contracts/tools.md
 
 **Checkpoint**: Both tools functional. Agent can query the database and display results to the user. Core value proposition works.
 
@@ -81,8 +81,8 @@
 
 *Note: Truncation logic is already implemented in T009/T010 (Phase 2). This phase ensures it's properly wired into the query tool.*
 
-- [ ] T019 [US3] Verify `apps/jido_sql/lib/jido_sql/tools/query.ex` calls `truncate/3` with configurable limits read from application config (`:jido_sql, :max_rows` and `:jido_sql, :max_columns`), defaulting to 50 rows / 20 columns
-- [ ] T020 [US3] Add truncation defaults to `config/config.exs`: `config :jido_sql, max_rows: 50, max_columns: 20`
+- [X] T019 [US3] Verify `apps/jido_sql/lib/jido_sql/tools/query.ex` calls `truncate/3` with configurable limits read from application config (`:jido_sql, :max_rows` and `:jido_sql, :max_columns`), defaulting to 50 rows / 20 columns
+- [X] T020 [US3] Add truncation defaults to `config/config.exs`: `config :jido_sql, max_rows: 50, max_columns: 20`
 
 **Checkpoint**: Query tool enforces configurable truncation limits.
 
@@ -94,8 +94,8 @@
 
 **Independent Test**: Call display tool and verify the data panel shows a new tab with paginated query results.
 
-- [ ] T021 [US4] Create SQL result artifact renderer component in `apps/jido_murmur_web/` that renders `"sql_results"` artifacts: shows sub-tabs (one per displayed query, labeled from artifact `label` field), dynamically executes SQL via `QueryExecutor.execute/2` when a tab is viewed, renders paginated HTML table with Tailwind styling (column headers, row data, page navigation at 100 rows/page, empty state with headers)
-- [ ] T022 [US4] Register the SQL result renderer in the artifact renderer registry in `config/config.exs` under `:jido_murmur, :artifact_renderers` mapping `"sql_results"` to the renderer component
+- [X] T021 [US4] Create SQL result artifact renderer component in `apps/jido_murmur_web/` that renders `"sql_results"` artifacts: shows sub-tabs (one per displayed query, labeled from artifact `label` field), dynamically executes SQL via `QueryExecutor.execute/2` when a tab is viewed, renders paginated HTML table with Tailwind styling (column headers, row data, page navigation at 100 rows/page, empty state with headers)
+- [X] T022 [US4] Register the SQL result renderer in the artifact renderer registry in `config/config.exs` under `:jido_murmur, :artifact_renderers` mapping `"sql_results"` to the renderer component
 
 **Checkpoint**: Display tool results appear as paginated tables in data panel tabs. Each display call creates a new sub-tab.
 
@@ -107,10 +107,10 @@
 
 **Independent Test**: Have a conversation, restart server, reopen conversation, verify chat history visible and data panel tabs reappear with re-executable queries.
 
-- [ ] T023 [US6] Ensure both `query.ex` and `display.ex` tools in `apps/jido_sql/lib/jido_sql/tools/` include `sql` and `tool_name` fields in their return payload so they are persisted in `ThreadEntry.payload` by the existing storage adapter (drives chat column)
-- [ ] T024 [US6] Verify `display.ex` artifact emission uses `:merge` mode with append so successive display calls accumulate in `agent.state[:artifacts]["sql_results"]` and survive hibernation via checkpoint (drives data panel)
-- [ ] T025 [US6] Update the SQL result artifact renderer (from T021) to show "Click to load results" placeholder for each sub-tab when artifacts are restored from checkpoint on revisit, triggering `"reexecute_query"` event on click
-- [ ] T026 [US6] Add `"reexecute_query"` event handler to the data panel LiveView: receives `%{"sql" => sql_text, "index" => n}`, calls `JidoSql.QueryExecutor.execute/3`, renders paginated results in the corresponding data panel tab. On error, display error message in place of the result table.
+- [X] T023 [US6] Ensure both `query.ex` and `display.ex` tools in `apps/jido_sql/lib/jido_sql/tools/` include `sql` and `tool_name` fields in their return payload so they are persisted in `ThreadEntry.payload` by the existing storage adapter (drives chat column)
+- [X] T024 [US6] Verify `display.ex` artifact emission uses `:merge` mode with append so successive display calls accumulate in `agent.state[:artifacts]["sql_results"]` and survive hibernation via checkpoint (drives data panel)
+- [X] T025 [US6] Update the SQL result artifact renderer (from T021) to show "Click to load results" placeholder for each sub-tab when artifacts are restored from checkpoint on revisit, triggering `"reexecute_query"` event on click
+- [X] T026 [US6] Add `"reexecute_query"` event handler to the data panel LiveView: receives `%{"sql" => sql_text, "index" => n}`, calls `JidoSql.QueryExecutor.execute/3`, renders paginated results in the corresponding data panel tab. On error, display error message in place of the result table.
 
 **Checkpoint**: Past conversations show query history. Users can click to re-execute and see current results. Errors handled gracefully.
 
@@ -122,7 +122,7 @@
 
 **Independent Test**: Follow the docs and verify write queries are rejected.
 
-- [ ] T027 [US5] Add read-only configuration section to `apps/jido_sql/README.md` documenting both approaches: (1) create read-only PostgreSQL user with GRANT SELECT, (2) connection URI with `options=-c default_transaction_read_only=on` per quickstart.md
+- [X] T027 [US5] Add read-only configuration section to `apps/jido_sql/README.md` documenting both approaches: (1) create read-only PostgreSQL user with GRANT SELECT, (2) connection URI with `options=-c default_transaction_read_only=on` per quickstart.md
 
 **Checkpoint**: Read-only documentation complete. Operators can secure the SQL agent connection.
 
@@ -132,10 +132,10 @@
 
 **Purpose**: Integration verification, configuration cleanup, and final validation
 
-- [ ] T028 [P] Add `@moduledoc` to all new modules in `apps/jido_sql/lib/` describing purpose and usage
-- [ ] T029 Verify `JidoSql.Repo` starts correctly with `SQL_AGENT_DATABASE_URL` not set: should log a clear error and not crash the application (graceful degradation — SQL agent simply not available)
-- [ ] T030 Run full umbrella test suite (`mix test`) from repo root — verify all existing tests pass with zero regressions
-- [ ] T031 Run `mix precommit` from repo root to verify Credo, Dialyxir, and formatting compliance
+- [X] T028 [P] Add `@moduledoc` to all new modules in `apps/jido_sql/lib/` describing purpose and usage
+- [X] T029 Verify `JidoSql.Repo` starts correctly with `SQL_AGENT_DATABASE_URL` not set: should log a clear error and not crash the application (graceful degradation — SQL agent simply not available)
+- [X] T030 Run full umbrella test suite (`mix test`) from repo root — verify all existing tests pass with zero regressions
+- [X] T031 Run `mix precommit` from repo root to verify Credo, Dialyxir, and formatting compliance
 
 ---
 

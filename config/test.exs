@@ -20,6 +20,15 @@ config :jido_murmur, :llm_adapter, JidoMurmur.LLM.Mock
 # Skip hibernate (checkpoint persistence) in test — sandbox teardown causes noise
 config :jido_murmur, :skip_hibernate, true
 
+# SQL agent target database (uses the same test database for simplicity)
+config :jido_sql, JidoSql.Repo,
+  username: "postgres",
+  password: "postgres",
+  hostname: "localhost",
+  database: "murmur_test#{System.get_env("MIX_TEST_PARTITION")}",
+  pool: Sandbox,
+  pool_size: System.schedulers_online() * 2
+
 # jido_tasks test repo configuration (for isolated package tests)
 config :jido_tasks, JidoTasks.TestRepo,
   username: "postgres",

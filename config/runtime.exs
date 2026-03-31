@@ -40,6 +40,13 @@ end
 
 config :murmur_demo, MurmurWeb.Endpoint, http: [port: String.to_integer(System.get_env("PORT", "4000"))]
 
+# SQL agent target database (optional — disabled when not set)
+if sql_agent_db_url = System.get_env("SQL_AGENT_DATABASE_URL") do
+  config :jido_sql, JidoSql.Repo,
+    url: sql_agent_db_url,
+    pool_size: String.to_integer(System.get_env("SQL_AGENT_POOL_SIZE", "5"))
+end
+
 if config_env() == :prod do
   database_url =
     System.get_env("DATABASE_URL") ||

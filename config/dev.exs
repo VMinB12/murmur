@@ -13,6 +13,13 @@ config :murmur_demo, Murmur.Repo,
   show_sensitive_data_on_connection_error: true,
   pool_size: 10
 
+# SQL agent target database (optional — SQL agent disabled if not configured)
+if System.get_env("SQL_AGENT_DATABASE_URL") do
+  config :jido_sql, JidoSql.Repo,
+    url: System.get_env("SQL_AGENT_DATABASE_URL"),
+    pool_size: 5
+end
+
 # For development, we disable any cache and enable
 # debugging and code reloading.
 #

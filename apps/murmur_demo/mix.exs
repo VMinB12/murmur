@@ -36,6 +36,7 @@ defmodule MurmurDemo.MixProject do
       {:jido_murmur_web, in_umbrella: true},
       {:jido_tasks, in_umbrella: true},
       {:jido_arxiv, in_umbrella: true},
+      {:jido_sql, in_umbrella: true},
       {:phoenix, "~> 1.8.5"},
       {:phoenix_ecto, "~> 4.5"},
       {:ecto_sql, "~> 3.13"},

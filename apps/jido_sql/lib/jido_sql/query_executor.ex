@@ -26,7 +26,7 @@ defmodule JidoSql.QueryExecutor do
 
     case EctoSQL.query(repo, sql, [], timeout: timeout) do
       {:ok, %{columns: cols, rows: rows, num_rows: count}} ->
-        {:ok, %{columns: cols, rows: rows, total_rows: count}}
+        {:ok, %{columns: cols, rows: sanitize_rows(rows), total_rows: count}}
 
       {:error, %PostgrexError{} = err} ->
         {:error, Exception.message(err)}
@@ -138,8 +138,14 @@ defmodule JidoSql.QueryExecutor do
     "#{format_number(total)} rows returned."
   end
 
+  defp sanitize_rows(rows) do
+    Enum.map(rows, fn row -> Enum.map(row, &to_string_safe/1) end)
+  end
+
   defp to_string_safe(nil), do: "NULL"
-  defp to_string_safe(val) when is_binary(val), do: val
+  defp to_string_safe(val) when is_binary(val) do
+    if String.valid?(val), do: val, else: inspect(val)
+  end
   defp to_string_safe(val), do: inspect(val)
 
   defp format_number(n) when n >= 1_000 do

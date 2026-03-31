@@ -1,0 +1,68 @@
+# Architecture
+
+## System Overview
+
+Murmur is a real-time multi-agent chat platform built as an Elixir/Phoenix umbrella project. It enables users to create workspaces populated with AI agents that can converse with humans and each other, produce rich artifacts, and collaboratively manage tasks — all with persistent history and autonomous server-side execution.
+
+## Architecture Diagram
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         murmur_demo                             │
+│                  (Reference Phoenix application)                │
+│   LiveView ←→ PubSub ←→ Runner ←→ LLM                         │
+└──────┬──────────────┬──────────────┬──────────────┬─────────────┘
+       │              │              │              │
+┌──────▼──────┐ ┌─────▼──────┐ ┌────▼─────┐ ┌─────▼──────┐
+│jido_murmur  │ │jido_murmur │ │jido_tasks│ │jido_arxiv  │
+│  _web       │ │  (core)    │ │          │ │            │
+│ LiveView    │ │ Runner,    │ │ Task     │ │ arXiv      │
+│ Components  │ │ Plugins,   │ │ mgmt     │ │ search &   │
+│             │ │ Storage,   │ │ tools    │ │ display    │
+│             │ │ Schemas    │ │          │ │            │
+└─────────────┘ └──────┬─────┘ └──────────┘ └────────────┘
+                       │
+               ┌───────▼───────┐  ┌──────────────┐  ┌──────────────┐
+               │jido_artifacts │  │  jido_sql     │  │  jido (dep)  │
+               │ Artifact      │  │  SQL agent    │  │  Agent       │
+               │ system        │  │  plugin       │  │  framework   │
+               └───────────────┘  └──────────────┘  └──────────────┘
+                                         │
+                                    PostgreSQL
+```
+
+## Key Components
+
+| Component | Responsibility |
+|-----------|---------------|
+| `murmur_demo` | Reference Phoenix 1.8 application. Hosts LiveView UI, PubSub, Ecto Repo, and agent profile configuration. |
+| `jido_murmur` | Core backend: Runner (agent execution loop), PendingQueue (message queuing for busy agents), Plugins (streaming, artifacts), Storage.Ecto (conversation persistence), Schemas. |
+| `jido_murmur_web` | Pre-built LiveView components for the chat interface — split/unified views, message rendering, workspace management. |
+| `jido_tasks` | Task management Jido.Action tools — agents collaboratively manage a shared task board. |
+| `jido_arxiv` | arXiv academic research tools — search and paper display as agent actions. |
+| `jido_artifacts` | Artifact production system — agents emit rich artifacts (HTML, charts, papers) that render in the UI. |
+| `jido_sql` | SQL agent plugin — natural-language-to-SQL query execution against a target database, with safety guardrails. |
+
+## Technology Stack
+
+| Layer | Technology | Rationale |
+|-------|-----------|-----------|
+| Language | Elixir 1.15+ / OTP | Concurrency, fault tolerance, real-time via lightweight processes |
+| Web framework | Phoenix 1.8 + LiveView | Real-time UI with server-rendered HTML over WebSocket |
+| Agent framework | Jido | Composable agent actions, signals, plugins, and supervision |
+| AI/LLM | jido_ai + Req | Model-agnostic LLM integration via configurable aliases |
+| Database | PostgreSQL + Ecto | Relational storage for conversations, tasks, artifacts |
+| PubSub | Phoenix.PubSub | Real-time event distribution between agents and UI |
+| Build | Mix umbrella | Independent packages, shared config, single repo |
+| CSS | Tailwind CSS v4 | Utility-first styling with new import-based config |
+
+## Key Constraints & Trade-offs
+
+- **Umbrella structure**: Each app (`jido_murmur`, `jido_tasks`, etc.) is designed to be independently publishable to Hex. This adds inter-app boundary discipline but increases coordination cost.
+- **Jido dependency**: The agent runtime is tightly coupled to the Jido framework. This gives rich agent primitives but means Murmur evolves with Jido's API.
+- **Phoenix PubSub for agent communication**: Agents use PubSub for real-time events. This is simple and performant in a single-node deployment but requires distributed PubSub (e.g., Redis adapter) for multi-node.
+- **PostgreSQL as single data store**: All persistence (conversations, tasks, artifacts, SQL agent queries) goes through PostgreSQL. Scales well for the expected load but may need read replicas at scale.
+
+## Sub-documents
+
+_(none yet — split when any section exceeds ~200 lines)_

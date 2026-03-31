@@ -203,16 +203,18 @@ defmodule MurmurWeb.WorkspaceLive do
 
     artifacts = socket.assigns.artifacts
     session_artifacts = Map.get(artifacts, session_id, %{})
-    sql_results = session_artifacts["sql_results"] || []
+    sql_artifact = session_artifacts["sql_results"] || %{data: []}
+    query_list = Map.get(sql_artifact, :data, []) || []
 
-    updated_results =
-      List.update_at(sql_results, index, fn item ->
+    updated_list =
+      List.update_at(query_list, index, fn item ->
         item
         |> Map.put(result_key, result_val)
         |> Map.delete(if(result_key == "loaded_result", do: "loaded_error", else: "loaded_result"))
       end)
 
-    updated_session = Map.put(session_artifacts, "sql_results", updated_results)
+    updated_artifact = Map.put(sql_artifact, :data, updated_list)
+    updated_session = Map.put(session_artifacts, "sql_results", updated_artifact)
     updated_artifacts = Map.put(artifacts, session_id, updated_session)
 
     {:noreply, assign(socket, :artifacts, updated_artifacts)}

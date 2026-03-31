@@ -1,5 +1,15 @@
 import Config
 
+# SQL agent target database — defaults to the local dev Postgres (read-only).
+# Set SQL_AGENT_DATABASE_URL in runtime to point at a different database.
+config :jido_sql, JidoSql.Repo,
+  username: "postgres",
+  password: "postgres",
+  hostname: "localhost",
+  database: "murmur_dev",
+  pool_size: 5,
+  parameters: [default_transaction_read_only: "on"]
+
 # Do not include metadata nor timestamps in development logs
 config :logger, :default_formatter, format: "[$level] $message\n"
 
@@ -12,13 +22,6 @@ config :murmur_demo, Murmur.Repo,
   stacktrace: true,
   show_sensitive_data_on_connection_error: true,
   pool_size: 10
-
-# SQL agent target database (optional — SQL agent disabled if not configured)
-if System.get_env("SQL_AGENT_DATABASE_URL") do
-  config :jido_sql, JidoSql.Repo,
-    url: System.get_env("SQL_AGENT_DATABASE_URL"),
-    pool_size: 5
-end
 
 # For development, we disable any cache and enable
 # debugging and code reloading.

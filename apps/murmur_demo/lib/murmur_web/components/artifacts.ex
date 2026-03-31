@@ -17,6 +17,11 @@ defmodule MurmurWeb.Components.Artifacts do
   alias MurmurWeb.Components.Artifacts.PdfViewer
   alias MurmurWeb.Components.Artifacts.SqlResults
 
+  # Artifact data is stored in an envelope %{data: ..., version: ..., ...}.
+  # Unwrap it before passing to renderers.
+  defp unwrap_envelope(%{data: inner}), do: inner
+  defp unwrap_envelope(data), do: data
+
   # --- Badge dispatcher ---
 
   @doc "Renders a compact clickable badge for an artifact in the chat column."
@@ -26,24 +31,32 @@ defmodule MurmurWeb.Components.Artifacts do
   attr :active?, :boolean, default: false
 
   def artifact_badge(%{name: "papers"} = assigns) do
+    assigns = update(assigns, :data, &unwrap_envelope/1)
+
     ~H"""
     <PaperList.badge data={@data} session_id={@session_id} active?={@active?} />
     """
   end
 
   def artifact_badge(%{name: "displayed_paper"} = assigns) do
+    assigns = update(assigns, :data, &unwrap_envelope/1)
+
     ~H"""
     <PdfViewer.badge data={@data} session_id={@session_id} active?={@active?} />
     """
   end
 
   def artifact_badge(%{name: "sql_results"} = assigns) do
+    assigns = update(assigns, :data, &unwrap_envelope/1)
+
     ~H"""
     <SqlResults.badge data={@data} session_id={@session_id} active?={@active?} />
     """
   end
 
   def artifact_badge(assigns) do
+    assigns = update(assigns, :data, &unwrap_envelope/1)
+
     ~H"""
     <Generic.badge name={@name} data={@data} session_id={@session_id} active?={@active?} />
     """
@@ -114,7 +127,9 @@ defmodule MurmurWeb.Components.Artifacts do
 
     active_data =
       if active do
-        get_in(assigns.artifacts, [active.session_id, active.name])
+        assigns.artifacts
+        |> get_in([active.session_id, active.name])
+        |> unwrap_envelope()
       end
 
     assigns =

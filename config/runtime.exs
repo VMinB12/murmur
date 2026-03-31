@@ -40,11 +40,14 @@ end
 
 config :murmur_demo, MurmurWeb.Endpoint, http: [port: String.to_integer(System.get_env("PORT", "4000"))]
 
-# SQL agent target database (optional — disabled when not set)
+# SQL agent target database.
+# In dev, defaults to the local compose Postgres (see config/dev.exs).
+# Set SQL_AGENT_DATABASE_URL to override and point at a different database.
 if sql_agent_db_url = System.get_env("SQL_AGENT_DATABASE_URL") do
   config :jido_sql, JidoSql.Repo,
     url: sql_agent_db_url,
-    pool_size: String.to_integer(System.get_env("SQL_AGENT_POOL_SIZE", "5"))
+    pool_size: String.to_integer(System.get_env("SQL_AGENT_POOL_SIZE", "5")),
+    parameters: [default_transaction_read_only: System.get_env("SQL_AGENT_READ_ONLY", "on")]
 end
 
 if config_env() == :prod do

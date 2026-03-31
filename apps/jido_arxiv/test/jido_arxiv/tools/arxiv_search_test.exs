@@ -1,5 +1,6 @@
 defmodule JidoArxiv.Tools.ArxivSearchTest do
-  use ExUnit.Case, async: true
+  # Must be async: false — mutates global :jido_arxiv :req_options config
+  use ExUnit.Case, async: false
 
   alias JidoArxiv.Tools.ArxivSearch
 

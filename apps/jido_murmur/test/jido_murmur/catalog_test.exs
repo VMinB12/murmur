@@ -1,5 +1,6 @@
 defmodule JidoMurmur.CatalogTest do
-  use ExUnit.Case, async: true
+  # Must be async: false — mutates global :jido_murmur :profiles config
+  use ExUnit.Case, async: false
 
   alias JidoMurmur.Catalog
 

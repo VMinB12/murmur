@@ -65,7 +65,7 @@ Returned by `QueryExecutor.truncate/3`. Sent to the LLM via the `query` tool.
 
 ### ThreadEntry Payload Extension (existing schema, no migration)
 
-SQL tool results are stored in the existing `jido_murmur_thread_entries.payload` JSONB field. No new table or migration required.
+SQL tool calls and results are stored in the existing `jido_murmur_thread_entries.payload` JSONB field. This drives the **chat column**. No new table or migration required.
 
 **Payload fields added for SQL tools**:
 
@@ -73,8 +73,6 @@ SQL tool results are stored in the existing `jido_murmur_thread_entries.payload`
 |-------|------|-------------|
 | sql | String | The SQL query text executed by the tool |
 | tool_name | String | `"query"` or `"display"` — distinguishes tool type |
-| row_count | integer | Number of rows in the result (for display metadata) |
-| truncated | boolean | Whether the result was truncated (for `query` tool) |
 
 **Example payload for `query` tool result**:
 ```json
@@ -83,9 +81,7 @@ SQL tool results are stored in the existing `jido_murmur_thread_entries.payload`
   "tool_call_id": "call_abc123",
   "content": "5 rows returned:\n\nid | name | email\n1 | Alice | alice@example.com\n...",
   "sql": "SELECT id, name, email FROM users LIMIT 5",
-  "tool_name": "query",
-  "row_count": 5,
-  "truncated": false
+  "tool_name": "query"
 }
 ```
 
@@ -94,10 +90,38 @@ SQL tool results are stored in the existing `jido_murmur_thread_entries.payload`
 {
   "role": "tool",
   "tool_call_id": "call_def456",
-  "content": "Query result displayed to user",
+  "content": "Query result displayed to user (2847 rows)",
   "sql": "SELECT * FROM orders WHERE total > 100",
-  "tool_name": "display",
-  "row_count": 2847
+  "tool_name": "display"
+}
+```
+
+### Display Artifact (deferred, persisted via StoreArtifact → checkpoint)
+
+Each `display` tool call appends an entry to the `"sql_results"` artifact list in agent state. This drives the **data panel tabs**. Persisted via the existing StoreArtifact → agent state → checkpoint pipeline. No result data is stored — only SQL text.
+
+**Artifact name**: `"sql_results"`
+**Merge mode**: `:merge` with `append` — each display call adds to the list
+
+**Entry fields**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| sql | String | The SQL query text to display |
+| label | String | Human-readable label derived from the query (e.g., "Orders over $100") |
+| row_count | integer | Row count from validation execution (for badges) |
+| column_count | integer | Column count from validation execution |
+
+**Example artifact data** (stored in `agent.state[:artifacts]["sql_results"]`):
+```json
+{
+  "data": [
+    {"sql": "SELECT * FROM orders WHERE total > 100", "label": "Orders over $100", "row_count": 2847, "column_count": 4},
+    {"sql": "SELECT name, COUNT(*) FROM customers GROUP BY name", "label": "Customer order counts", "row_count": 156, "column_count": 2}
+  ],
+  "version": 2,
+  "updated_at": "2026-03-31T12:00:00Z",
+  "source": "sql_agent"
 }
 ```
 
@@ -115,10 +139,14 @@ JidoSql.Repo ──executes──> Target Database (external)
      └── QueryExecutor ──executes──> Raw SQL
               │
               ├── query tool ──truncates──> Truncated Result ──returns to──> LLM
+              │        │
+              │        └── SQL text ──persisted in──> ThreadEntry.payload (chat column)
               │
-              └── display tool ──emits──> Artifact Signal ──broadcasts to──> LiveView
+              └── display tool ──validates SQL──> emits deferred artifact
                        │
-                       └── SQL text ──persisted in──> ThreadEntry.payload
+                       ├── %{sql, label} ──persisted in──> StoreArtifact ──> checkpoint (data panel)
+                       ├── PubSub broadcast ──> LiveView renderer ──executes SQL──> paginated table
+                       └── "displayed" ──returns to──> LLM
 ```
 
 ## State Transitions
@@ -141,23 +169,30 @@ JidoSql.Repo ──executes──> Target Database (external)
 [User Message] → Agent generates SQL
     │
     ├── query tool → execute → truncate → return text to LLM
-    │                                      (SQL stored in thread payload)
+    │                                      (tool call + result stored in ThreadEntry)
     │
-    └── display tool → execute → emit artifact → broadcast to LiveView
-                                                  return "displayed" to LLM
-                                                  (SQL stored in thread payload)
+    └── display tool → execute (validate) → emit deferred artifact %{sql, label}
+                                             → StoreArtifact appends to "sql_results" list
+                                             → PubSub broadcast → renderer executes SQL → table in data panel
+                                             → return "displayed" to LLM
+                                             (tool call + result stored in ThreadEntry)
 ```
 
-### Re-execution Lifecycle (past conversations)
+### Revisit Lifecycle (past conversations)
 
 ```
-[User opens past conversation] → Thread entries loaded
+[User opens past conversation]
     │
-    ├── Entries with payload.tool_name == "display"
-    │   → Render placeholder: "Click to load results"
+    ├── Chat column:
+    │   ThreadEntry loaded → UITurn.project_entries()
+    │   → Messages, tool calls, truncated results rendered in chat
     │
-    └── User clicks placeholder
-        → LiveView sends "reexecute_query" event with SQL text
-        → QueryExecutor.execute(repo, sql)
-        → Results sent to client for paginated display
+    └── Data panel:
+        Artifacts restored from checkpoint
+        → agent.state[:artifacts]["sql_results"] = [%{sql, label}, ...]
+        → Renderer shows tab per entry with "Click to load" placeholder
+        → User clicks tab
+           → LiveView executes SQL via QueryExecutor.execute/2
+           → Paginated table rendered in data panel tab
+           → On error: error message shown in place of table
 ```

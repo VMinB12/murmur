@@ -67,7 +67,7 @@
 **Independent Test**: Send a chat message to the SQL agent and verify a query result table is displayed.
 
 - [ ] T017 [US1] Create `apps/jido_sql/lib/jido_sql/tools/query.ex` with `use Jido.Action, name: "sql_query", schema: [sql_query: [type: :string, required: true]]`: calls `QueryExecutor.execute/3` then `truncate/3` then `format_text_table/1`, returns `{:ok, %{result: formatted_text}}` or `{:error, message}` per contracts/tools.md
-- [ ] T018 [US1] Create `apps/jido_sql/lib/jido_sql/tools/display.ex` with `use Jido.Action, name: "sql_display", schema: [sql_query: [type: :string, required: true]]`: calls `QueryExecutor.execute/3`, emits artifact via `Artifact.emit(ctx, "sql_result", %{sql_query: ..., columns: ..., rows: ..., row_count: ..., column_count: ...})`, returns `{:ok, %{result: "Query result displayed to user"}, directive}` or `{:error, message}` per contracts/tools.md
+- [ ] T018 [US1] Create `apps/jido_sql/lib/jido_sql/tools/display.ex` with `use Jido.Action, name: "sql_display", schema: [sql_query: [type: :string, required: true]]`: calls `QueryExecutor.execute/3` to validate the SQL works, then emits a deferred artifact via `Artifact.emit(ctx, "sql_results", %{sql: ..., label: ..., row_count: ..., column_count: ...}, mode: :merge, merge: {:append, :data})`, returns `{:ok, %{result: "Query result displayed to user (N rows)"}, directive}` or `{:error, message}` per contracts/tools.md
 
 **Checkpoint**: Both tools functional. Agent can query the database and display results to the user. Core value proposition works.
 
@@ -90,27 +90,27 @@
 
 ## Phase 6: User Story 4 — User Sees Full Display Results (Priority: P2)
 
-**Goal**: The `display` tool sends complete results to the UI with pagination.
+**Goal**: The data panel renderer dynamically executes SQL and shows paginated results in tabs.
 
-**Independent Test**: Call display tool and verify the LiveView renders a paginated table.
+**Independent Test**: Call display tool and verify the data panel shows a new tab with paginated query results.
 
-- [ ] T021 [US4] Create SQL result artifact renderer component in `apps/jido_murmur_web/` that renders `"sql_result"` artifacts as a paginated HTML table with Tailwind styling: column headers, row data, page navigation (100 rows per page), empty state with column headers
-- [ ] T022 [US4] Register the SQL result renderer in the artifact renderer registry in `config/config.exs` under `:jido_murmur, :artifact_renderers` mapping `"sql_result"` to the renderer component
+- [ ] T021 [US4] Create SQL result artifact renderer component in `apps/jido_murmur_web/` that renders `"sql_results"` artifacts: shows sub-tabs (one per displayed query, labeled from artifact `label` field), dynamically executes SQL via `QueryExecutor.execute/2` when a tab is viewed, renders paginated HTML table with Tailwind styling (column headers, row data, page navigation at 100 rows/page, empty state with headers)
+- [ ] T022 [US4] Register the SQL result renderer in the artifact renderer registry in `config/config.exs` under `:jido_murmur, :artifact_renderers` mapping `"sql_results"` to the renderer component
 
-**Checkpoint**: Display tool results appear as paginated tables in the UI.
+**Checkpoint**: Display tool results appear as paginated tables in data panel tabs. Each display call creates a new sub-tab.
 
 ---
 
 ## Phase 7: User Story 6 — Persistent Conversation and Query History (Priority: P2)
 
-**Goal**: SQL queries persist in thread entries and can be re-executed on revisit.
+**Goal**: Two-layer persistence: ThreadEntry drives chat column, artifacts drive data panel tabs on revisit.
 
-**Independent Test**: Have a conversation, restart server, reopen conversation, click to reload query results.
+**Independent Test**: Have a conversation, restart server, reopen conversation, verify chat history visible and data panel tabs reappear with re-executable queries.
 
-- [ ] T023 [US6] Ensure both `query.ex` and `display.ex` tools in `apps/jido_sql/lib/jido_sql/tools/` include `sql` and `tool_name` fields in their return payload so they are persisted in `ThreadEntry.payload` by the existing storage adapter
-- [ ] T024 [US6] Add `"reexecute_query"` event handler to the chat LiveView in `apps/jido_murmur_web/`: receives `%{"sql" => sql_text}`, calls `JidoSql.QueryExecutor.execute/3`, sends results back to the client for display
-- [ ] T025 [US6] Update the SQL result artifact renderer (from T021) to detect when rendering a past conversation entry with `payload.tool_name == "display"` and `payload.sql`: show a "Click to load results" placeholder button that triggers the `"reexecute_query"` event
-- [ ] T026 [US6] Handle re-execution errors in the LiveView: if `QueryExecutor.execute/3` returns `{:error, msg}`, display the error message in place of the result table
+- [ ] T023 [US6] Ensure both `query.ex` and `display.ex` tools in `apps/jido_sql/lib/jido_sql/tools/` include `sql` and `tool_name` fields in their return payload so they are persisted in `ThreadEntry.payload` by the existing storage adapter (drives chat column)
+- [ ] T024 [US6] Verify `display.ex` artifact emission uses `:merge` mode with append so successive display calls accumulate in `agent.state[:artifacts]["sql_results"]` and survive hibernation via checkpoint (drives data panel)
+- [ ] T025 [US6] Update the SQL result artifact renderer (from T021) to show "Click to load results" placeholder for each sub-tab when artifacts are restored from checkpoint on revisit, triggering `"reexecute_query"` event on click
+- [ ] T026 [US6] Add `"reexecute_query"` event handler to the data panel LiveView: receives `%{"sql" => sql_text, "index" => n}`, calls `JidoSql.QueryExecutor.execute/3`, renders paginated results in the corresponding data panel tab. On error, display error message in place of the result table.
 
 **Checkpoint**: Past conversations show query history. Users can click to re-execute and see current results. Errors handled gracefully.
 
@@ -149,7 +149,7 @@
 - **US1 Ask Questions (Phase 4)**: Depends on Phase 2 + Phase 3 (needs schema + executor)
 - **US3 Truncation (Phase 5)**: Depends on Phase 4 (wiring only — logic in Phase 2)
 - **US4 Display (Phase 6)**: Depends on Phase 4 (needs display tool)
-- **US6 Persistence (Phase 7)**: Depends on Phase 4 + Phase 6 (needs tools + renderer)
+- **US6 Persistence (Phase 7)**: Depends on Phase 4 + Phase 6 (needs tools + renderer + artifact pipeline)
 - **US5 Read-Only Docs (Phase 8)**: No code deps — can run parallel after Phase 1
 - **Polish (Phase 9)**: Depends on all phases complete
 
@@ -165,8 +165,8 @@ After Phase 3 (schema) completes:
 
 After Phase 4 (tools) completes:
 ├── Phase 5: US3 (Truncation config) — config tweaks only
-├── Phase 6: US4 (Display renderer) — LiveView component
-└── Phase 7: US6 (Persistence) — payload wiring + reexecute handler
+├── Phase 6: US4 (Display renderer) — data panel component with dynamic SQL execution
+└── Phase 7: US6 (Persistence) — ThreadEntry payload wiring + artifact revisit placeholders
 
 Then sequentially:
 └── Phase 9: Polish
@@ -200,7 +200,7 @@ At this point the user can ask questions and see results. Everything after is en
 2. Add Schema (US2) → Agent knows the database
 3. Add Tools (US1) → Core Q&A works
 4. Add Truncation config (US3) → Reliability for large tables
-5. Add Display renderer (US4) → Polished table UI
-6. Add Persistence (US6) → Past conversations survive restarts
+5. Add Display renderer (US4) → Data panel tabs with dynamic SQL execution
+6. Add Persistence (US6) → Chat history + data panel tabs survive restarts
 7. Add Read-Only docs (US5) → Production safety guidance
 8. Each story adds value without breaking previous stories

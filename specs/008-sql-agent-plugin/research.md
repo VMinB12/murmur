@@ -97,9 +97,9 @@ Table: customers
 
 ## R4: Artifact Display Pattern for SQL Results
 
-**Decision**: The `display` tool emits an artifact signal with `type: "sql_result"` containing `{sql_query, columns, rows, row_count, column_count}`. The ArtifactPlugin broadcasts this to the LiveView, which renders a paginated table. The tool returns `"Query result displayed to user"` to the agent.
+**Decision**: The `display` tool validates the SQL query by executing it, then emits a **deferred artifact** with `type: "sql_results"` containing only `%{sql, label}`. The artifact is appended to a list via `:merge` mode. The ArtifactPlugin broadcasts this to the LiveView. The renderer in the data panel dynamically executes the SQL to fetch and display results. The tool returns `"Query result displayed to user"` to the agent.
 
-**Rationale**: Follows the exact pattern of `DisplayPaper` in `jido_arxiv` — emit artifact, return confirmation text. The artifact data structure mirrors the Python reference implementation's `DataChunk`. Pagination is handled client-side by the LiveView component.
+**Rationale**: The SQL agent exemplifies a **deferred artifact** pattern: the artifact stores only a reference (the SQL query text), and the renderer fetches results dynamically. This avoids persisting large result sets in agent state/checkpoints. It contrasts with the ArXiv agent's **materialized artifact** pattern, where full result data is stored. Both use the same `Artifact.emit` → `StoreArtifact` → checkpoint pipeline — the only difference is what data the artifact contains and how the renderer displays it.
 
 **Implementation sketch**:
 ```elixir
@@ -107,50 +107,72 @@ def run(params, ctx) do
   case QueryExecutor.execute(repo(), params.sql_query) do
     {:ok, result} ->
       artifact_data = %{
-        sql_query: params.sql_query,
-        columns: result.columns,
-        rows: result.rows,
+        sql: params.sql_query,
+        label: derive_label(params.sql_query),
         row_count: result.total_rows,
         column_count: length(result.columns)
       }
-      directive = Artifact.emit(ctx, "sql_result", artifact_data)
-      {:ok, %{result: "Query result displayed to user"}, directive}
+      directive = Artifact.emit(ctx, "sql_results", artifact_data,
+        mode: :merge, merge: {:append, :data})
+      {:ok, %{result: "Query result displayed to user (#{result.total_rows} rows)"}, directive}
     {:error, msg} ->
       {:error, msg}
   end
 end
 ```
 
+**Why validate by executing?**: The tool executes the SQL first to confirm it works before emitting the artifact. This prevents broken queries from becoming permanent data panel tabs. Row/column counts are captured for display metadata (badges, tab labels).
+
 **Alternatives considered**:
-- **Direct PubSub broadcast (skip Artifact)**: Rejected — loses agent state integration, versioning, and the established broadcast pattern.
+- **Store full result rows in artifact**: Rejected — result sets can be huge; storing them in agent state → checkpoint bloats storage and memory. The SQL can always be re-executed.
+- **Direct PubSub broadcast (skip Artifact)**: Rejected — loses agent state integration, versioning, checkpoint persistence, and the established display pattern.
 - **Return full data to agent**: Rejected — wastes context window; agent doesn't need the data, only the user does.
 
-## R5: Query Persistence Strategy
+## R5: Persistence Architecture — Two Layers
 
-**Decision**: Store SQL query text in the `payload` map of existing `ThreadEntry` records. The `kind` field distinguishes tool results. The `payload.sql` field holds the query text for later re-execution. No new database table needed.
+**Decision**: Persistence is split into two layers, each serving a distinct UI surface:
 
-**Rationale**: ThreadEntry's `payload` is a flexible JSONB field that already stores tool results. Adding `sql` to the payload is zero-cost — no migration, no new schema. The existing `UITurn` projection passes payload data through to the frontend unchanged, so the LiveView can detect `payload.sql` and render a "re-execute" placeholder.
+1. **Conversation history → ThreadEntry**: Tool calls (including SQL text in `payload.sql`) and tool results (truncated text in `payload.content`) persist in the existing `jido_murmur_thread_entries` table. This drives the **chat column** on revisit. No changes needed — ThreadEntry already stores tool calls and results.
 
-**Payload structure for SQL tool results**:
+2. **Display tabs → Artifact system**: The `display` tool emits a deferred artifact (`%{sql, label}`) via `Artifact.emit` → `StoreArtifact` → agent state → checkpoint. This drives the **data panel** on revisit. Each display call appends to the `"sql_results"` artifact list.
+
+**Rationale**: The frontend receives state from the backend and displays it. It never parses conversation history to derive data panel content. ThreadEntry drives the chat column. Artifacts drive the data panel. Clean separation.
+
+**Conversation history payload** (unchanged from existing behavior):
 ```elixir
+# Stored automatically by the thread storage adapter
 %{
   role: "tool",
   tool_call_id: "call_abc",
   content: "150 rows returned (showing first 50)...",
+  # Additional fields in payload for SQL tools:
   sql: "SELECT * FROM orders WHERE created_at > '2026-01-01'",
   tool_name: "query"  # or "display"
 }
 ```
 
-**Re-execution flow**:
-1. LiveView loads conversation → thread entries rendered
-2. Entries with `payload.sql` and `tool_name: "display"` show a "Click to load results" placeholder
-3. User clicks → LiveView sends `phx-click="reexecute_query"` with the SQL text
-4. Server calls `QueryExecutor.execute/2` → results sent back via PubSub or direct assign
+**Artifact data** (persisted via StoreArtifact → checkpoint):
+```elixir
+# Stored in agent.state[:artifacts]["sql_results"] as a list
+[
+  %{sql: "SELECT * FROM orders WHERE total > 100", label: "Orders over $100"},
+  %{sql: "SELECT name, COUNT(*) FROM customers GROUP BY name", label: "Customer order counts"}
+]
+```
+
+**On revisit — chat column**:
+1. ThreadEntry loaded → `UITurn.project_entries()` → chat messages rendered
+2. Tool call entries show SQL text and truncated results inline (conversation context)
+
+**On revisit — data panel**:
+1. Artifacts restored from checkpoint → `"sql_results"` list available
+2. Renderer shows a tab per entry with "Click to load" placeholder
+3. User clicks tab → LiveView executes SQL → paginated table rendered
 
 **Alternatives considered**:
-- **Dedicated `query_results` table**: Rejected — adds migration complexity for no benefit when ThreadEntry payload already supports arbitrary fields.
-- **Store results alongside SQL text**: Rejected — user specified: persist SQL only, re-execute on demand.
+- **ThreadEntry-only (parse chat for display tabs)**: Rejected — puts too much responsibility on the frontend; requires parsing conversation history to derive data panel content.
+- **Artifact-only (skip ThreadEntry)**: Rejected — conversation history already persists tool calls via ThreadEntry; no reason to change that.
+- **Dedicated `query_results` table**: Rejected — adds migration complexity; both existing systems (ThreadEntry + artifacts) already handle their respective concerns.
 
 ## R6: Read-Only Database Access
 
@@ -180,12 +202,12 @@ SQL_AGENT_DATABASE_URL=postgres://user:pass@host/mydb?options=-c%20default_trans
 
 ## R7: Pagination Strategy
 
-**Decision**: Client-side pagination in the LiveView. The `display` tool sends the full result set as an artifact. The LiveView component renders one page at a time (e.g., 100 rows per page) and lets the user navigate pages.
+**Decision**: Server-side pagination in the data panel renderer. When a display tab is viewed (or clicked on revisit), the LiveView executes the SQL query and paginates results server-side (e.g., 100 rows per page). The renderer sends one page of data at a time and lets the user navigate pages.
 
-**Rationale**: For most analytical queries the full result set is manageable in browser memory (a few thousand rows). Server-side pagination would require maintaining cursor state and re-executing with OFFSET/LIMIT, adding complexity. If result sets grow very large, we can add server-side pagination later.
+**Rationale**: Since the display tool uses a deferred artifact pattern (SQL text only, no stored results), the renderer must execute the SQL to fetch data. Pagination happens at fetch time — the renderer can use `LIMIT/OFFSET` wrapping or Elixir-side slicing. This avoids sending large result sets to the browser.
 
 **Alternatives considered**:
-- **Server-side OFFSET/LIMIT pagination**: Rejected for v1 — adds complexity and cursor management. Can be added later if needed.
+- **Client-side pagination (send all rows)**: Rejected — since results are fetched dynamically, there's no reason to transfer all rows to the browser at once.
 - **Virtual scrolling**: Rejected — requires custom JS; over-engineered for v1.
 
 ## R8: Agent Instructions & Schema Injection

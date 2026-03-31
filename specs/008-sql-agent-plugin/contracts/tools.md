@@ -63,19 +63,19 @@ Output: {:error, "ERROR 42P01 (undefined_table) relation \"nonexistent_table\" d
 ## Tool: `display`
 
 **Module**: `JidoSql.Tools.Display`
-**Purpose**: Execute a SQL query and send the full, paginated results to the user's UI.
+**Purpose**: Validate a SQL query and create a data panel tab showing the results.
 
 ### Interface
 
 ```
 Action Name: "sql_display"
-Description: "Run a SQL query and display the full results to the user as a table. Use this when you have the final answer ready."
+Description: "Run a SQL query and display the full results to the user as a table in the data panel. Use this when you have the final answer ready."
 
 Parameters:
   - sql_query: string (required) — The SQL query to execute and display
 
 Returns on success:
-  {:ok, %{result: "Query result displayed to user"}, Directive.Emit artifact}
+  {:ok, %{result: "Query result displayed to user (N rows)"}, Directive.Emit artifact}
 
 Returns on error:
   {:error, "Database error description"}
@@ -83,37 +83,41 @@ Returns on error:
 
 ### Behavior Contract
 
-1. Executes the provided SQL query against `JidoSql.Repo`
+1. Executes the provided SQL query against `JidoSql.Repo` to **validate** it works
 2. Applies a query timeout (default: 15 seconds)
 3. On success:
-   - Emits an artifact signal with type `"artifact.sql_result"`
-   - Artifact data contains: `{sql_query, columns, rows, row_count, column_count}`
+   - Emits a **deferred artifact** with type `"artifact.sql_results"` using `:merge` mode (append)
+   - Artifact data contains only: `%{sql, label, row_count, column_count}` — **no result rows**
    - ArtifactPlugin broadcasts to LiveView via PubSub
-   - Returns `"Query result displayed to user"` to the agent (not the data)
+   - StoreArtifact appends to the `"sql_results"` list in agent state (→ checkpoint)
+   - Returns `"Query result displayed to user (N rows)"` to the agent (not the data)
+   - The data panel renderer receives the signal and dynamically executes the SQL to display results
 4. On error:
    - Returns the database error message as plain text
    - LLM can use the error to self-correct and retry
-5. SQL query text is stored in the thread entry payload for persistence
+   - No artifact is emitted for failed queries
 
-### Artifact Signal Data Structure
+### Artifact Data Structure (deferred — SQL text only)
 
 ```elixir
+# Single entry appended to the "sql_results" artifact list
 %{
-  sql_query: "SELECT * FROM orders WHERE total > 100",
-  columns: ["id", "customer_id", "total", "created_at"],
-  rows: [[1, 42, 150.00, "2026-01-15"], ...],
+  sql: "SELECT * FROM orders WHERE total > 100",
+  label: "Orders over $100",
   row_count: 2847,
   column_count: 4
 }
 ```
+
+**Note**: The artifact stores only the query reference. The renderer fetches results dynamically by executing the SQL. This contrasts with the ArXiv agent's materialized artifacts which store full result data.
 
 ### Examples
 
 **Successful display**:
 ```
 Input:  sql_query: "SELECT name, COUNT(*) as order_count FROM customers JOIN orders ON customers.id = orders.customer_id GROUP BY name ORDER BY order_count DESC"
-Output: "Query result displayed to user"
-Side effect: Artifact broadcast to LiveView with full result set
+Output: "Query result displayed to user (42 rows)"
+Side effect: Deferred artifact appended to "sql_results" list; data panel renderer executes SQL and shows table
 ```
 
 **Error**:
@@ -160,10 +164,25 @@ describe_schema!(repo) :: String.t()
 
 ---
 
-## LiveView Contract: Re-execution
+## LiveView Contract: Data Panel Renderer
+
+### Real-time display (during conversation)
+
+When the ArtifactPlugin broadcasts an `"artifact.sql_results"` signal, the data panel renderer:
+1. Receives the artifact data (`%{sql, label, row_count, column_count}`)
+2. Adds a new sub-tab in the `"sql_results"` artifact tab
+3. Automatically executes the SQL via `QueryExecutor.execute/2`
+4. Renders the paginated result table in the data panel
+
+### Re-execution (past conversations)
+
+When artifacts are restored from checkpoint on revisit:
+1. The `"sql_results"` artifact contains a list of `%{sql, label, ...}` entries
+2. Renderer shows a sub-tab per entry with a "Click to load results" placeholder
+3. User clicks tab → LiveView sends `"reexecute_query"` event with SQL text
+4. Server calls `QueryExecutor.execute/2` → paginated results rendered in the tab
+5. On error: error message displayed in place of the result table
 
 **Event**: `"reexecute_query"`
-**Payload**: `%{"sql" => "SELECT ...", "entry_id" => "..."}`
-**Response**: Execute query via `QueryExecutor.execute/2`, send results as assign or PubSub update
-
-This event is triggered when a user clicks a "Load results" placeholder on a past conversation's display tool result. The LiveView executes the stored SQL and renders the paginated table.
+**Payload**: `%{"sql" => "SELECT ...", "index" => 0}`
+**Response**: Execute query via `QueryExecutor.execute/2`, render results in the corresponding data panel tab

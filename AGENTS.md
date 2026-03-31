@@ -1,5 +1,7 @@
 This is a web application written using the Phoenix web framework.
 
+At the start of every chat, inspect `specs/` and `specs/architecture/` for relevant documentation on the projects philosophy, goals and design principles.
+
 ## Project guidelines
 
 - Use `mix precommit` alias when you are done with all changes and fix any pending issues

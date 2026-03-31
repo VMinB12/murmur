@@ -1,5 +1,7 @@
 defmodule JidoTasks.ConfigTest do
-  use ExUnit.Case, async: true
+  # Must be async: false — this test mutates global Application env (:repo, :pubsub)
+  # which would race with other tests calling JidoTasks.repo()/pubsub().
+  use ExUnit.Case, async: false
 
   alias JidoTasks.Config
 

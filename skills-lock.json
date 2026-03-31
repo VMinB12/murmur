@@ -26,6 +26,26 @@
       "sourceType": "github",
       "computedHash": "063a0e6448123cd359ad0044cc46b0e490cc7964d45ef4bb9fd842bd2ffbca67"
     },
+    "spec-driven": {
+      "source": "b12consulting/skills",
+      "sourceType": "github",
+      "computedHash": "d6247f64ceb32206c96ee8e63c740173ee099a7f993e1659ec61c8cd13292c93"
+    },
+    "specs-review": {
+      "source": "b12consulting/skills",
+      "sourceType": "github",
+      "computedHash": "43278cd08d8ebef2acd7f0513749bf62824d97eeb3fbf8128b66f14e2b0ce47f"
+    },
+    "specs-setup": {
+      "source": "b12consulting/skills",
+      "sourceType": "github",
+      "computedHash": "d72b050933b7917fdae08dc68a0c7e5ddf63b665440b456e735dad5d368f0a4d"
+    },
+    "specs-tickets": {
+      "source": "b12consulting/skills",
+      "sourceType": "github",
+      "computedHash": "df0762a80c140f8ffd4cc276fa6d4be083bd6a5e60a7508e762770fc2eb2fdd2"
+    },
     "yuma-design": {
       "source": "b12consulting/skills",
       "sourceType": "github",

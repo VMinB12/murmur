@@ -1,0 +1,203 @@
+# jido_murmur — Core Backend
+
+## Purpose
+
+Core orchestration backend for the multi-agent chat platform. Provides workspace management, agent lifecycle control, inter-agent communication, stateful session storage, observability integration, and a plugin architecture for extending agent behavior.
+
+## Public API
+
+### AgentHelper — Agent Lifecycle
+
+| Function | Signature | Purpose |
+|----------|-----------|---------|
+| `start_agent/1` | `(session) → {:ok, pid}` | Start or restore an agent from checkpoint |
+| `load_messages/1` | `(session) → [map()]` | Load conversation history (live process or storage) |
+| `load_artifacts/1` | `(session) → [map()]` | Load generated artifacts from agent state |
+| `subscribe/1` | `(session) → :ok` | Subscribe to all PubSub topics for a session |
+
+### Workspaces — Workspace & Session Management
+
+| Function | Purpose |
+|----------|---------|
+| `create_workspace/1` | Create a new workspace |
+| `get_workspace!/2` | Fetch a workspace with authorization |
+| `list_workspaces/0` | List all workspaces |
+| `create_agent_session/2` | Create an agent session in a workspace |
+| `get_agent_session!/1` | Fetch a session |
+| `list_agent_sessions/1` | List sessions in a workspace |
+| `find_agent_session_by_name/2` | Lookup session by display name |
+| `delete_agent_session/1` | Delete a session |
+
+### Runner — Message Queue & Agent Communication
+
+| Function | Purpose |
+|----------|---------|
+| `send_message/2` | Queue a message for agent processing |
+| `active?/1` | Check if agent has an active drain-loop |
+
+### Catalog — Agent Profile Registry
+
+| Function | Purpose |
+|----------|---------|
+| `list_profiles/0` | List registered agent profiles from config |
+| `get_profile!/1` | Get profile metadata including agent module |
+| `agent_module/1` | Resolve profile name to agent module |
+| `agent_color/2` | Get Tailwind CSS color classes for agent |
+
+### Topics — PubSub Hierarchy
+
+All topics follow `workspace:{wid}:...` for multi-workspace isolation:
+
+| Function | Topic Pattern |
+|----------|---------------|
+| `agent_messages/2` | `workspace:{wid}:agent:{sid}:messages` |
+| `agent_stream/2` | `workspace:{wid}:agent:{sid}:stream` |
+| `agent_artifacts/2` | `workspace:{wid}:agent:{sid}:artifacts` |
+| `workspace_tasks/1` | `workspace:{wid}:tasks` |
+| `workspace/1` | `workspace:{wid}` |
+
+## Internal Architecture
+
+### Agent Lifecycle (AgentHelper + Runner)
+
+1. `start_agent/1` restores state from a checkpoint (if available) or creates a fresh agent via Jido
+2. Conversation history (thread) is persisted in PostgreSQL using the `Jido.Storage` adapter
+3. Messages are enqueued in `PendingQueue` (ETS-backed)
+4. A single drain-loop Task per session processes queued messages atomically
+5. Completed responses trigger `MessageCompleted` signals broadcast via PubSub
+
+### Inter-Agent Communication (TellAction + MessageInjector)
+
+- Agents use the `tell` action for fire-and-forget inter-agent messages
+- Messages routed by display name with a 5-hop depth limit (prevents infinite loops)
+- `MessageInjector` (a ReAct RequestTransformer) drains pending messages into the LLM request
+
+### Request Transformation Pipeline
+
+Multiple transformers are chained via `ComposableRequestTransformer`:
+- Each can override `:messages`, `:llm_opts`, and `:tools`
+- Overrides are deep-merged (messages replaced wholesale, llm_opts merged by key)
+
+### Storage Duality
+
+- Active agents maintain thread state in memory (Jido process)
+- `load_messages/artifacts` checks the live process first, falls back to PostgreSQL
+- Checkpoints stored in `jido_murmur_checkpoints` for recovery
+- Thread entries stored individually in `jido_murmur_thread_entries` with sequence ordering
+
+### Plugin Architecture
+
+All plugins use `Jido.Plugin`, declaration-ordered:
+
+| Plugin | Purpose |
+|--------|---------|
+| `StreamingPlugin` | Broadcasts lifecycle signals via PubSub for real-time UI |
+
+### Observability
+
+- `ObsTracer` — Custom `Jido.Observe.Tracer` enriching spans with workspace/agent identity
+- `ObsTracer.Cache` — ETS lookup for agent_id → (workspace_id, display_name)
+- `ReqLLMTracer` — Telemetry integration for LLM calls
+
+### ETS Tables (owned by TableOwner GenServer)
+
+| Table | Purpose |
+|-------|---------|
+| `:jido_murmur_pending_messages` | Message queue for active agents |
+| `:jido_murmur_active_runners` | Track active drain-loop sessions |
+| `ObsCache` | Agent identity metadata for tracer |
+
+## Data Models
+
+### Workspace
+
+```
+jido_murmur_workspaces
+├── id: binary_id (PK)
+├── name: string (required, max 255)
+├── owner_id: string (optional, indexed)
+├── metadata: map
+└── timestamps (utc_datetime_usec)
+```
+
+### AgentSession
+
+```
+jido_murmur_agent_sessions
+├── id: binary_id (PK)
+├── workspace_id: binary_id (FK → workspaces, cascade delete)
+├── agent_profile_id: string (maps to Catalog profile)
+├── display_name: string (required, max 255)
+├── status: :idle | :busy (default :idle)
+├── owner_id: string (optional)
+├── metadata: map
+├── unique index: (workspace_id, display_name)
+└── timestamps (utc_datetime_usec)
+```
+
+### Checkpoint (Jido.Storage adapter)
+
+```
+jido_murmur_checkpoints
+├── key: string (PK, format: "agent_module:session_id")
+├── data: map (serialized agent snapshot)
+└── timestamps (utc_datetime_usec)
+```
+
+### ThreadEntry (Jido.Storage adapter)
+
+```
+jido_murmur_thread_entries
+├── id: binary_id (PK)
+├── thread_id: string (= session.id)
+├── seq: integer (sequence ordering)
+├── kind: string (:message, :ai_message, :tool_call, etc.)
+├── payload: map
+├── refs: map
+├── at: bigint (system time in nanoseconds)
+├── unique index: (thread_id, seq)
+└── inserted_at (utc_datetime_usec)
+```
+
+### UITurn (presentation struct)
+
+```elixir
+%UITurn{
+  id: String.t(),
+  thinking: String.t() | nil,
+  tool_calls: [%ToolCall{id, name, args, result, status}],
+  content: String.t(),
+  sender_name: String.t() | nil,
+  status: :thinking | :tool_calling | :completed | :error
+}
+```
+
+## Signal Types
+
+| Signal | Type | Emitted By |
+|--------|------|------------|
+| `MessageReceived` | `murmur.message.received` | `TellAction` |
+| `MessageCompleted` | `murmur.message.completed` | `Runner` |
+
+## Dependencies
+
+**Requires:** `jido ~> 2.0`, `jido_ai ~> 2.0`, `jido_action ~> 2.0`, `jido_signal ~> 2.0`, `phoenix_pubsub ~> 2.0`, `ecto_sql ~> 3.13`, `postgrex`, `jason ~> 1.2`, `agent_obs ~> 0.1.4`
+
+**Used by:** `jido_murmur_web`, `jido_tasks`, `jido_sql`, `murmur_demo`
+
+## Configuration
+
+```elixir
+# Required
+config :jido_murmur,
+  repo: MyApp.Repo,
+  pubsub: MyApp.PubSub,
+  jido_mod: MyApp.Jido,
+  otp_app: :my_app
+
+# Optional
+config :jido_murmur,
+  profiles: [MyApp.Agents.ProfileA, MyApp.Agents.ProfileB],
+  authorize: MyApp.Authorization,
+  artifact_renderers: %{"type" => RendererModule}
+```

@@ -1,0 +1,14 @@
+The following issues remain to be fixed:
+- Discrepencies between live-streamed rendering and completed rendering and read from persistence rendering
+  - No tool call displayed during streaming response (only shows up after completion)
+  - Inconsistent message ordering. Tool calls are always latest. Likely due to lack of UUIDv7.
+- Tracing should be separate module
+- Tracing has several issues:
+  - traces not showing at all
+  - Only input is shown, not the output
+  - Not clear if tool calls are showing at all
+  - Grouping by session id is not working consistently
+- murmur_web should be more agnostic as to which agents are running — should be able to display any agent's conversation without needing to know about it in advance
+- 5-hop depth limit for messages should be made configurable with default set to no limit
+- Should we use AIElements?
+- Should we use Grafana with custom panels as an alternative to Arize Phoenix?

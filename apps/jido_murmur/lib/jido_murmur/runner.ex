@@ -20,6 +20,13 @@ defmodule JidoMurmur.Runner do
 
   @active_table :jido_murmur_active_runners
 
+  @type session_like :: %{
+          required(:id) => String.t(),
+          required(:workspace_id) => String.t(),
+          required(:agent_profile_id) => String.t(),
+          required(:display_name) => String.t()
+        }
+
   @doc """
   Send a message to an agent session.
 
@@ -28,6 +35,7 @@ defmodule JidoMurmur.Runner do
 
   Returns `:queued` or `:agent_not_running`.
   """
+  @spec send_message(session_like(), String.t()) :: :queued | :agent_not_running
   def send_message(session, content) do
     jido_mod = JidoMurmur.jido_mod()
     pid = jido_mod.whereis(session.id)
@@ -42,6 +50,7 @@ defmodule JidoMurmur.Runner do
   end
 
   @doc "Check if an agent session has a drain-loop running."
+  @spec active?(String.t()) :: boolean()
   def active?(session_id) do
     :ets.lookup(@active_table, session_id) != []
   end

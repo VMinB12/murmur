@@ -6,6 +6,7 @@ defmodule JidoTasks.Tasks do
   alias JidoTasks.Task
 
   @doc "Lists tasks for a workspace, optionally filtered by status."
+  @spec list_tasks(String.t(), keyword()) :: [Task.t()]
   def list_tasks(workspace_id, opts \\ []) do
     :telemetry.span([:jido_tasks, :task, :list], %{workspace_id: workspace_id}, fn ->
       query = from(t in Task, where: t.workspace_id == ^workspace_id, order_by: [asc: t.inserted_at])
@@ -22,12 +23,16 @@ defmodule JidoTasks.Tasks do
   end
 
   @doc "Gets a single task by ID. Raises if not found."
+    @spec get_task!(Ecto.UUID.t()) :: Task.t()
   def get_task!(id), do: JidoTasks.repo().get!(Task, id)
 
   @doc "Gets a single task by ID. Returns nil if not found."
+    @spec get_task(Ecto.UUID.t()) :: Task.t() | nil
   def get_task(id), do: JidoTasks.repo().get(Task, id)
 
   @doc "Creates a task in the given workspace."
+    @spec create_task(String.t(), map(), String.t()) ::
+      {:ok, Task.t()} | {:error, Ecto.Changeset.t()}
   def create_task(workspace_id, attrs, created_by) do
     :telemetry.span([:jido_tasks, :task, :create], %{workspace_id: workspace_id}, fn ->
       result =
@@ -43,6 +48,7 @@ defmodule JidoTasks.Tasks do
   end
 
   @doc "Updates an existing task's title, description, or status."
+  @spec update_task(Task.t(), map()) :: {:ok, Task.t()} | {:error, Ecto.Changeset.t()}
   def update_task(%Task{} = task, attrs) do
     old_status = task.status
 
@@ -63,6 +69,7 @@ defmodule JidoTasks.Tasks do
   end
 
   @doc "Returns task counts grouped by status for a workspace."
+  @spec task_stats(String.t()) :: %{optional(Task.status()) => non_neg_integer()}
   def task_stats(workspace_id) do
     from(t in Task,
       where: t.workspace_id == ^workspace_id,
@@ -74,10 +81,12 @@ defmodule JidoTasks.Tasks do
   end
 
   @doc "Deletes all tasks for a workspace."
+  @spec delete_tasks_for_workspace(String.t()) :: {non_neg_integer(), nil | [term()]}
   def delete_tasks_for_workspace(workspace_id) do
     JidoTasks.repo().delete_all(from(t in Task, where: t.workspace_id == ^workspace_id))
   end
 
   @doc "PubSub topic for task updates in a workspace."
+  @spec tasks_topic(String.t()) :: String.t()
   def tasks_topic(workspace_id), do: JidoMurmur.Topics.workspace_tasks(workspace_id)
 end

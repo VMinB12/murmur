@@ -21,6 +21,7 @@ defmodule JidoMurmur.Storage.Ecto do
   # --- Checkpoints ---
 
   @impl true
+  @spec get_checkpoint(term(), keyword()) :: {:ok, term()} | :not_found
   def get_checkpoint(key, _opts) do
     repo = JidoMurmur.repo()
     key_str = serialize_key(key)
@@ -32,6 +33,7 @@ defmodule JidoMurmur.Storage.Ecto do
   end
 
   @impl true
+  @spec put_checkpoint(term(), term(), keyword()) :: :ok
   def put_checkpoint(key, data, _opts) do
     repo = JidoMurmur.repo()
     key_str = serialize_key(key)
@@ -51,6 +53,7 @@ defmodule JidoMurmur.Storage.Ecto do
   end
 
   @impl true
+  @spec delete_checkpoint(term(), keyword()) :: :ok
   def delete_checkpoint(key, _opts) do
     repo = JidoMurmur.repo()
     key_str = serialize_key(key)
@@ -66,6 +69,7 @@ defmodule JidoMurmur.Storage.Ecto do
   # --- Threads ---
 
   @impl true
+  @spec load_thread(String.t(), keyword()) :: {:ok, Thread.t()} | :not_found
   def load_thread(thread_id, _opts) do
     repo = JidoMurmur.repo()
 
@@ -87,6 +91,7 @@ defmodule JidoMurmur.Storage.Ecto do
   end
 
   @impl true
+  @spec append_thread(String.t(), [Entry.t()], keyword()) :: {:ok, Thread.t()} | {:error, :conflict}
   def append_thread(thread_id, entries, opts) do
     repo = JidoMurmur.repo()
     expected_rev = Keyword.get(opts, :expected_rev)
@@ -117,6 +122,7 @@ defmodule JidoMurmur.Storage.Ecto do
   end
 
   @impl true
+  @spec delete_thread(String.t(), keyword()) :: :ok
   def delete_thread(thread_id, _opts) do
     repo = JidoMurmur.repo()
     repo.delete_all(from e in ThreadEntry, where: e.thread_id == ^thread_id)

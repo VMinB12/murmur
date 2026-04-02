@@ -74,6 +74,7 @@ defmodule JidoArtifacts.Artifact do
   end
 
   @doc "PubSub topic for artifact updates for the given session."
+  @spec artifact_topic(String.t(), String.t()) :: String.t()
   def artifact_topic(workspace_id, session_id),
     do: "workspace:#{workspace_id}:agent:#{session_id}:artifacts"
 

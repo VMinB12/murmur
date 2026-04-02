@@ -31,3 +31,6 @@
 - Implemented Phase 3 by introducing `%JidoSql.QueryResult{}` as the canonical `QueryExecutor.execute/3` return type and updating the SQL tools, SQL result renderer, and `workspace_live` re-execution path to consume the struct explicitly.
 - Added a small `JidoSql.query_executor/0` injection point so SQL tools can be tested without a live database, keeping the production default on `JidoSql.QueryExecutor`.
 - Added direct `jido_sql` tests for `QueryResult`, `QueryExecutor` helper behavior, and SQL tool behavior using fake executors, then verified them with `mix test --no-start` from `apps/jido_sql`.
+- Completed Phase 4 by filling in the missing public `@spec` coverage on `JidoMurmur.Runner`, `JidoTasks.Tasks`, `JidoTasks.Task`, and `JidoMurmur.Storage.Ecto`, while tightening `JidoSql.QueryExecutor` helper result types and adding the missing public spec on `JidoArtifacts.Artifact.artifact_topic/2`.
+- Reconfirmed that the umbrella `mix precommit` alias remains unchanged and does not include Dialyzer.
+- Ran `mix dialyzer` manually from the repository root; it passed with zero errors, so no `.dialyzer_ignore.exs` file was needed.

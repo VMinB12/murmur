@@ -35,10 +35,10 @@
 
 ## Phase 4: P2 Public Specs and Manual Dialyzer
 
-- [ ] T018 Add public `@spec` annotations to `apps/jido_artifacts/lib/jido_artifacts/envelope.ex` and `apps/jido_artifacts/lib/jido_artifacts/artifact.ex`.
-- [ ] T019 [P] Add public `@spec` annotations to `apps/jido_sql/lib/jido_sql/query_executor.ex`, `apps/jido_murmur/lib/jido_murmur/runner.ex`, and `apps/jido_murmur/lib/jido_murmur/ui_turn.ex`.
-- [ ] T020 [P] Add public `@spec` annotations to `apps/jido_tasks/lib/jido_tasks/tasks.ex` and `apps/jido_murmur/lib/jido_murmur/storage/ecto.ex`.
-- [ ] T021 Confirm the root `mix.exs` keeps `mix precommit` unchanged, then run `mix dialyzer` manually from the repo root and create `.dialyzer_ignore.exs` only if a warning is verified to be a false positive.
+- [x] T018 Add public `@spec` annotations to `apps/jido_artifacts/lib/jido_artifacts/envelope.ex` and `apps/jido_artifacts/lib/jido_artifacts/artifact.ex`.
+- [x] T019 [P] Add public `@spec` annotations to `apps/jido_sql/lib/jido_sql/query_executor.ex`, `apps/jido_murmur/lib/jido_murmur/runner.ex`, and `apps/jido_murmur/lib/jido_murmur/ui_turn.ex`.
+- [x] T020 [P] Add public `@spec` annotations to `apps/jido_tasks/lib/jido_tasks/tasks.ex` and `apps/jido_murmur/lib/jido_murmur/storage/ecto.ex`.
+- [x] T021 Confirm the root `mix.exs` keeps `mix precommit` unchanged, then run `mix dialyzer` manually from the repo root and create `.dialyzer_ignore.exs` only if a warning is verified to be a false positive.
 
 ## Phase 5: P3 Signal Schema Tightening
 

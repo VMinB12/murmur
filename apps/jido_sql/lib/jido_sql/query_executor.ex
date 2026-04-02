@@ -9,6 +9,14 @@ defmodule JidoSql.QueryExecutor do
   @default_max_rows 50
   @default_max_cols 20
 
+  @type truncated_result :: %{
+          columns: [String.t()],
+          rows: [[String.t()]],
+          truncated: boolean(),
+          total_rows: non_neg_integer(),
+          total_columns: non_neg_integer()
+        }
+
   @doc """
   Executes a raw SQL query against the given Ecto Repo.
 
@@ -45,7 +53,7 @@ defmodule JidoSql.QueryExecutor do
 
   Returns a map with `:truncated` flag indicating whether truncation was applied.
   """
-  @spec truncate(QueryResult.t(), non_neg_integer(), non_neg_integer()) :: map()
+  @spec truncate(QueryResult.t(), non_neg_integer(), non_neg_integer()) :: truncated_result()
   def truncate(result, max_rows \\ @default_max_rows, max_cols \\ @default_max_cols) do
     total_columns = length(result.columns)
     cols = Enum.take(result.columns, max_cols)
@@ -64,7 +72,7 @@ defmodule JidoSql.QueryExecutor do
   @doc """
   Formats a truncated result as a pipe-separated text table for LLM consumption.
   """
-  @spec format_text_table(map()) :: String.t()
+  @spec format_text_table(truncated_result()) :: String.t()
   def format_text_table(%{columns: [], rows: [], total_rows: 0}) do
     "(no rows)"
   end

@@ -1,7 +1,7 @@
 ---
 id: "009"
 title: "Data Contract Enforcement"
-status: specifying
+status: planned
 jira: ""
 owner: ""
 created: 2026-03-31

@@ -12,3 +12,11 @@
 - Drafted Spec.md with 7 user stories across 3 priority tiers (P1: envelope + unified path + integration tests, P2: SQL struct + Dialyzer + typespecs, P3: signal typing).
 - Created Decisions.md with 5 open questions: persisted artifact migration strategy, struct serialization, Dialyzer strictness, TypedStruct vs plain Elixir, and signal typing scope.
 - Status moved to `open-questions` — awaiting user decisions on Q1–Q5 before proceeding to Plan phase.
+
+## 2026-04-02
+
+- Resumed ticket after the spec and decisions were settled, with the user explicitly requesting the planning artifacts before code changes.
+- Reviewed the current implementation points for `StoreArtifact`, `ArtifactPlugin`, `workspace_live`, artifact component dispatchers, checkpoint persistence, and `JidoSql.QueryExecutor` to make the plan concrete rather than aspirational.
+- Created `plan.md` with a hard-cutover strategy: canonical `%JidoArtifacts.Envelope{}` boundary first, then artifact integration tests, then typed SQL results, then public specs + manual Dialyzer, then signal schema tightening.
+- Created `tasks.md` with phased work items covering the artifact contract, integration coverage, SQL result struct, `@spec` coverage, manual Dialyzer verification, and signal typing.
+- Updated ticket status to `planned` so the folder state now matches the available spec, decisions, plan, and task breakdown.

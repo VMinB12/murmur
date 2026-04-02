@@ -5,6 +5,8 @@ defmodule MurmurWeb.Components.Artifacts.SqlResults do
 
   import MurmurWeb.CoreComponents, only: [icon: 1]
 
+  alias JidoSql.QueryResult
+
   @doc "Compact badge for the chat column."
   attr :data, :any, required: true
   attr :session_id, :string, required: true
@@ -132,10 +134,10 @@ defmodule MurmurWeb.Components.Artifacts.SqlResults do
 
   attr :result, :map, required: true
 
-  defp result_table(assigns) do
-    columns = assigns.result["columns"] || assigns.result[:columns] || []
-    rows = assigns.result["rows"] || assigns.result[:rows] || []
-    total_rows = assigns.result["total_rows"] || assigns.result[:total_rows] || length(rows)
+  defp result_table(%{result: %QueryResult{} = result} = assigns) do
+    columns = result.columns
+    rows = result.rows
+    total_rows = result.total_rows
 
     # Paginate: show first 100 rows
     page_size = 100

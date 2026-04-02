@@ -10,19 +10,20 @@ defmodule JidoSql.Tools.Query do
       sql_query: [type: :string, required: true, doc: "The SQL query to execute"]
     ]
 
-  alias JidoSql.QueryExecutor
+  alias JidoSql.QueryResult
 
   @impl true
   def run(params, _ctx) do
     max_rows = Application.get_env(:jido_sql, :max_rows, 50)
     max_cols = Application.get_env(:jido_sql, :max_columns, 20)
+    executor = JidoSql.query_executor()
 
-    case QueryExecutor.execute(JidoSql.repo(), params.sql_query) do
-      {:ok, result} ->
+    case executor.execute(JidoSql.repo(), params.sql_query) do
+      {:ok, %QueryResult{} = result} ->
         formatted =
           result
-          |> QueryExecutor.truncate(max_rows, max_cols)
-          |> QueryExecutor.format_text_table()
+          |> executor.truncate(max_rows, max_cols)
+          |> executor.format_text_table()
 
         {:ok, %{result: formatted}}
 

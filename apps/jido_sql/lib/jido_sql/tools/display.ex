@@ -16,11 +16,12 @@ defmodule JidoSql.Tools.Display do
     ]
 
   alias JidoArtifacts.{Artifact, Merge}
+  alias JidoSql.QueryResult
 
   @impl true
   def run(params, ctx) do
-    case JidoSql.QueryExecutor.execute(JidoSql.repo(), params.sql_query) do
-      {:ok, result} ->
+    case JidoSql.query_executor().execute(JidoSql.repo(), params.sql_query) do
+      {:ok, %QueryResult{} = result} ->
         artifact_data = %{
           sql: params.sql_query,
           label: derive_label(params.sql_query),

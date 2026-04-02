@@ -2,6 +2,7 @@ defmodule JidoSql.QueryExecutor do
   @moduledoc "Executes raw SQL queries with timeout, truncation, and text formatting."
 
   alias Ecto.Adapters.SQL, as: EctoSQL
+  alias JidoSql.QueryResult
   alias Postgrex.Error, as: PostgrexError
 
   @default_timeout 15_000
@@ -11,7 +12,7 @@ defmodule JidoSql.QueryExecutor do
   @doc """
   Executes a raw SQL query against the given Ecto Repo.
 
-  Returns `{:ok, %{columns: [...], rows: [[...]], total_rows: n}}` on success,
+  Returns `{:ok, %QueryResult{}}` on success,
   or `{:error, message}` on failure.
 
   ## Options
@@ -19,14 +20,14 @@ defmodule JidoSql.QueryExecutor do
     * `:timeout` — query timeout in ms (default: #{@default_timeout})
   """
   @spec execute(module(), String.t(), keyword()) ::
-          {:ok, %{columns: [String.t()], rows: [[term()]], total_rows: non_neg_integer()}}
+          {:ok, QueryResult.t()}
           | {:error, String.t()}
   def execute(repo, sql, opts \\ []) do
     timeout = Keyword.get(opts, :timeout, @default_timeout)
 
     case EctoSQL.query(repo, sql, [], timeout: timeout) do
       {:ok, %{columns: cols, rows: rows, num_rows: count}} ->
-        {:ok, %{columns: cols, rows: sanitize_rows(rows), total_rows: count}}
+        {:ok, QueryResult.new(cols, sanitize_rows(rows), count)}
 
       {:error, %PostgrexError{} = err} ->
         {:error, Exception.message(err)}
@@ -44,7 +45,7 @@ defmodule JidoSql.QueryExecutor do
 
   Returns a map with `:truncated` flag indicating whether truncation was applied.
   """
-  @spec truncate(map(), non_neg_integer(), non_neg_integer()) :: map()
+  @spec truncate(QueryResult.t(), non_neg_integer(), non_neg_integer()) :: map()
   def truncate(result, max_rows \\ @default_max_rows, max_cols \\ @default_max_cols) do
     total_columns = length(result.columns)
     cols = Enum.take(result.columns, max_cols)

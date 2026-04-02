@@ -1,2 +1,5 @@
 ExUnit.start()
-Ecto.Adapters.SQL.Sandbox.mode(JidoSql.Repo, :manual)
+
+if Process.whereis(JidoSql.Repo) do
+  Ecto.Adapters.SQL.Sandbox.mode(JidoSql.Repo, :manual)
+end

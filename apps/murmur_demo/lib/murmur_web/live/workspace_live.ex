@@ -11,6 +11,7 @@ defmodule MurmurWeb.WorkspaceLive do
   alias JidoMurmur.Topics
   alias JidoMurmur.UITurn
   alias JidoMurmur.Workspaces
+  alias JidoSql.QueryResult
   alias JidoTasks.Signals.TaskCreated
   alias JidoTasks.Signals.TaskUpdated
   alias JidoTasks.Tasks
@@ -198,7 +199,7 @@ defmodule MurmurWeb.WorkspaceLive do
 
     {result_key, result_val} =
       case JidoSql.QueryExecutor.execute(JidoSql.Repo, sql) do
-        {:ok, result} -> {"loaded_result", result}
+        {:ok, %QueryResult{} = result} -> {"loaded_result", result}
         {:error, msg} -> {"loaded_error", msg}
       end
 

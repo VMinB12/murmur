@@ -28,3 +28,6 @@
 - Fixed `workspace_live.html.heex` so split and unified badge rows filter artifact visibility using the `%Envelope{}` payload instead of legacy raw-list/raw-map checks.
 - Expanded artifact verification coverage with stronger plugin merge assertions and a new `workspace_live_artifact_signal_test.exs` module covering live signal-driven rendering for `papers`, `displayed_paper`, and `sql_results` artifacts.
 - Verified the new Phase 2 changes compile cleanly with `mix compile`, but Murmur demo DB-backed test execution remains blocked in this environment because PostgreSQL is not available on `localhost:5432` for `JidoSql.Repo` setup.
+- Implemented Phase 3 by introducing `%JidoSql.QueryResult{}` as the canonical `QueryExecutor.execute/3` return type and updating the SQL tools, SQL result renderer, and `workspace_live` re-execution path to consume the struct explicitly.
+- Added a small `JidoSql.query_executor/0` injection point so SQL tools can be tested without a live database, keeping the production default on `JidoSql.QueryExecutor`.
+- Added direct `jido_sql` tests for `QueryResult`, `QueryExecutor` helper behavior, and SQL tool behavior using fake executors, then verified them with `mix test --no-start` from `apps/jido_sql`.

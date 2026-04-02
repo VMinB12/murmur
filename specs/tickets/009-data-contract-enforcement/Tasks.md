@@ -28,10 +28,10 @@
 
 ## Phase 3: P2 Typed SQL Result Boundary
 
-- [ ] T014 Create `apps/jido_sql/lib/jido_sql/query_result.ex` defining `%JidoSql.QueryResult{}` with enforced keys and a public `@type t` for query execution results.
-- [ ] T015 Update `apps/jido_sql/lib/jido_sql/query_executor.ex` so `execute/3` returns `{:ok, %JidoSql.QueryResult{}} | {:error, reason}`, and adjust helper functions only as needed to keep the public boundary coherent.
-- [ ] T016 Update `apps/jido_sql/lib/jido_sql/tools/query.ex`, `apps/jido_sql/lib/jido_sql/tools/display.ex`, and `apps/murmur_demo/lib/murmur_web/live/workspace_live.ex` to pattern-match on `%JidoSql.QueryResult{}` instead of plain maps.
-- [ ] T017 Update `apps/jido_sql/test/jido_sql/query_executor_test.exs`, `apps/jido_sql/test/jido_sql/tools/query_test.exs`, and `apps/jido_sql/test/jido_sql/tools/display_test.exs` to assert the typed `%JidoSql.QueryResult{}` contract.
+- [x] T014 Create `apps/jido_sql/lib/jido_sql/query_result.ex` defining `%JidoSql.QueryResult{}` with enforced keys and a public `@type t` for query execution results.
+- [x] T015 Update `apps/jido_sql/lib/jido_sql/query_executor.ex` so `execute/3` returns `{:ok, %JidoSql.QueryResult{}} | {:error, reason}`, and adjust helper functions only as needed to keep the public boundary coherent.
+- [x] T016 Update `apps/jido_sql/lib/jido_sql/tools/query.ex`, `apps/jido_sql/lib/jido_sql/tools/display.ex`, and `apps/murmur_demo/lib/murmur_web/live/workspace_live.ex` to pattern-match on `%JidoSql.QueryResult{}` instead of plain maps.
+- [x] T017 Update `apps/jido_sql/test/jido_sql/query_executor_test.exs`, `apps/jido_sql/test/jido_sql/tools/query_test.exs`, and `apps/jido_sql/test/jido_sql/tools/display_test.exs` to assert the typed `%JidoSql.QueryResult{}` contract.
 
 ## Phase 4: P2 Public Specs and Manual Dialyzer
 

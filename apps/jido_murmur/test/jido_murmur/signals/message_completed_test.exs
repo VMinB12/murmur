@@ -35,6 +35,10 @@ defmodule JidoMurmur.Signals.MessageCompletedTest do
     test "rejects missing response" do
       assert {:error, _} = MessageCompleted.new(%{session_id: "sess_abc"})
     end
+
+    test "rejects response payloads that are neither strings nor maps" do
+      assert {:error, _} = MessageCompleted.new(%{session_id: "sess_abc", response: [:not, :valid]})
+    end
   end
 
   describe "subject/2" do

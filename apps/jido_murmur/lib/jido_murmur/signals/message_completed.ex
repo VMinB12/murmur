@@ -6,13 +6,23 @@ defmodule JidoMurmur.Signals.MessageCompleted do
   Subject: `/workspaces/{wid}/agents/{sid}`
   """
 
+  @type response_payload :: String.t() | map()
+
   use Jido.Signal,
     type: "murmur.message.completed",
     default_source: "/jido_murmur/runner",
     schema: [
       session_id: [type: :string, required: true, doc: "Agent session ID"],
-      response: [type: :any, required: true, doc: "Agent response content"]
+      response: [
+        type: {:custom, __MODULE__, :validate_response, []},
+        required: true,
+        doc: "Agent response content"
+      ]
     ]
+
+  @spec validate_response(term()) :: {:ok, response_payload()} | {:error, String.t()}
+  def validate_response(response) when is_binary(response) or is_map(response), do: {:ok, response}
+  def validate_response(_), do: {:error, "must be a string or map response payload"}
 
   @doc "Build the subject URI for this signal."
   def subject(workspace_id, session_id),

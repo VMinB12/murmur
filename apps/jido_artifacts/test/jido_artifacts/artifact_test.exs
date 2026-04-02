@@ -4,6 +4,7 @@ defmodule JidoArtifacts.ArtifactTest do
   alias JidoArtifacts.Artifact
   alias JidoArtifacts.Envelope
   alias JidoArtifacts.Merge
+  alias JidoArtifacts.SignalPayload
 
   defp envelope(data, version \\ 1) do
     Envelope.new(data, version, "agent-1", ~U[2026-01-01 00:00:00Z])
@@ -15,10 +16,11 @@ defmodule JidoArtifacts.ArtifactTest do
 
       assert %Jido.Agent.Directive.Emit{signal: signal} = directive
       assert signal.type == "artifact.papers"
+      assert %SignalPayload{} = signal.data
       assert signal.data.name == "papers"
-      assert signal.data.data == [%{id: 1}]
+      assert signal.data.payload == [%{id: 1}]
       assert signal.data.mode == :replace
-      refute Map.has_key?(signal.data, :merge_result)
+      assert is_nil(signal.data.merge_result)
     end
 
     test "sets source to /jido_artifacts/<name>" do
@@ -32,7 +34,7 @@ defmodule JidoArtifacts.ArtifactTest do
       directive = Artifact.emit(%{}, "text", "plain string content")
 
       assert %Jido.Agent.Directive.Emit{signal: signal} = directive
-      assert signal.data.data == "plain string content"
+      assert signal.data.payload == "plain string content"
     end
   end
 
@@ -45,7 +47,7 @@ defmodule JidoArtifacts.ArtifactTest do
       assert %Jido.Agent.Directive.Emit{signal: signal} = directive
       assert signal.data.mode == :merge
       assert signal.data.merge_result == [%{id: 1}, %{id: 2}]
-      assert signal.data.data == [%{id: 2}]
+      assert signal.data.payload == [%{id: 2}]
     end
 
     test "handles nil existing via merge function" do

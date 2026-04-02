@@ -42,13 +42,13 @@
 
 ## Phase 5: P3 Signal Schema Tightening
 
-- [ ] T022 Update `apps/jido_murmur/lib/jido_murmur/signals/message_received.ex` and `apps/jido_murmur/lib/jido_murmur/signals/message_completed.ex` so their schemas use concrete field types rather than `:any` where the current payload shape is known.
-- [ ] T023 Update `apps/jido_tasks/lib/jido_tasks/signals/task_created.ex` and `apps/jido_tasks/lib/jido_tasks/signals/task_updated.ex` so their `task` fields use `JidoTasks.Task.t()` rather than `:any`.
-- [ ] T024 Add a typed artifact signal module or equivalent typed schema implementation under `apps/jido_artifacts/lib/jido_artifacts/` so the `artifact.*` family documents a concrete Murmur-owned payload contract without requiring a Jido framework change.
-- [ ] T025 Update the corresponding signal tests in `apps/jido_murmur/test/jido_murmur/signals/*.exs` and `apps/jido_tasks/test/jido_tasks/signals/*.exs`, and add artifact signal tests under `apps/jido_artifacts/test/jido_artifacts/`, to assert the tightened schema contracts.
+- [x] T022 Update `apps/jido_murmur/lib/jido_murmur/signals/message_received.ex` and `apps/jido_murmur/lib/jido_murmur/signals/message_completed.ex` so their schemas use concrete field types rather than `:any` where the current payload shape is known.
+- [x] T023 Update `apps/jido_tasks/lib/jido_tasks/signals/task_created.ex` and `apps/jido_tasks/lib/jido_tasks/signals/task_updated.ex` so their `task` fields use `JidoTasks.Task.t()` rather than `:any`.
+- [x] T024 Add a typed artifact signal module or equivalent typed schema implementation under `apps/jido_artifacts/lib/jido_artifacts/` so the `artifact.*` family documents a concrete Murmur-owned payload contract without requiring a Jido framework change.
+- [x] T025 Update the corresponding signal tests in `apps/jido_murmur/test/jido_murmur/signals/*.exs` and `apps/jido_tasks/test/jido_tasks/signals/*.exs`, and add artifact signal tests under `apps/jido_artifacts/test/jido_artifacts/`, to assert the tightened schema contracts.
 
 ## Phase 6: End-to-End Validation
 
-- [ ] T026 Run focused tests for `apps/jido_artifacts/test/`, `apps/jido_sql/test/`, `apps/jido_murmur_web/test/jido_murmur_web/components/artifact_panel_test.exs`, and the Murmur artifact LiveView tests to verify the new contracts before full-suite validation.
-- [ ] T027 Run `mix test` from `/Users/vincent.min/Projects/murmur` after the P1 and P2 work is complete.
-- [ ] T028 Run `mix precommit` from `/Users/vincent.min/Projects/murmur` once implementation and manual Dialyzer verification are complete.
+- [x] T026 Run focused tests for `apps/jido_artifacts/test/`, `apps/jido_sql/test/`, `apps/jido_murmur_web/test/jido_murmur_web/components/artifact_panel_test.exs`, and the Murmur artifact LiveView tests to verify the new contracts before full-suite validation.
+- [x] T027 Run `mix test` from `/Users/vincent.min/Projects/murmur` after the P1 and P2 work is complete.
+- [x] T028 Run `mix precommit` from `/Users/vincent.min/Projects/murmur` once implementation and manual Dialyzer verification are complete.

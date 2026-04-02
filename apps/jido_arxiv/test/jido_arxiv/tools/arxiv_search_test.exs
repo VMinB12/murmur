@@ -46,7 +46,7 @@ defmodule JidoArxiv.Tools.ArxivSearchTest do
       assert %Jido.Agent.Directive.Emit{signal: signal} = directive
       assert signal.type == "artifact.papers"
       assert signal.data.mode == :merge
-      assert length(signal.data.data) == 2
+      assert length(signal.data.payload) == 2
     end
 
     test "parses paper metadata correctly" do
@@ -59,7 +59,7 @@ defmodule JidoArxiv.Tools.ArxivSearchTest do
 
       {:ok, _result, directive} = ArxivSearch.run(params, ctx)
 
-      [paper1, paper2] = directive.signal.data.data
+  [paper1, paper2] = directive.signal.data.payload
 
       assert paper1.id == "2301.07041v1"
       assert paper1.title == "Attention Is All You Need Revisited"
@@ -96,7 +96,7 @@ defmodule JidoArxiv.Tools.ArxivSearchTest do
 
       {:ok, _result, directive} = ArxivSearch.run(%{query: "test"}, %{})
 
-      [paper] = directive.signal.data.data
+  [paper] = directive.signal.data.payload
       assert paper.title == "Multi-line Title With Spaces"
       assert paper.abstract =~ "Abstract with tabs and newlines in it"
     end
@@ -117,7 +117,7 @@ defmodule JidoArxiv.Tools.ArxivSearchTest do
       {:ok, %{result: result}, directive} = ArxivSearch.run(%{query: "nonexistent"}, %{})
 
       assert result =~ "Found 0 papers"
-      assert directive.signal.data.data == []
+  assert directive.signal.data.payload == []
     end
   end
 
@@ -160,7 +160,7 @@ defmodule JidoArxiv.Tools.ArxivSearchTest do
       {:ok, %{result: result}, directive} = ArxivSearch.run(%{query: "test"}, %{})
 
       assert result =~ "Found 0 papers"
-      assert directive.signal.data.data == []
+      assert directive.signal.data.payload == []
     end
   end
 

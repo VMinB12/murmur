@@ -34,3 +34,7 @@
 - Completed Phase 4 by filling in the missing public `@spec` coverage on `JidoMurmur.Runner`, `JidoTasks.Tasks`, `JidoTasks.Task`, and `JidoMurmur.Storage.Ecto`, while tightening `JidoSql.QueryExecutor` helper result types and adding the missing public spec on `JidoArtifacts.Artifact.artifact_topic/2`.
 - Reconfirmed that the umbrella `mix precommit` alias remains unchanged and does not include Dialyzer.
 - Ran `mix dialyzer` manually from the repository root; it passed with zero errors, so no `.dialyzer_ignore.exs` file was needed.
+- Completed Phase 5 by tightening the `murmur.message.*` schemas with explicit message/response validation, requiring `%JidoTasks.Task{}` for `task.*` signals, and introducing typed `JidoArtifacts.SignalPayload` and `JidoArtifacts.SignalUpdate` structs so the `artifact.*` family now has an application-owned contract instead of raw maps.
+- Updated the focused signal tests across `jido_murmur`, `jido_tasks`, `jido_artifacts`, and Murmur’s artifact plugin/live path to assert the tightened contracts.
+- Completed Phase 6 validation by running the focused ticket test targets, then fixing the remaining stale artifact payload assertions in `jido_sql` and `jido_arxiv` so the full umbrella suite matched the new typed contract.
+- Verified the final state with `mix test` and `mix precommit` from the repository root; both passed cleanly, and `mix precommit` still preserved the manual-Dialyzer workflow while reporting only the existing low-confidence Sobelow XSS warning in `apps/murmur_demo/lib/murmur_web/helpers/markdown.ex`.

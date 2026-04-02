@@ -4,17 +4,18 @@ defmodule MurmurWeb.WorkspaceLiveArtifactSignalTest do
   import Phoenix.LiveViewTest
 
   alias JidoArtifacts.Envelope
+  alias JidoArtifacts.SignalUpdate
   alias JidoMurmur.Topics
   alias JidoMurmur.Workspaces
 
-  defp envelope(data, source \\ "agent-1", version \\ 1) do
+  defp envelope(data, source, version \\ 1) do
     Envelope.new(data, version, source, ~U[2026-01-01 00:00:00Z])
   end
 
   defp artifact_signal(session_id, name, envelope) do
     Jido.Signal.new!(
       "artifact.#{name}",
-      %{name: name, data: envelope, mode: :replace, scope: :agent},
+      SignalUpdate.new!(name, envelope),
       source: "/jido_artifacts/#{name}",
       subject: "/agents/#{session_id}"
     )

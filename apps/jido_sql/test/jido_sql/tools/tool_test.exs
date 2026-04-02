@@ -77,9 +77,9 @@ defmodule JidoSql.Tools.ToolTest do
       assert result == "Query result displayed to user (2 rows)"
       assert signal.type == "artifact.sql_results"
       assert signal.data.mode == :merge
-      assert signal.data.data.label == "SELECT * FROM users"
-      assert signal.data.data.row_count == 2
-      assert signal.data.data.column_count == 2
+      assert signal.data.payload.label == "SELECT * FROM users"
+      assert signal.data.payload.row_count == 2
+      assert signal.data.payload.column_count == 2
     end
 
     test "returns executor errors unchanged" do

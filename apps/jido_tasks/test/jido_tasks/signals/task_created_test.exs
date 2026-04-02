@@ -2,20 +2,21 @@ defmodule JidoTasks.Signals.TaskCreatedTest do
   use ExUnit.Case, async: true
 
   alias JidoTasks.Signals.TaskCreated
+  alias JidoTasks.Task
 
   describe "new/2" do
     test "creates signal with correct type and source" do
-      task = %{id: "42", title: "Test task", status: :todo}
+      task = %Task{id: "42", title: "Test task", status: :todo}
       {:ok, signal} = TaskCreated.new(%{task: task})
 
       assert signal.type == "task.created"
       assert signal.source == "/jido_tasks/tools/add_task"
       assert signal.data.task == task
-      assert signal.id != nil
+      assert signal.id
     end
 
     test "creates signal with subject override" do
-      task = %{id: "42", title: "Test task"}
+      task = %Task{id: "42", title: "Test task", status: :todo}
       subject = TaskCreated.subject("ws_1", "42")
 
       {:ok, signal} = TaskCreated.new(%{task: task}, subject: subject)
@@ -25,6 +26,10 @@ defmodule JidoTasks.Signals.TaskCreatedTest do
 
     test "rejects missing task" do
       assert {:error, _} = TaskCreated.new(%{})
+    end
+
+    test "rejects non-task payloads" do
+      assert {:error, _} = TaskCreated.new(%{task: %{id: "42", title: "Test task"}})
     end
   end
 

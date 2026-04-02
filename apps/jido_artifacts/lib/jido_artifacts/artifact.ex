@@ -29,6 +29,7 @@ defmodule JidoArtifacts.Artifact do
 
   alias Jido.Agent.Directive
   alias JidoArtifacts.Envelope
+  alias JidoArtifacts.SignalPayload
 
   @doc """
   Creates an `Emit` directive that broadcasts an artifact update.
@@ -52,9 +53,9 @@ defmodule JidoArtifacts.Artifact do
       if merge_fn do
         existing = existing_artifact_payload(get_in(ctx, [:state, :artifacts, name]))
         merge_result = merge_fn.(existing, data)
-        %{name: name, data: data, mode: :merge, merge_result: merge_result, scope: scope}
+        SignalPayload.new!(name, data, mode: :merge, merge_result: merge_result, scope: scope)
       else
-        %{name: name, data: data, mode: :replace, scope: scope}
+        SignalPayload.new!(name, data, scope: scope)
       end
 
     agent_id = get_in(ctx, [:state, :__agent_id__])

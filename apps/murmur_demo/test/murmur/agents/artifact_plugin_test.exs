@@ -13,6 +13,8 @@ defmodule Murmur.Agents.ArtifactPluginTest do
   alias JidoArtifacts.Artifact
   alias JidoArtifacts.ArtifactPlugin
   alias JidoArtifacts.Envelope
+  alias JidoArtifacts.SignalPayload
+  alias JidoArtifacts.SignalUpdate
 
   @workspace_id "test-workspace-456"
   @session_id "test-session-123"
@@ -29,7 +31,7 @@ defmodule Murmur.Agents.ArtifactPluginTest do
   defp build_signal(name, data, mode) do
     Jido.Signal.new!(
       "artifact.#{name}",
-      %{name: name, data: data, mode: mode},
+      SignalPayload.new!(name, data, mode: mode),
       source: "/artifact/#{name}"
     )
   end
@@ -41,8 +43,7 @@ defmodule Murmur.Agents.ArtifactPluginTest do
       ArtifactPlugin.handle_signal(signal, build_context())
 
       assert_receive %Jido.Signal{type: "artifact.papers", data: data}
-      assert data[:name] == "papers" or data["name"] == "papers"
-      assert %Envelope{} = data[:data] || data["data"]
+      assert %SignalUpdate{name: "papers", envelope: %Envelope{}} = data
     end
 
     test "returns override to StoreArtifact action with replace mode" do
@@ -57,15 +58,20 @@ defmodule Murmur.Agents.ArtifactPluginTest do
       assert %Envelope{} = params.artifact_envelope
     end
 
-    test "returns override to StoreArtifact action with append mode" do
-      signal = build_signal("papers", [%{id: 2}], :append)
+    test "returns override to StoreArtifact action with merge mode" do
+      signal =
+        Jido.Signal.new!(
+          "artifact.papers",
+          SignalPayload.new!("papers", [%{id: 2}], mode: :merge, merge_result: [%{id: 2}]),
+          source: "/artifact/papers"
+        )
 
       assert {:ok, {:override, {StoreArtifact, params}}} =
                ArtifactPlugin.handle_signal(signal, build_context())
 
       assert params.artifact_name == "papers"
       assert params.artifact_data == [%{id: 2}]
-      assert params.artifact_mode == :append
+      assert params.artifact_mode == :merge
       assert %Envelope{} = params.artifact_envelope
     end
 
@@ -73,7 +79,7 @@ defmodule Murmur.Agents.ArtifactPluginTest do
       signal =
         Jido.Signal.new!(
           "artifact.doc",
-          %{name: "doc", data: %{content: "hello"}},
+          SignalPayload.new!("doc", %{content: "hello"}),
           source: "/artifact/doc"
         )
 
@@ -83,29 +89,16 @@ defmodule Murmur.Agents.ArtifactPluginTest do
       assert params.artifact_mode == :replace
     end
 
-    test "handles string-keyed signal data" do
-      signal =
-        Jido.Signal.new!(
-          "artifact.papers",
-          %{"name" => "papers", "data" => [%{"id" => 1}], "mode" => :append},
-          source: "/artifact/papers"
-        )
-
-      assert {:ok, {:override, {StoreArtifact, params}}} =
-               ArtifactPlugin.handle_signal(signal, build_context())
-
-      assert params.artifact_name == "papers"
-      assert params.artifact_data == [%{"id" => 1}]
-      assert params.artifact_mode == :append
-    end
-
     test "computes merged envelope version from an existing artifact envelope" do
       existing_envelope = Envelope.new([%{id: 1}], 2, @session_id, ~U[2026-01-01 00:00:00Z])
 
       signal =
         Jido.Signal.new!(
           "artifact.papers",
-          %{name: "papers", data: [%{id: 2}], mode: :merge, merge_result: [%{id: 1}, %{id: 2}]},
+          SignalPayload.new!("papers", [%{id: 2}],
+            mode: :merge,
+            merge_result: [%{id: 1}, %{id: 2}]
+          ),
           source: "/artifact/papers"
         )
 

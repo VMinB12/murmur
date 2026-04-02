@@ -5,7 +5,7 @@ defmodule JidoMurmur.Signals.MessageReceivedTest do
 
   describe "new/2" do
     test "creates signal with correct type and source" do
-      msg = %{role: "user", content: "Hello"}
+      msg = %{id: "msg_1", role: "user", content: "Hello"}
       {:ok, signal} = MessageReceived.new(%{session_id: "sess_abc", message: msg})
 
       assert signal.type == "murmur.message.received"
@@ -17,7 +17,7 @@ defmodule JidoMurmur.Signals.MessageReceivedTest do
 
     test "creates signal with subject override" do
       subject = MessageReceived.subject("ws_1", "sess_abc")
-      msg = %{role: "user", content: "Hi"}
+      msg = %{id: "msg_2", role: "user", content: "Hi"}
 
       {:ok, signal} =
         MessageReceived.new(%{session_id: "sess_abc", message: msg}, subject: subject)
@@ -31,6 +31,11 @@ defmodule JidoMurmur.Signals.MessageReceivedTest do
 
     test "rejects missing message" do
       assert {:error, _} = MessageReceived.new(%{session_id: "sess_abc"})
+    end
+
+    test "rejects invalid message payload shape" do
+      assert {:error, _} =
+               MessageReceived.new(%{session_id: "sess_abc", message: %{role: "user", content: "Hi"}})
     end
   end
 

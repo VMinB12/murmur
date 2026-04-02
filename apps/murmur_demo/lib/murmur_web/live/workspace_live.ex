@@ -4,6 +4,7 @@ defmodule MurmurWeb.WorkspaceLive do
 
   alias Jido.AI.Signal.LLMResponse
   alias JidoArtifacts.Envelope
+  alias JidoArtifacts.SignalUpdate
   alias JidoMurmur.Catalog
   alias JidoMurmur.ObsTracer.Cache, as: ObsCache
   alias JidoMurmur.Runner
@@ -511,10 +512,10 @@ defmodule MurmurWeb.WorkspaceLive do
   end
 
   @impl true
-  def handle_info(%Jido.Signal{type: "artifact." <> _name, data: data} = signal, socket) do
+  def handle_info(%Jido.Signal{type: "artifact." <> _name, data: %SignalUpdate{} = data} = signal, socket) do
     session_id = extract_session_id(signal)
-    artifact_name = data[:name] || data["name"]
-    artifact_envelope = data[:data] || data["data"]
+    artifact_name = data.name
+    artifact_envelope = data.envelope
 
     socket =
       update(socket, :artifacts, fn artifacts ->

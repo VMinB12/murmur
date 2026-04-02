@@ -49,7 +49,7 @@ defmodule JidoArxiv.Tools.ToolTest do
       assert %Jido.Agent.Directive.Emit{signal: signal} = directive
       assert signal.type == "artifact.displayed_paper"
       assert signal.data.mode == :replace
-      assert signal.data.data.pdf_url =~ "2301.07041"
+      assert signal.data.payload.pdf_url =~ "2301.07041"
     end
   end
 

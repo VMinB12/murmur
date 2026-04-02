@@ -21,17 +21,26 @@ defmodule JidoArtifacts.ArtifactPlugin do
   alias JidoArtifacts.Actions.StoreArtifact
   alias JidoArtifacts.Artifact
   alias JidoArtifacts.Envelope
+  alias JidoArtifacts.SignalPayload
+  alias JidoArtifacts.SignalUpdate
 
   require Logger
 
   @impl Jido.Plugin
-  def handle_signal(%{type: "artifact." <> _name, data: data} = signal, context) do
+  def handle_signal(%{type: "artifact." <> _name, data: %SignalPayload{} = data} = signal, context) do
     session_id = context.agent.id
     workspace_id = context.agent.state[:workspace_id]
     topic = Artifact.artifact_topic(workspace_id, session_id)
     current_artifacts = context.agent.state[:artifacts] || %{}
 
-    {artifact_name, artifact_data, mode, merge_result, scope} = extract_signal_data(data)
+    %SignalPayload{
+      name: artifact_name,
+      payload: artifact_data,
+      mode: mode,
+      merge_result: merge_result,
+      scope: scope
+    } = data
+
     artifact_envelope =
       build_envelope(Map.get(current_artifacts, artifact_name), artifact_data, mode, merge_result, context)
 
@@ -48,23 +57,13 @@ defmodule JidoArtifacts.ArtifactPlugin do
     # Broadcast the original signal with subject populated
     broadcast_signal =
       signal
-      |> Map.put(:data, %{name: artifact_name, data: artifact_envelope, mode: mode, scope: scope})
+      |> Map.put(:data, SignalUpdate.new!(artifact_name, artifact_envelope, mode: mode, scope: scope))
       |> ensure_subject(session_id)
 
     Phoenix.PubSub.broadcast(JidoArtifacts.pubsub(), topic, broadcast_signal)
 
     store_params = build_store_params(artifact_name, artifact_data, mode, merge_result, artifact_envelope)
     {:ok, {:override, {StoreArtifact, store_params}}}
-  end
-
-  defp extract_signal_data(data) do
-    {
-      data[:name] || data["name"],
-      data[:data] || data["data"],
-      data[:mode] || data["mode"] || :replace,
-      data[:merge_result] || data["merge_result"],
-      data[:scope] || data["scope"] || :agent
-    }
   end
 
   defp build_store_params(name, data, mode, merge_result, artifact_envelope) do

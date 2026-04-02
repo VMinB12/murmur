@@ -12,8 +12,13 @@ defmodule MurmurWeb.WorkspaceLiveArtifactPersistenceTest do
 
   import Phoenix.LiveViewTest
 
+  alias JidoArtifacts.Envelope
   alias JidoMurmur.Catalog
   alias JidoMurmur.Workspaces
+
+  defp envelope(data, version \\ 1) do
+    Envelope.new(data, version, "agent-1", ~U[2026-01-01 00:00:00Z])
+  end
 
   defp assert_eventually(fun, retries \\ 50) do
     if fun.() do
@@ -80,7 +85,7 @@ defmodule MurmurWeb.WorkspaceLiveArtifactPersistenceTest do
       # Inject artifact data directly into agent state
       {:ok, server_state} = Jido.AgentServer.state(pid)
       agent = server_state.agent
-      agent = %{agent | state: Map.put(agent.state, :artifacts, %{"papers" => @papers})}
+      agent = %{agent | state: Map.put(agent.state, :artifacts, %{"papers" => envelope(@papers)})}
 
       # Hibernate to persist the agent state (including artifacts)
       assert :ok = Murmur.Jido.hibernate(agent)
@@ -117,7 +122,7 @@ defmodule MurmurWeb.WorkspaceLiveArtifactPersistenceTest do
       # Inject artifact data directly into agent state (agent stays running)
       {:ok, server_state} = Jido.AgentServer.state(pid)
       agent = server_state.agent
-      agent = %{agent | state: Map.put(agent.state, :artifacts, %{"papers" => @papers})}
+      agent = %{agent | state: Map.put(agent.state, :artifacts, %{"papers" => envelope(@papers)})}
 
       # Update the running agent's state via hibernate + thaw cycle
       assert :ok = Murmur.Jido.hibernate(agent)
@@ -156,7 +161,7 @@ defmodule MurmurWeb.WorkspaceLiveArtifactPersistenceTest do
       # Get agent and add artifacts
       {:ok, server_state} = Jido.AgentServer.state(pid)
       agent = server_state.agent
-      agent = %{agent | state: Map.put(agent.state, :artifacts, %{"papers" => @papers})}
+      agent = %{agent | state: Map.put(agent.state, :artifacts, %{"papers" => envelope(@papers)})}
 
       # Hibernate
       assert :ok = Murmur.Jido.hibernate(agent)
@@ -165,7 +170,7 @@ defmodule MurmurWeb.WorkspaceLiveArtifactPersistenceTest do
       {:ok, restored} = Murmur.Jido.thaw(agent_module, session.id)
 
       # Artifacts should be present in the restored agent's state
-      assert restored.state.artifacts == %{"papers" => @papers}
+      assert restored.state.artifacts == %{"papers" => envelope(@papers)}
     end
 
     test "empty artifacts survive round-trip", %{

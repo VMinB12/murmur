@@ -3,10 +3,15 @@ defmodule JidoMurmurWeb.Components.ArtifactPanelTest do
 
   import Phoenix.LiveViewTest
 
+  alias JidoArtifacts.Envelope
   alias JidoMurmurWeb.Components.ArtifactPanel
   alias JidoMurmurWeb.Components.ArtifactPanel.Generic
   alias JidoMurmurWeb.Components.ArtifactPanel.PaperList
   alias JidoMurmurWeb.Components.ArtifactPanel.PdfViewer
+
+  defp envelope(data, source \\ "agent-1", version \\ 1) do
+    Envelope.new(data, version, source, ~U[2026-01-01 00:00:00Z])
+  end
 
   describe "ArtifactPanel.artifact_panel/1" do
     test "renders empty state when no artifacts" do
@@ -29,8 +34,8 @@ defmodule JidoMurmurWeb.Components.ArtifactPanelTest do
       ]
 
       artifacts = %{
-        "s1" => %{"papers" => [%{"title" => "Paper 1"}]},
-        "s2" => %{"tasks" => [%{"title" => "Task 1"}]}
+        "s1" => %{"papers" => envelope([%{"title" => "Paper 1"}])},
+        "s2" => %{"tasks" => envelope([%{"title" => "Task 1"}], "agent-2")}
       }
 
       html =
@@ -48,7 +53,7 @@ defmodule JidoMurmurWeb.Components.ArtifactPanelTest do
 
     test "highlights active artifact tab" do
       sessions = [%{id: "s1", display_name: "Bot A"}]
-      artifacts = %{"s1" => %{"papers" => [%{"title" => "P1"}]}}
+      artifacts = %{"s1" => %{"papers" => envelope([%{"title" => "P1"}])}}
       active = %{session_id: "s1", name: "papers"}
 
       html =
@@ -66,9 +71,10 @@ defmodule JidoMurmurWeb.Components.ArtifactPanelTest do
 
       artifacts = %{
         "s1" => %{
-          "papers" => [
-            %{"title" => "Deep Learning Paper", "id" => "2301.00001", "abstract" => "Abstract text"}
-          ]
+          "papers" =>
+            envelope([
+              %{"title" => "Deep Learning Paper", "id" => "2301.00001", "abstract" => "Abstract text"}
+            ])
         }
       }
 
@@ -87,7 +93,14 @@ defmodule JidoMurmurWeb.Components.ArtifactPanelTest do
 
     test "skips empty artifacts in tabs" do
       sessions = [%{id: "s1", display_name: "Bot"}]
-      artifacts = %{"s1" => %{"empty_list" => [], "empty_map" => %{}, "valid" => ["data"]}}
+
+      artifacts = %{
+        "s1" => %{
+          "empty_list" => envelope([]),
+          "empty_map" => envelope(%{}),
+          "valid" => envelope(["data"])
+        }
+      }
 
       html =
         render_component(&ArtifactPanel.artifact_panel/1,
@@ -107,7 +120,7 @@ defmodule JidoMurmurWeb.Components.ArtifactPanelTest do
       html =
         render_component(&ArtifactPanel.artifact_badge/1,
           name: "papers",
-          data: [%{"title" => "P1"}, %{"title" => "P2"}],
+          data: envelope([%{"title" => "P1"}, %{"title" => "P2"}]),
           session_id: "s1"
         )
 
@@ -119,7 +132,7 @@ defmodule JidoMurmurWeb.Components.ArtifactPanelTest do
       html =
         render_component(&ArtifactPanel.artifact_badge/1,
           name: "displayed_paper",
-          data: %{"title" => "My Paper", "id" => "2301.00001"},
+          data: envelope(%{"title" => "My Paper", "id" => "2301.00001"}),
           session_id: "s1"
         )
 
@@ -131,7 +144,7 @@ defmodule JidoMurmurWeb.Components.ArtifactPanelTest do
       html =
         render_component(&ArtifactPanel.artifact_badge/1,
           name: "custom_data",
-          data: ["item1", "item2", "item3"],
+          data: envelope(["item1", "item2", "item3"]),
           session_id: "s1"
         )
 
@@ -159,7 +172,7 @@ defmodule JidoMurmurWeb.Components.ArtifactPanelTest do
       html =
         render_component(&ArtifactPanel.artifact_badge/1,
           name: "my_type",
-          data: "test",
+          data: envelope("test"),
           session_id: "s1",
           renderers: %{"my_type" => TestRenderer}
         )

@@ -9,14 +9,14 @@
 
 ## Phase 1: P1 Artifact Contract Foundations
 
-- [ ] T001 Create `apps/jido_artifacts/lib/jido_artifacts/envelope.ex` defining `%JidoArtifacts.Envelope{}` with `@enforce_keys [:data, :version, :source, :updated_at]`, `@type t`, and public constructor/accessor helpers.
-- [ ] T002 Update `apps/jido_artifacts/lib/jido_artifacts/actions/store_artifact.ex` so `StoreArtifact.run/2` always persists `%JidoArtifacts.Envelope{}` and deletes keys on nil merge results without leaving map-based legacy code.
-- [ ] T003 Update `apps/jido_artifacts/lib/jido_artifacts/artifact_plugin.ex` so the broadcast payload and override params carry the canonical `%JidoArtifacts.Envelope{}` generated for that artifact update.
-- [ ] T004 Update `apps/jido_artifacts/lib/jido_artifacts/artifact.ex` so merge callbacks operate on existing envelope payloads instead of envelope structs, and add/refresh the public `@spec` annotations on the artifact API.
-- [ ] T005 Update `apps/murmur_demo/lib/murmur_web/live/workspace_live.ex` so live artifact signals store `%JidoArtifacts.Envelope{}` in `socket.assigns.artifacts`, artifact deletion mirrors persistence semantics, and SQL result re-execution mutates the envelope payload instead of reverting to a raw map.
-- [ ] T006 Update `apps/murmur_demo/lib/murmur_web/components/artifacts.ex` to require `%JidoArtifacts.Envelope{}` at the boundary and remove the legacy `unwrap_envelope/1` fallback clauses.
-- [ ] T007 [P] Update `apps/jido_murmur_web/lib/jido_murmur_web/components/artifact_panel.ex` to require `%JidoArtifacts.Envelope{}` at the boundary and remove the legacy unwrap fallback clauses.
-- [ ] T008 [P] Update `apps/jido_murmur_web/priv/templates/components/artifact_panel.ex` and `apps/jido_murmur_web/mix.exs` so the generated component template and published package both depend on and use `JidoArtifacts.Envelope` directly.
+- [x] T001 Create `apps/jido_artifacts/lib/jido_artifacts/envelope.ex` defining `%JidoArtifacts.Envelope{}` with `@enforce_keys [:data, :version, :source, :updated_at]`, `@type t`, and public constructor/accessor helpers.
+- [x] T002 Update `apps/jido_artifacts/lib/jido_artifacts/actions/store_artifact.ex` so `StoreArtifact.run/2` always persists `%JidoArtifacts.Envelope{}` and deletes keys on nil merge results without leaving map-based legacy code.
+- [x] T003 Update `apps/jido_artifacts/lib/jido_artifacts/artifact_plugin.ex` so the broadcast payload and override params carry the canonical `%JidoArtifacts.Envelope{}` generated for that artifact update.
+- [x] T004 Update `apps/jido_artifacts/lib/jido_artifacts/artifact.ex` so merge callbacks operate on existing envelope payloads instead of envelope structs, and add/refresh the public `@spec` annotations on the artifact API.
+- [x] T005 Update `apps/murmur_demo/lib/murmur_web/live/workspace_live.ex` so live artifact signals store `%JidoArtifacts.Envelope{}` in `socket.assigns.artifacts`, artifact deletion mirrors persistence semantics, and SQL result re-execution mutates the envelope payload instead of reverting to a raw map.
+- [x] T006 Update `apps/murmur_demo/lib/murmur_web/components/artifacts.ex` to require `%JidoArtifacts.Envelope{}` at the boundary and remove the legacy `unwrap_envelope/1` fallback clauses.
+- [x] T007 [P] Update `apps/jido_murmur_web/lib/jido_murmur_web/components/artifact_panel.ex` to require `%JidoArtifacts.Envelope{}` at the boundary and remove the legacy unwrap fallback clauses.
+- [x] T008 [P] Update `apps/jido_murmur_web/priv/templates/components/artifact_panel.ex` and `apps/jido_murmur_web/mix.exs` so the generated component template and published package both depend on and use `JidoArtifacts.Envelope` directly.
 
 ## Phase 2: P1 Artifact Contract Verification
 

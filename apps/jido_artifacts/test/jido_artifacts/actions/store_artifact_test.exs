@@ -2,6 +2,11 @@ defmodule JidoArtifacts.Actions.StoreArtifactTest do
   use ExUnit.Case, async: true
 
   alias JidoArtifacts.Actions.StoreArtifact
+  alias JidoArtifacts.Envelope
+
+  defp envelope(data, version \\ 1) do
+    Envelope.new(data, version, "agent-1", ~U[2026-01-01 00:00:00Z])
+  end
 
   describe "run/2 create (version 1)" do
     test "wraps new artifact in metadata envelope" do
@@ -31,7 +36,7 @@ defmodule JidoArtifacts.Actions.StoreArtifactTest do
 
   describe "run/2 update (version increment)" do
     test "increments version on update" do
-      existing_envelope = %{data: [%{id: 1}], updated_at: ~U[2026-01-01 00:00:00Z], source: "agent-1", version: 3}
+      existing_envelope = envelope([%{id: 1}], 3)
       params = %{artifact_name: "papers", artifact_data: [%{id: 2}], artifact_mode: :replace}
       ctx = %{state: %{artifacts: %{"papers" => existing_envelope}, __agent_id__: "agent-1"}}
 
@@ -43,7 +48,7 @@ defmodule JidoArtifacts.Actions.StoreArtifactTest do
     end
 
     test "preserves other artifacts" do
-      other_envelope = %{data: "other", updated_at: ~U[2026-01-01 00:00:00Z], source: "agent-1", version: 1}
+      other_envelope = envelope("other")
       params = %{artifact_name: "new", artifact_data: "data", artifact_mode: :replace}
       ctx = %{state: %{artifacts: %{"existing" => other_envelope}, __agent_id__: "agent-1"}}
 
@@ -74,7 +79,7 @@ defmodule JidoArtifacts.Actions.StoreArtifactTest do
 
   describe "run/2 delete (nil merge_result)" do
     test "removes key when merge_result is nil" do
-      existing_envelope = %{data: [%{id: 1}], updated_at: ~U[2026-01-01 00:00:00Z], source: "agent-1", version: 1}
+      existing_envelope = envelope([%{id: 1}])
 
       params = %{
         artifact_name: "papers",

@@ -6,6 +6,7 @@ defmodule <%= @app_module %>Web.Components.ArtifactPanel do
 
   use Phoenix.Component
 
+  alias JidoArtifacts.Envelope
   import <%= @app_module %>Web.CoreComponents, only: [icon: 1]
 
   alias __MODULE__.Generic
@@ -17,6 +18,10 @@ defmodule <%= @app_module %>Web.Components.ArtifactPanel do
     "displayed_paper" => PdfViewer
   }
 
+  defp extract_data(%Envelope{data: inner}), do: inner
+  defp empty_artifact?(nil), do: true
+  defp empty_artifact?(%Envelope{data: data}), do: data == nil or data == [] or data == %%{}
+
   attr :name, :string, required: true
   attr :data, :any, required: true
   attr :session_id, :string, required: true
@@ -25,7 +30,10 @@ defmodule <%= @app_module %>Web.Components.ArtifactPanel do
 
   def artifact_badge(assigns) do
     renderer = Map.get(assigns.renderers, assigns.name) || Map.get(@default_renderers, assigns.name)
-    assigns = assign(assigns, :renderer, renderer)
+    assigns =
+      assigns
+      |> assign(:renderer, renderer)
+      |> update(:data, &extract_data/1)
 
     ~H"""
     <%%= if @renderer do %>
@@ -43,7 +51,10 @@ defmodule <%= @app_module %>Web.Components.ArtifactPanel do
 
   def artifact_detail(assigns) do
     renderer = Map.get(assigns.renderers, assigns.name) || Map.get(@default_renderers, assigns.name)
-    assigns = assign(assigns, :renderer, renderer)
+    assigns =
+      assigns
+      |> assign(:renderer, renderer)
+      |> update(:data, &extract_data/1)
 
     ~H"""
     <%%= if @renderer do %>
@@ -69,7 +80,7 @@ defmodule <%= @app_module %>Web.Components.ArtifactPanel do
         agent_name = if session, do: session.display_name, else: "agent"
 
         artifacts_map
-        |> Enum.reject(fn {_name, data} -> data == nil or data == [] or data == %%{} end)
+        |> Enum.reject(fn {_name, data} -> empty_artifact?(data) end)
         |> Enum.map(fn {name, _data} ->
           %%{session_id: session_id, agent_name: agent_name, name: name}
         end)

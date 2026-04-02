@@ -2,7 +2,12 @@ defmodule JidoArtifacts.ArtifactTest do
   use ExUnit.Case, async: true
 
   alias JidoArtifacts.Artifact
+  alias JidoArtifacts.Envelope
   alias JidoArtifacts.Merge
+
+  defp envelope(data, version \\ 1) do
+    Envelope.new(data, version, "agent-1", ~U[2026-01-01 00:00:00Z])
+  end
 
   describe "emit/4 without merge (replace)" do
     test "creates an Emit directive with mode :replace" do
@@ -33,7 +38,7 @@ defmodule JidoArtifacts.ArtifactTest do
 
   describe "emit/4 with merge callback" do
     test "applies merge function and includes merge_result" do
-      ctx = %{state: %{artifacts: %{"papers" => [%{id: 1}]}}}
+      ctx = %{state: %{artifacts: %{"papers" => envelope([%{id: 1}])}}}
 
       directive = Artifact.emit(ctx, "papers", [%{id: 2}], merge: &Merge.append/2)
 
@@ -53,7 +58,7 @@ defmodule JidoArtifacts.ArtifactTest do
     end
 
     test "works with append_max" do
-      ctx = %{state: %{artifacts: %{"items" => [1, 2, 3]}}}
+      ctx = %{state: %{artifacts: %{"items" => envelope([1, 2, 3])}}}
 
       directive = Artifact.emit(ctx, "items", [4, 5], merge: Merge.append_max(3))
 
@@ -62,7 +67,7 @@ defmodule JidoArtifacts.ArtifactTest do
     end
 
     test "works with custom merge function" do
-      ctx = %{state: %{artifacts: %{"count" => 5}}}
+      ctx = %{state: %{artifacts: %{"count" => envelope(5)}}}
 
       merge = fn existing, new -> (existing || 0) + new end
       directive = Artifact.emit(ctx, "count", 3, merge: merge)

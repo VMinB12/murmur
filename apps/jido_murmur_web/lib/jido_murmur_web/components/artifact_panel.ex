@@ -31,6 +31,7 @@ defmodule JidoMurmurWeb.Components.ArtifactPanel do
 
   use Phoenix.Component
 
+  alias JidoArtifacts.Envelope
   import JidoMurmurWeb, only: [icon: 1]
 
   alias JidoMurmurWeb.Components.ArtifactPanel.Generic
@@ -41,6 +42,10 @@ defmodule JidoMurmurWeb.Components.ArtifactPanel do
     "papers" => PaperList,
     "displayed_paper" => PdfViewer
   }
+
+  defp extract_data(%Envelope{data: inner}), do: inner
+  defp empty_artifact?(nil), do: true
+  defp empty_artifact?(%Envelope{data: data}), do: data == nil or data == [] or data == %{}
 
   # --- Badge dispatcher ---
 
@@ -54,7 +59,7 @@ defmodule JidoMurmurWeb.Components.ArtifactPanel do
   def artifact_badge(assigns) do
     renderer = Map.get(assigns.renderers, assigns.name) || Map.get(@default_renderers, assigns.name)
     badge_fn = if renderer, do: &renderer.badge/1, else: &Generic.badge/1
-    badge_fn.(%{assigns | data: unwrap_envelope(assigns.data)})
+    badge_fn.(%{assigns | data: extract_data(assigns.data)})
   end
 
   # --- Detail dispatcher ---
@@ -68,13 +73,8 @@ defmodule JidoMurmurWeb.Components.ArtifactPanel do
   def artifact_detail(assigns) do
     renderer = Map.get(assigns.renderers, assigns.name) || Map.get(@default_renderers, assigns.name)
     detail_fn = if renderer, do: &renderer.detail/1, else: &Generic.detail/1
-    detail_fn.(%{assigns | data: unwrap_envelope(assigns.data)})
+    detail_fn.(%{assigns | data: extract_data(assigns.data)})
   end
-
-  # Unwrap metadata envelope if present. Envelopes have :data and :version keys.
-  # Pass through raw data unchanged for backward compatibility.
-  defp unwrap_envelope(%{data: inner, version: _version}), do: inner
-  defp unwrap_envelope(data), do: data
 
   # --- Artifact panel ---
 
@@ -99,7 +99,7 @@ defmodule JidoMurmurWeb.Components.ArtifactPanel do
         agent_name = if session, do: session.display_name, else: "agent"
 
         artifacts_map
-        |> Enum.reject(fn {_name, data} -> data == nil or data == [] or data == %{} end)
+        |> Enum.reject(fn {_name, data} -> empty_artifact?(data) end)
         |> Enum.map(fn {name, _data} ->
           %{session_id: session_id, agent_name: agent_name, name: name}
         end)

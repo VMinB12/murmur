@@ -12,6 +12,7 @@ defmodule Murmur.Agents.ArtifactPluginTest do
   alias JidoArtifacts.Actions.StoreArtifact
   alias JidoArtifacts.Artifact
   alias JidoArtifacts.ArtifactPlugin
+  alias JidoArtifacts.Envelope
 
   @workspace_id "test-workspace-456"
   @session_id "test-session-123"
@@ -41,6 +42,7 @@ defmodule Murmur.Agents.ArtifactPluginTest do
 
       assert_receive %Jido.Signal{type: "artifact.papers", data: data}
       assert data[:name] == "papers" or data["name"] == "papers"
+      assert %Envelope{} = data[:data] || data["data"]
     end
 
     test "returns override to StoreArtifact action with replace mode" do
@@ -52,6 +54,7 @@ defmodule Murmur.Agents.ArtifactPluginTest do
       assert params.artifact_name == "papers"
       assert params.artifact_data == [%{id: 1}]
       assert params.artifact_mode == :replace
+      assert %Envelope{} = params.artifact_envelope
     end
 
     test "returns override to StoreArtifact action with append mode" do
@@ -63,6 +66,7 @@ defmodule Murmur.Agents.ArtifactPluginTest do
       assert params.artifact_name == "papers"
       assert params.artifact_data == [%{id: 2}]
       assert params.artifact_mode == :append
+      assert %Envelope{} = params.artifact_envelope
     end
 
     test "defaults mode to :replace when not specified" do

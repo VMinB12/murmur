@@ -11,6 +11,11 @@ defmodule Murmur.Agents.Actions.StoreArtifactTest do
   use ExUnit.Case, async: true
 
   alias JidoArtifacts.Actions.StoreArtifact
+  alias JidoArtifacts.Envelope
+
+  defp envelope(data, source \\ "agent-1", version \\ 1) do
+    Envelope.new(data, version, source, ~U[2026-01-01 00:00:00Z])
+  end
 
   describe "run/2 with :replace mode" do
     test "stores artifact data in envelope when no prior artifacts exist" do
@@ -23,7 +28,7 @@ defmodule Murmur.Agents.Actions.StoreArtifactTest do
     end
 
     test "replaces existing artifact data with version increment" do
-      existing = %{data: [%{id: 1}], updated_at: ~U[2026-01-01 00:00:00Z], source: "agent-1", version: 1}
+      existing = envelope([%{id: 1}])
       ctx = %{state: %{artifacts: %{"papers" => existing}}}
       params = %{artifact_name: "papers", artifact_data: [%{id: 2}], artifact_mode: :replace}
 
@@ -33,7 +38,7 @@ defmodule Murmur.Agents.Actions.StoreArtifactTest do
     end
 
     test "preserves other artifacts" do
-      queries_envelope = %{data: [%{sql: "SELECT 1"}], updated_at: ~U[2026-01-01 00:00:00Z], source: "a", version: 1}
+      queries_envelope = envelope([%{sql: "SELECT 1"}], "a")
       ctx = %{state: %{artifacts: %{"queries" => queries_envelope}}}
       params = %{artifact_name: "papers", artifact_data: [%{id: 2}], artifact_mode: :replace}
 
@@ -69,7 +74,7 @@ defmodule Murmur.Agents.Actions.StoreArtifactTest do
     end
 
     test "deletes key when merge_result is nil" do
-      existing = %{data: [%{id: 1}], updated_at: ~U[2026-01-01 00:00:00Z], source: "a", version: 1}
+      existing = envelope([%{id: 1}], "a")
       ctx = %{state: %{artifacts: %{"papers" => existing}}}
 
       params = %{

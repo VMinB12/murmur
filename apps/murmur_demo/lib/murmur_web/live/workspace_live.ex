@@ -3,6 +3,7 @@ defmodule MurmurWeb.WorkspaceLive do
   use MurmurWeb, :live_view
 
   alias Jido.AI.Signal.LLMResponse
+  alias JidoArtifacts.Envelope
   alias JidoMurmur.Catalog
   alias JidoMurmur.ObsTracer.Cache, as: ObsCache
   alias JidoMurmur.Runner
@@ -203,8 +204,13 @@ defmodule MurmurWeb.WorkspaceLive do
 
     artifacts = socket.assigns.artifacts
     session_artifacts = Map.get(artifacts, session_id, %{})
-    sql_artifact = session_artifacts["sql_results"] || %{data: []}
-    query_list = Map.get(sql_artifact, :data, []) || []
+    sql_artifact = session_artifacts["sql_results"]
+
+    query_list =
+      case sql_artifact do
+        %Envelope{data: data} -> data
+        nil -> []
+      end
 
     updated_list =
       List.update_at(query_list, index, fn item ->
@@ -213,7 +219,12 @@ defmodule MurmurWeb.WorkspaceLive do
         |> Map.delete(if(result_key == "loaded_result", do: "loaded_error", else: "loaded_result"))
       end)
 
-    updated_artifact = Map.put(sql_artifact, :data, updated_list)
+    updated_artifact =
+      case sql_artifact do
+        %Envelope{} = envelope -> %Envelope{envelope | data: updated_list}
+        nil -> Envelope.new(updated_list, 1, "workspace_live")
+      end
+
     updated_session = Map.put(session_artifacts, "sql_results", updated_artifact)
     updated_artifacts = Map.put(artifacts, session_id, updated_session)
 
@@ -502,21 +513,19 @@ defmodule MurmurWeb.WorkspaceLive do
   def handle_info(%Jido.Signal{type: "artifact." <> _name, data: data} = signal, socket) do
     session_id = extract_session_id(signal)
     artifact_name = data[:name] || data["name"]
-    artifact_data = data[:data] || data["data"]
-    mode = data[:mode] || data["mode"] || :replace
+    artifact_envelope = data[:data] || data["data"]
 
     socket =
       update(socket, :artifacts, fn artifacts ->
         session_artifacts = Map.get(artifacts, session_id, %{})
 
         updated =
-          case mode do
-            :append ->
-              existing = Map.get(session_artifacts, artifact_name, [])
-              Map.put(session_artifacts, artifact_name, existing ++ List.wrap(artifact_data))
+          case artifact_envelope do
+            %Envelope{} = envelope ->
+              Map.put(session_artifacts, artifact_name, envelope)
 
-            _replace ->
-              Map.put(session_artifacts, artifact_name, artifact_data)
+            nil ->
+              Map.delete(session_artifacts, artifact_name)
           end
 
         Map.put(artifacts, session_id, updated)

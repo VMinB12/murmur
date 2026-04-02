@@ -10,6 +10,7 @@ defmodule MurmurWeb.Components.Artifacts do
 
   use Phoenix.Component
 
+  alias JidoArtifacts.Envelope
   import MurmurWeb.CoreComponents, only: [icon: 1]
 
   alias MurmurWeb.Components.Artifacts.Generic
@@ -17,10 +18,9 @@ defmodule MurmurWeb.Components.Artifacts do
   alias MurmurWeb.Components.Artifacts.PdfViewer
   alias MurmurWeb.Components.Artifacts.SqlResults
 
-  # Artifact data is stored in an envelope %{data: ..., version: ..., ...}.
-  # Unwrap it before passing to renderers.
-  defp unwrap_envelope(%{data: inner}), do: inner
-  defp unwrap_envelope(data), do: data
+  defp extract_data(%Envelope{data: inner}), do: inner
+  defp empty_artifact?(nil), do: true
+  defp empty_artifact?(%Envelope{data: data}), do: data == nil or data == [] or data == %{}
 
   # --- Badge dispatcher ---
 
@@ -31,7 +31,7 @@ defmodule MurmurWeb.Components.Artifacts do
   attr :active?, :boolean, default: false
 
   def artifact_badge(%{name: "papers"} = assigns) do
-    assigns = update(assigns, :data, &unwrap_envelope/1)
+    assigns = update(assigns, :data, &extract_data/1)
 
     ~H"""
     <PaperList.badge data={@data} session_id={@session_id} active?={@active?} />
@@ -39,7 +39,7 @@ defmodule MurmurWeb.Components.Artifacts do
   end
 
   def artifact_badge(%{name: "displayed_paper"} = assigns) do
-    assigns = update(assigns, :data, &unwrap_envelope/1)
+    assigns = update(assigns, :data, &extract_data/1)
 
     ~H"""
     <PdfViewer.badge data={@data} session_id={@session_id} active?={@active?} />
@@ -47,7 +47,7 @@ defmodule MurmurWeb.Components.Artifacts do
   end
 
   def artifact_badge(%{name: "sql_results"} = assigns) do
-    assigns = update(assigns, :data, &unwrap_envelope/1)
+    assigns = update(assigns, :data, &extract_data/1)
 
     ~H"""
     <SqlResults.badge data={@data} session_id={@session_id} active?={@active?} />
@@ -55,7 +55,7 @@ defmodule MurmurWeb.Components.Artifacts do
   end
 
   def artifact_badge(assigns) do
-    assigns = update(assigns, :data, &unwrap_envelope/1)
+    assigns = update(assigns, :data, &extract_data/1)
 
     ~H"""
     <Generic.badge name={@name} data={@data} session_id={@session_id} active?={@active?} />
@@ -70,24 +70,32 @@ defmodule MurmurWeb.Components.Artifacts do
   attr :session_id, :string, required: true
 
   def artifact_detail(%{name: "papers"} = assigns) do
+    assigns = update(assigns, :data, &extract_data/1)
+
     ~H"""
     <PaperList.detail data={@data} session_id={@session_id} />
     """
   end
 
   def artifact_detail(%{name: "displayed_paper"} = assigns) do
+    assigns = update(assigns, :data, &extract_data/1)
+
     ~H"""
     <PdfViewer.detail data={@data} session_id={@session_id} />
     """
   end
 
   def artifact_detail(%{name: "sql_results"} = assigns) do
+    assigns = update(assigns, :data, &extract_data/1)
+
     ~H"""
     <SqlResults.detail data={@data} session_id={@session_id} />
     """
   end
 
   def artifact_detail(assigns) do
+    assigns = update(assigns, :data, &extract_data/1)
+
     ~H"""
     <Generic.detail name={@name} data={@data} session_id={@session_id} />
     """
@@ -116,7 +124,7 @@ defmodule MurmurWeb.Components.Artifacts do
         agent_name = if session, do: session.display_name, else: "agent"
 
         artifacts_map
-        |> Enum.reject(fn {_name, data} -> data == nil or data == [] or data == %{} end)
+        |> Enum.reject(fn {_name, data} -> empty_artifact?(data) end)
         |> Enum.map(fn {name, _data} ->
           %{session_id: session_id, agent_name: agent_name, name: name}
         end)
@@ -129,7 +137,6 @@ defmodule MurmurWeb.Components.Artifacts do
       if active do
         assigns.artifacts
         |> get_in([active.session_id, active.name])
-        |> unwrap_envelope()
       end
 
     assigns =

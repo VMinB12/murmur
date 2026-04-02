@@ -28,6 +28,7 @@ defmodule JidoArtifacts.Artifact do
   """
 
   alias Jido.Agent.Directive
+  alias JidoArtifacts.Envelope
 
   @doc """
   Creates an `Emit` directive that broadcasts an artifact update.
@@ -49,7 +50,7 @@ defmodule JidoArtifacts.Artifact do
 
     signal_data =
       if merge_fn do
-        existing = get_in(ctx, [:state, :artifacts, name])
+        existing = existing_artifact_payload(get_in(ctx, [:state, :artifacts, name]))
         merge_result = merge_fn.(existing, data)
         %{name: name, data: data, mode: :merge, merge_result: merge_result, scope: scope}
       else
@@ -75,4 +76,7 @@ defmodule JidoArtifacts.Artifact do
   @doc "PubSub topic for artifact updates for the given session."
   def artifact_topic(workspace_id, session_id),
     do: "workspace:#{workspace_id}:agent:#{session_id}:artifacts"
+
+  defp existing_artifact_payload(nil), do: nil
+  defp existing_artifact_payload(%Envelope{} = envelope), do: Envelope.data(envelope)
 end

@@ -20,3 +20,7 @@
 - Created `plan.md` with a hard-cutover strategy: canonical `%JidoArtifacts.Envelope{}` boundary first, then artifact integration tests, then typed SQL results, then public specs + manual Dialyzer, then signal schema tightening.
 - Created `tasks.md` with phased work items covering the artifact contract, integration coverage, SQL result struct, `@spec` coverage, manual Dialyzer verification, and signal typing.
 - Updated ticket status to `planned` so the folder state now matches the available spec, decisions, plan, and task breakdown.
+- Started implementation on Phase 1 and introduced `JidoArtifacts.Envelope` as the canonical in-memory artifact contract.
+- Updated `StoreArtifact`, `ArtifactPlugin`, `Artifact.emit/4`, `workspace_live`, the demo artifact dispatcher, and the shared `jido_murmur_web` artifact panel so the live path now carries the same envelope shape as persisted checkpoints.
+- Updated the most directly impacted unit/component tests to use `%Envelope{}` and verified the envelope refactor with `mix compile`, app-local `jido_artifacts` tests, and app-local `jido_murmur_web` component tests.
+- Attempted a root-level focused test run, but the workspace test alias currently aborts before execution because `JidoSql.Repo` cannot connect to PostgreSQL on `localhost:5432`. That environment issue is separate from the Phase 1 refactor.

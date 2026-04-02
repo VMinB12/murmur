@@ -34,6 +34,7 @@ defmodule JidoMurmurWeb.MixProject do
 
   defp deps do
     [
+      {:jido_artifacts, jido_artifacts_dep()},
       {:jido_murmur, jido_murmur_dep()},
       {:igniter, "~> 0.7", optional: true, runtime: false},
       {:phoenix_live_view, "~> 1.1.0"},
@@ -44,6 +45,12 @@ defmodule JidoMurmurWeb.MixProject do
   end
 
   defp jido_murmur_dep do
+    if System.get_env("HEX_PUBLISH"),
+      do: "~> #{@version}",
+      else: [in_umbrella: true]
+  end
+
+  defp jido_artifacts_dep do
     if System.get_env("HEX_PUBLISH"),
       do: "~> #{@version}",
       else: [in_umbrella: true]

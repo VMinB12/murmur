@@ -352,7 +352,7 @@
                 <% session_artifacts = Map.get(@artifacts, session.id, %{}) %>
                 <%= if session_artifacts != %{} do %>
                   <div class="flex items-center gap-1.5 px-3 py-1.5 border-t border-base-300/50 overflow-x-auto">
-                    <%= for {name, data} <- session_artifacts, data != nil and data != [] and data != %{} do %>
+                    <%= for {name, data} <- session_artifacts, artifact_present?(data) do %>
                       <.artifact_badge
                         name={name}
                         data={data}
@@ -732,9 +732,9 @@
               Enum.flat_map(@artifacts, fn {sid, arts} ->
                 Enum.map(arts, fn {name, data} -> {sid, name, data} end)
               end) %>
-            <%= if all_artifacts != [] do %>
+            <%= if Enum.any?(all_artifacts, fn {_, _, data} -> artifact_present?(data) end) do %>
               <div class="flex items-center gap-1.5 px-4 py-1.5 border-t border-base-300/50 overflow-x-auto">
-                <%= for {sid, name, data} <- all_artifacts, data != nil and data != [] and data != %{} do %>
+                <%= for {sid, name, data} <- all_artifacts, artifact_present?(data) do %>
                   <.artifact_badge
                     name={name}
                     data={data}

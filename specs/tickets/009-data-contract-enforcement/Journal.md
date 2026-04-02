@@ -24,3 +24,7 @@
 - Updated `StoreArtifact`, `ArtifactPlugin`, `Artifact.emit/4`, `workspace_live`, the demo artifact dispatcher, and the shared `jido_murmur_web` artifact panel so the live path now carries the same envelope shape as persisted checkpoints.
 - Updated the most directly impacted unit/component tests to use `%Envelope{}` and verified the envelope refactor with `mix compile`, app-local `jido_artifacts` tests, and app-local `jido_murmur_web` component tests.
 - Attempted a root-level focused test run, but the workspace test alias currently aborts before execution because `JidoSql.Repo` cannot connect to PostgreSQL on `localhost:5432`. That environment issue is separate from the Phase 1 refactor.
+- Continued with Phase 2 by expanding the contract-focused tests rather than adding more compatibility code.
+- Fixed `workspace_live.html.heex` so split and unified badge rows filter artifact visibility using the `%Envelope{}` payload instead of legacy raw-list/raw-map checks.
+- Expanded artifact verification coverage with stronger plugin merge assertions and a new `workspace_live_artifact_signal_test.exs` module covering live signal-driven rendering for `papers`, `displayed_paper`, and `sql_results` artifacts.
+- Verified the new Phase 2 changes compile cleanly with `mix compile`, but Murmur demo DB-backed test execution remains blocked in this environment because PostgreSQL is not available on `localhost:5432` for `JidoSql.Repo` setup.

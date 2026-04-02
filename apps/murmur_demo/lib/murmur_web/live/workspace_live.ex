@@ -764,6 +764,9 @@ defmodule MurmurWeb.WorkspaceLive do
   defp extract_artifacts(%{state: %{artifacts: artifacts}}) when is_map(artifacts), do: artifacts
   defp extract_artifacts(_), do: %{}
 
+  defp artifact_present?(%Envelope{data: data}), do: data not in [nil, [], %{}]
+  defp artifact_present?(_), do: false
+
   defp cleanup_storage(session) do
     {adapter, opts} = Murmur.Jido.__jido_storage__()
     agent_module = Catalog.agent_module(session.agent_profile_id)

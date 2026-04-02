@@ -20,11 +20,11 @@
 
 ## Phase 2: P1 Artifact Contract Verification
 
-- [ ] T009 Update `apps/jido_artifacts/test/jido_artifacts/actions/store_artifact_test.exs` and `apps/murmur_demo/test/murmur/agents/actions/store_artifact_test.exs` to assert `%JidoArtifacts.Envelope{}` construction, version increments, and delete behavior.
-- [ ] T010 Update `apps/jido_artifacts/test/jido_artifacts/artifact_test.exs` and `apps/murmur_demo/test/murmur/agents/artifact_plugin_test.exs` to verify merge behavior against existing envelopes and to assert that plugin-broadcast artifact signals carry `%JidoArtifacts.Envelope{}`.
-- [ ] T011 Update `apps/jido_murmur_web/test/jido_murmur_web/components/artifact_panel_test.exs` so dispatcher-level component tests pass `%JidoArtifacts.Envelope{}` into the panel and badge/detail entry points.
-- [ ] T012 Update `apps/murmur_demo/test/murmur_web/live/workspace_live_artifact_persistence_test.exs` so checkpoint round-trip tests seed `%JidoArtifacts.Envelope{}` artifacts and verify thaw preserves the struct with no conversion path.
-- [ ] T013 Add `apps/murmur_demo/test/murmur_web/live/workspace_live_artifact_signal_test.exs` covering the signal-driven live path from artifact PubSub broadcast to rendered badge/detail output for the shipped artifact types, including badge counts and visible content.
+- [x] T009 Update `apps/jido_artifacts/test/jido_artifacts/actions/store_artifact_test.exs` and `apps/murmur_demo/test/murmur/agents/actions/store_artifact_test.exs` to assert `%JidoArtifacts.Envelope{}` construction, version increments, and delete behavior.
+- [x] T010 Update `apps/jido_artifacts/test/jido_artifacts/artifact_test.exs` and `apps/murmur_demo/test/murmur/agents/artifact_plugin_test.exs` to verify merge behavior against existing envelopes and to assert that plugin-broadcast artifact signals carry `%JidoArtifacts.Envelope{}`.
+- [x] T011 Update `apps/jido_murmur_web/test/jido_murmur_web/components/artifact_panel_test.exs` so dispatcher-level component tests pass `%JidoArtifacts.Envelope{}` into the panel and badge/detail entry points.
+- [x] T012 Update `apps/murmur_demo/test/murmur_web/live/workspace_live_artifact_persistence_test.exs` so checkpoint round-trip tests seed `%JidoArtifacts.Envelope{}` artifacts and verify thaw preserves the struct with no conversion path.
+- [x] T013 Add `apps/murmur_demo/test/murmur_web/live/workspace_live_artifact_signal_test.exs` covering the signal-driven live path from artifact PubSub broadcast to rendered badge/detail output for the shipped artifact types, including badge counts and visible content.
 
 ## Phase 3: P2 Typed SQL Result Boundary
 

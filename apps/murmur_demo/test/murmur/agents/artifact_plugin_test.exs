@@ -22,8 +22,8 @@ defmodule Murmur.Agents.ArtifactPluginTest do
     :ok
   end
 
-  defp build_context do
-    %{agent: %{id: @session_id, state: %{workspace_id: @workspace_id}}}
+  defp build_context(artifacts \\ %{}) do
+    %{agent: %{id: @session_id, state: %{workspace_id: @workspace_id, artifacts: artifacts}}}
   end
 
   defp build_signal(name, data, mode) do
@@ -97,6 +97,27 @@ defmodule Murmur.Agents.ArtifactPluginTest do
       assert params.artifact_name == "papers"
       assert params.artifact_data == [%{"id" => 1}]
       assert params.artifact_mode == :append
+    end
+
+    test "computes merged envelope version from an existing artifact envelope" do
+      existing_envelope = Envelope.new([%{id: 1}], 2, @session_id, ~U[2026-01-01 00:00:00Z])
+
+      signal =
+        Jido.Signal.new!(
+          "artifact.papers",
+          %{name: "papers", data: [%{id: 2}], mode: :merge, merge_result: [%{id: 1}, %{id: 2}]},
+          source: "/artifact/papers"
+        )
+
+      assert {:ok, {:override, {StoreArtifact, params}}} =
+               ArtifactPlugin.handle_signal(signal, build_context(%{"papers" => existing_envelope}))
+
+      assert params.artifact_mode == :merge
+      assert params.merge_result == [%{id: 1}, %{id: 2}]
+      assert %Envelope{} = params.artifact_envelope
+      assert params.artifact_envelope.data == [%{id: 1}, %{id: 2}]
+      assert params.artifact_envelope.version == 3
+      assert params.artifact_envelope.source == @session_id
     end
   end
 end

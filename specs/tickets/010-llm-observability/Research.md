@@ -1,5 +1,7 @@
 # LLM Observability Analysis & Integration Plan
 
+> Supersession note (2026-04-02): This research document captures the earlier AgentObs-based investigation. The current ticket direction is defined by [Spec.md](Spec.md) and [Decisions.md](Decisions.md), which supersede the AgentObs recommendation in favor of a Murmur-owned implementation that still renders cleanly in Arize Phoenix.
+
 > **Goal:** Add developer-facing observability for LLM agent interactions — see what went into the model, what came out, token usage, tool calls, and nested trace trees — using a platform purpose-built for LLM semantics (not raw OTEL JSON dumps).
 
 ---

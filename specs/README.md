@@ -14,7 +14,7 @@
 | # | Title | Status | Owner |
 |---|-------|--------|-------|
 | 009 | [Data Contract Enforcement](tickets/009-data-contract-enforcement/) | specifying | — |
-| 010 | [LLM Observability & Tracing](tickets/010-llm-observability/) | research | — |
+| 010 | [LLM Observability & Tracing](tickets/010-llm-observability/) | planned | — |
 | 011 | [Frontend Architecture Review](tickets/011-frontend-architecture-review/) | research | — |
 
 ## Recently Completed

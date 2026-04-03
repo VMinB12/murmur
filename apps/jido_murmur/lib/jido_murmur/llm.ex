@@ -9,6 +9,6 @@ defmodule JidoMurmur.LLM do
 
   @type handle :: term()
 
-  @callback ask(module(), pid(), String.t(), map()) :: {:ok, handle()} | {:error, term()}
+  @callback ask(module(), pid(), String.t(), keyword()) :: {:ok, handle()} | {:error, term()}
   @callback await(module(), handle(), keyword()) :: {:ok, term()} | {:error, term()}
 end

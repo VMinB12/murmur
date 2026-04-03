@@ -3,8 +3,8 @@ defmodule JidoMurmur.LLM.Real do
   @behaviour JidoMurmur.LLM
 
   @impl true
-  def ask(agent_module, pid, content, tool_ctx) do
-    agent_module.ask(pid, content, tool_context: tool_ctx)
+  def ask(agent_module, pid, content, opts) do
+    agent_module.ask(pid, content, opts)
   rescue
     e -> {:error, Exception.message(e)}
   end

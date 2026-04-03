@@ -6,7 +6,7 @@ defmodule MurmurWeb.WorkspaceLive do
   alias JidoArtifacts.Envelope
   alias JidoArtifacts.SignalUpdate
   alias JidoMurmur.Catalog
-  alias JidoMurmur.ObsTracer.Cache, as: ObsCache
+  alias JidoMurmur.Observability.SessionCache
   alias JidoMurmur.Runner
   alias JidoMurmur.Signals.MessageReceived
   alias JidoMurmur.Topics
@@ -155,7 +155,7 @@ defmodule MurmurWeb.WorkspaceLive do
     # Restart agents fresh (no history)
     Enum.each(socket.assigns.agent_sessions, fn session ->
       agent_module = Catalog.agent_module(session.agent_profile_id)
-      ObsCache.put(session.id, session.workspace_id, session.display_name)
+      SessionCache.put(session.id, session.workspace_id, session.display_name)
 
       Murmur.Jido.start_agent(agent_module,
         id: session.id,
@@ -787,7 +787,7 @@ defmodule MurmurWeb.WorkspaceLive do
 
   defp ensure_agent_started(session) do
     # Populate observability cache so the tracer can enrich spans
-    ObsCache.put(session.id, session.workspace_id, session.display_name)
+    SessionCache.put(session.id, session.workspace_id, session.display_name)
 
     case Murmur.Jido.whereis(session.id) do
       nil ->

@@ -16,6 +16,7 @@ defmodule JidoMurmur.TellAction do
     ]
 
   alias Jido.Tracing.Context, as: TracingContext
+  alias JidoMurmur.Observability
   alias JidoMurmur.Runner
   alias JidoMurmur.Signals.MessageReceived
   alias JidoMurmur.Workspaces
@@ -27,12 +28,13 @@ defmodule JidoMurmur.TellAction do
     workspace_id = context[:workspace_id]
     sender_name = context[:sender_name]
     hop_count = context[:hop_count] || 0
+    interaction_id = context[:interaction_id]
 
     with :ok <- validate_hop_count(hop_count),
          %{} = target <- Workspaces.find_agent_session_by_name(workspace_id, params.target_agent) do
       prefixed_message = "[#{sender_name}]: #{params.message}"
 
-      case deliver_message(target, prefixed_message, hop_count + 1) do
+      case deliver_message(target, prefixed_message, hop_count + 1, interaction_id) do
         :ok ->
           {:ok, %{delivered: true, target: params.target_agent}}
 
@@ -50,7 +52,7 @@ defmodule JidoMurmur.TellAction do
 
   defp validate_hop_count(_), do: :ok
 
-  defp deliver_message(target_session, message, _hop_count) do
+  defp deliver_message(target_session, message, _hop_count, interaction_id) do
     jido_mod = JidoMurmur.jido_mod()
     pid = jido_mod.whereis(target_session.id)
 
@@ -70,7 +72,9 @@ defmodule JidoMurmur.TellAction do
         role: "user",
         content: message,
         sender_name: sender_name,
-        sender_trace_id: sender_trace_id
+        sender_trace_id: sender_trace_id,
+        interaction_id: interaction_id || Observability.next_interaction_id(),
+        kind: :steering
       }
 
       signal =
@@ -81,7 +85,15 @@ defmodule JidoMurmur.TellAction do
 
       Phoenix.PubSub.broadcast(JidoMurmur.pubsub(), topic, signal)
 
-      Runner.send_message(target_session, message)
+      Runner.send_message(
+        target_session,
+        message,
+        sender_name: sender_name,
+        sender_trace_id: sender_trace_id,
+        interaction_id: inter_msg.interaction_id,
+        kind: :steering
+      )
+
       :ok
     else
       {:error, :agent_not_running}

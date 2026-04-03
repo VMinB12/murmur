@@ -1,11 +1,11 @@
 ---
 id: "010"
 title: "LLM Observability & Tracing"
-status: planned
+status: in-progress
 jira: ""
 owner: ""
 created: 2026-03-31
-updated: 2026-04-03
+updated: 2026-04-02
 ---
 
 # 010 — LLM Observability & Tracing

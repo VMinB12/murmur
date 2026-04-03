@@ -1,35 +1,10 @@
 defmodule JidoMurmur.ObsTracer.Cache do
-  @moduledoc """
-  ETS-backed cache mapping agent session IDs to workspace + display name.
+  @moduledoc false
 
-  Populated in `AgentHelper.start_agent/1` when an agent process boots,
-  cleaned up on agent termination. Lookups are O(1) with no DB hit.
-  """
+  alias JidoMurmur.Observability.SessionCache
 
-  @table :jido_murmur_obs_sessions
-
-  @doc "Create the ETS table. Called from `JidoMurmur.TableOwner`."
-  def create_table do
-    :ets.new(@table, [:named_table, :public, :set, read_concurrency: true])
-  end
-
-  @doc "Cache an agent session's workspace ID and display name."
-  def put(agent_id, workspace_id, display_name) do
-    :ets.insert(@table, {agent_id, workspace_id, display_name})
-    :ok
-  end
-
-  @doc "Look up cached workspace ID and display name for an agent session."
-  def lookup(agent_id) do
-    case :ets.lookup(@table, agent_id) do
-      [{^agent_id, workspace_id, display_name}] -> {workspace_id, display_name}
-      [] -> nil
-    end
-  end
-
-  @doc "Remove a cached agent session entry."
-  def delete(agent_id) do
-    :ets.delete(@table, agent_id)
-    :ok
-  end
+  def create_table, do: SessionCache.create_table()
+  def put(agent_id, workspace_id, display_name), do: SessionCache.put(agent_id, workspace_id, display_name)
+  def lookup(agent_id), do: SessionCache.lookup(agent_id)
+  def delete(agent_id), do: SessionCache.delete(agent_id)
 end

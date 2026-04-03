@@ -16,6 +16,7 @@ defmodule JidoMurmur.MessageInjector do
 
   @behaviour Jido.AI.Reasoning.ReAct.RequestTransformer
 
+  alias JidoMurmur.Observability
   alias JidoMurmur.PendingQueue
   alias JidoMurmur.TeamInstructions
 
@@ -55,12 +56,13 @@ defmodule JidoMurmur.MessageInjector do
   defp inject_pending_messages(messages, nil), do: messages
 
   defp inject_pending_messages(messages, agent_id) do
-    case PendingQueue.drain(agent_id) do
+    case PendingQueue.drain_envelopes(agent_id) do
       [] ->
         messages
 
       pending ->
-        injected = Enum.map(pending, fn content -> %{role: :user, content: content} end)
+        Observability.record_injected_messages(agent_id, pending)
+        injected = Enum.map(pending, fn envelope -> %{role: :user, content: envelope.content} end)
         messages ++ injected
     end
   end

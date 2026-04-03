@@ -23,6 +23,8 @@ defmodule JidoMurmur.StreamingPlugin do
       "ai.usage"
     ]
 
+  alias JidoMurmur.Observability
+
   @impl Jido.Plugin
   def handle_signal(signal, context) do
     session_id = context.agent.id
@@ -42,6 +44,8 @@ defmodule JidoMurmur.StreamingPlugin do
       else
         %{signal | subject: "/agents/#{session_id}"}
       end
+
+    Observability.record_signal(signal, %{workspace_id: workspace_id, session_id: session_id})
 
     Phoenix.PubSub.broadcast(JidoMurmur.pubsub(), topic, signal)
     {:ok, :continue}

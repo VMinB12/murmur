@@ -2,9 +2,6 @@ import Config
 
 alias Ecto.Adapters.SQL.Sandbox
 
-# Disable observability tracing in tests
-config :agent_obs, enabled: false
-
 # jido_murmur test repo configuration (for isolated package tests)
 config :jido_murmur, JidoMurmur.TestRepo,
   username: "postgres",
@@ -19,6 +16,7 @@ config :jido_murmur, :llm_adapter, JidoMurmur.LLM.Mock
 
 # Skip hibernate (checkpoint persistence) in test — sandbox teardown causes noise
 config :jido_murmur, :skip_hibernate, true
+config :jido_murmur, observability: [enabled: true, capture_content: true]
 
 # SQL agent target database (uses the same test database for simplicity)
 config :jido_sql, JidoSql.Repo,

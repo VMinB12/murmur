@@ -7,7 +7,7 @@ defmodule JidoMurmur.AgentHelper do
   """
 
   alias JidoMurmur.Catalog
-  alias JidoMurmur.ObsTracer.Cache, as: ObsCache
+  alias JidoMurmur.Observability.SessionCache
   alias JidoMurmur.UITurn
 
   require Logger
@@ -25,7 +25,7 @@ defmodule JidoMurmur.AgentHelper do
     agent_module = Catalog.agent_module(session.agent_profile_id)
 
     # Populate observability cache so the tracer can enrich spans
-    ObsCache.put(session.id, session.workspace_id, session.display_name)
+    SessionCache.put(session.id, session.workspace_id, session.display_name)
 
     case jido_mod.whereis(session.id) do
       nil ->

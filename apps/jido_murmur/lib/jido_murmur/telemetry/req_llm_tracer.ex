@@ -1,39 +1,26 @@
 defmodule JidoMurmur.Telemetry.ReqLLMTracer do
   @moduledoc """
-  Bridges ReqLLM telemetry events to OpenTelemetry spans with OpenInference
-  semantic conventions for Arize Phoenix.
+  Bridges ReqLLM telemetry into Murmur's observability store.
 
-  ReqLLM emits `[:req_llm, :request, :start | :stop | :exception]` telemetry
-  events on every LLM call. This handler converts them into OTel spans so they
-  appear in Arize Phoenix without modifying any upstream dependency code.
-
-  For streaming calls, the `:start` event fires in the caller process while
-  `:stop` fires in the StreamServer GenServer. Span context is stored in an
-  ETS table keyed by `request_id` so it works across processes.
-
-  ## Streaming limitation
-
-  ReqLLM's streaming telemetry does not include the accumulated response text.
-  The StreamServer sends text chunks directly to the stream consumer without
-  storing them in telemetry metadata. For streaming calls, `output.value` shows
-  a byte-count indicator instead of the actual response content.
+  ReqLLM still provides the best source of raw request payloads, especially the
+  fully materialized input message list. Murmur now owns span lifecycles itself,
+  so this module enriches the active LLM span instead of creating a second span.
 
   Attach once during application startup:
 
       JidoMurmur.Telemetry.ReqLLMTracer.attach()
   """
 
-  require OpenTelemetry.Tracer, as: Tracer
   require Logger
 
-  alias JidoMurmur.ObsTracer.Cache, as: ObsCache
+  alias JidoMurmur.Observability
+  alias JidoMurmur.Observability.SessionCache
 
   @handler_id :jido_murmur_req_llm_tracer
   @table __MODULE__
 
   @doc "Attaches telemetry handlers for ReqLLM request lifecycle events."
   def attach do
-    # Create ETS table for cross-process span context sharing (streaming)
     if :ets.whereis(@table) == :undefined do
       :ets.new(@table, [:named_table, :public, :set, read_concurrency: true])
     end
@@ -56,51 +43,12 @@ defmodule JidoMurmur.Telemetry.ReqLLMTracer do
   @doc false
   def handle_event([:req_llm, :request, :start], _measurements, metadata, _config) do
     request_id = metadata[:request_id]
-
-    model_name = model_name(metadata)
-    provider = provider(metadata)
-
-    # Base span attributes
-    attributes =
-      %{
-        "openinference.span.kind" => "LLM",
-        "llm.model_name" => model_name,
-        "gen_ai.system" => provider,
-        "gen_ai.request.model" => model_name
-      }
-      |> maybe_put("session.id", metadata[:session_id])
-
-    # Flatten input messages from request_payload (US1)
-    input_msg_attrs =
-      case get_in(metadata, [:request_payload, :messages]) do
-        messages when is_list(messages) and messages != [] ->
-          flatten_input_messages(messages)
-          |> maybe_put("input.value", extract_input_value(messages))
-
-        _ ->
-          %{}
-      end
-
-    # Agent/session enrichment from ObsTracer.Cache (US4, US5)
     agent_context = resolve_agent_context()
 
-    agent_attrs =
-      case agent_context do
-        %{workspace_id: wid, display_name: name} ->
-          %{}
-          |> maybe_put("session.id", wid)
-          |> maybe_put("llm.agent_name", name)
-
-        _ ->
-          %{}
-      end
-
-    all_attrs = Map.merge(attributes, input_msg_attrs) |> Map.merge(agent_attrs)
-
-    span_ctx = Tracer.start_span("LLM #{model_name}", %{attributes: all_attrs})
+    Observability.record_req_llm_start(metadata)
 
     if request_id do
-      :ets.insert(@table, {request_id, span_ctx, agent_context})
+      :ets.insert(@table, {request_id, make_ref(), agent_context})
     end
 
     :ok
@@ -111,36 +59,8 @@ defmodule JidoMurmur.Telemetry.ReqLLMTracer do
   end
 
   def handle_event([:req_llm, :request, :stop], measurements, metadata, _config) do
-    case take_span(metadata[:request_id]) do
-      nil ->
-        :ok
-
-      {span_ctx, _agent_context} ->
-        usage = metadata[:usage] || %{}
-        input_tokens = Map.get(usage, :input_tokens, 0) || 0
-        output_tokens = Map.get(usage, :output_tokens, 0) || 0
-
-        stop_attrs =
-          %{
-            "llm.token_count.prompt" => input_tokens,
-            "llm.token_count.completion" => output_tokens,
-            "llm.token_count.total" => input_tokens + output_tokens,
-            "gen_ai.usage.input_tokens" => input_tokens,
-            "gen_ai.usage.output_tokens" => output_tokens
-          }
-          |> maybe_put("gen_ai.response.finish_reasons", finish_reason_string(metadata[:finish_reason]))
-
-        output_msg_attrs = build_output_attrs(metadata)
-
-        duration_ms = Map.get(measurements, :duration, 0) |> System.convert_time_unit(:native, :millisecond)
-
-        all_stop_attrs =
-          Map.merge(stop_attrs, output_msg_attrs)
-          |> Map.put("llm.latency_ms", duration_ms)
-
-        OpenTelemetry.Span.set_attributes(span_ctx, Map.to_list(all_stop_attrs))
-        OpenTelemetry.Span.end_span(span_ctx)
-    end
+    Observability.record_req_llm_stop(measurements, metadata)
+    maybe_delete_compat_span(metadata[:request_id])
 
     :ok
   rescue
@@ -150,41 +70,14 @@ defmodule JidoMurmur.Telemetry.ReqLLMTracer do
   end
 
   def handle_event([:req_llm, :request, :exception], _measurements, metadata, _config) do
-    case take_span(metadata[:request_id]) do
-      nil ->
-        :ok
-
-      {span_ctx, _agent_context} ->
-        error = metadata[:error]
-
-        OpenTelemetry.Span.set_attributes(span_ctx, [
-          {"error", true},
-          {"error.message", inspect(error)}
-        ])
-
-        OpenTelemetry.Span.set_status(span_ctx, OpenTelemetry.status(:error, inspect(error)))
-        OpenTelemetry.Span.end_span(span_ctx)
-    end
+    Observability.record_req_llm_exception(metadata)
+    maybe_delete_compat_span(metadata[:request_id])
 
     :ok
   rescue
     e ->
       Logger.warning("ReqLLMTracer exception failed: #{inspect(e)}")
       :ok
-  end
-
-  # --- span context storage ---
-
-  defp take_span(nil), do: nil
-
-  defp take_span(request_id) do
-    case :ets.take(@table, request_id) do
-      [{^request_id, span_ctx, agent_context}] -> {span_ctx, agent_context}
-      [{^request_id, span_ctx}] -> {span_ctx, nil}
-      [] -> nil
-    end
-  rescue
-    ArgumentError -> nil
   end
 
   # --- message flattening ---
@@ -321,7 +214,8 @@ defmodule JidoMurmur.Telemetry.ReqLLMTracer do
 
   def extract_output_value(_), do: nil
 
-  # --- agent context resolution ---
+  defp maybe_delete_compat_span(nil), do: :ok
+  defp maybe_delete_compat_span(request_id), do: :ets.delete(@table, request_id)
 
   defp resolve_agent_context do
     agent_id =
@@ -341,11 +235,9 @@ defmodule JidoMurmur.Telemetry.ReqLLMTracer do
         nil
 
       id ->
-        # The registry key may have a path suffix (e.g. "session_id/react_worker").
-        # ObsCache stores data under the base session ID only.
         base_id = id |> String.split("/") |> hd()
 
-        case ObsCache.lookup(base_id) do
+        case SessionCache.lookup(base_id) do
           {workspace_id, display_name} ->
             %{workspace_id: workspace_id, display_name: display_name}
 
@@ -357,10 +249,6 @@ defmodule JidoMurmur.Telemetry.ReqLLMTracer do
     _ -> nil
   end
 
-  # Walk $callers and $ancestors to find a PID registered in the Jido agent
-  # registry. In production, LLM calls happen in a Task spawned from the
-  # AgentServer via Task.Supervisor.start_child. The AgentServer PID ends up
-  # in $callers (the calling process), while $ancestors holds the supervisor.
   defp resolve_agent_id_from_ancestors do
     registry = jido_registry()
     if registry, do: find_agent_in_ancestry(registry)
@@ -446,11 +334,6 @@ defmodule JidoMurmur.Telemetry.ReqLLMTracer do
   def provider(%{model: %{provider: p}}), do: to_string(p)
   def provider(%{provider: p}) when is_binary(p), do: p
   def provider(_), do: "unknown"
-
-  defp finish_reason_string(nil), do: nil
-  defp finish_reason_string(reason) when is_atom(reason), do: Atom.to_string(reason)
-  defp finish_reason_string(reason) when is_binary(reason), do: reason
-  defp finish_reason_string(reason), do: inspect(reason)
 
   defp output_text(%{response_summary: %{text: text}}) when is_binary(text) and text != "", do: text
 

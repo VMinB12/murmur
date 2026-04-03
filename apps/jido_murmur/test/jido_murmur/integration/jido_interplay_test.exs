@@ -11,18 +11,24 @@ defmodule JidoMurmur.Integration.JidoInterplayTest do
 
   alias JidoMurmur.AgentHelper
   alias JidoMurmur.LLM
+  alias JidoMurmur.Observability.SessionCache
+  alias JidoMurmur.Observability.Store
   alias JidoMurmur.Runner
   alias JidoMurmur.StreamingPlugin
   alias JidoMurmur.Workspaces
 
+  @llm_span_table :jido_murmur_obs_llm_spans
+
   setup do
     ensure_ets_tables()
+    LLM.Mock.clear_response()
 
     original_profiles = Application.get_env(:jido_murmur, :profiles, [])
     Application.put_env(:jido_murmur, :llm_adapter, LLM.Mock)
     Application.put_env(:jido_murmur, :skip_hibernate, true)
 
     on_exit(fn ->
+      LLM.Mock.clear_response()
       Application.put_env(:jido_murmur, :profiles, original_profiles)
       Application.put_env(:jido_murmur, :llm_adapter, JidoMurmur.LLM.Mock)
       Application.put_env(:jido_murmur, :skip_hibernate, true)
@@ -68,6 +74,31 @@ defmodule JidoMurmur.Integration.JidoInterplayTest do
 
       # The agent should complete (mock LLM responds immediately)
       assert_receive %Jido.Signal{type: "murmur.message.completed"}, 10_000
+    end
+
+    test "streamed output content is accumulated in the observability store", %{session: session} do
+      assert {:ok, _pid} = AgentHelper.start_agent(session)
+      Phoenix.PubSub.subscribe(JidoMurmur.pubsub(), JidoMurmur.Topics.agent_messages(session.workspace_id, session.id))
+
+      pause_ref = make_ref()
+
+      LLM.Mock.set_response(%{
+        content: "Streamed plugin interplay response",
+        stream_chunks: ["Streamed plugin ", "interplay response"],
+        notify: self(),
+        pause_after: :deltas,
+        pause_ref: pause_ref
+      })
+
+      assert :queued = Runner.send_message(session, "Test plugin interplay")
+
+      assert_receive {:mock_llm_phase, :deltas, %{call_id: call_id, waiter_pid: waiter_pid}}, 10_000
+      assert [{^call_id, llm_record}] = :ets.lookup(@llm_span_table, call_id)
+      assert llm_record.streamed_text == "Streamed plugin interplay response"
+
+      send(waiter_pid, {:release_mock_llm, pause_ref})
+      assert_receive %Jido.Signal{type: "murmur.message.completed"}, 10_000
+      assert :ets.lookup(@llm_span_table, call_id) == []
     end
 
     test "custom plugin does not interfere with package plugin initialization", %{session: session} do
@@ -206,6 +237,11 @@ defmodule JidoMurmur.Integration.JidoInterplayTest do
     unless :ets.whereis(:jido_murmur_pending_messages) != :undefined do
       :ets.new(:jido_murmur_pending_messages, [:named_table, :public, :duplicate_bag])
     end
+
+    SessionCache.create_table()
+    Store.create_tables()
+
+    :ets.delete_all_objects(@llm_span_table)
   rescue
     ArgumentError -> :ok
   end

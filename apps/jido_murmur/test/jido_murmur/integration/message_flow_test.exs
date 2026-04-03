@@ -10,12 +10,18 @@ defmodule JidoMurmur.Integration.MessageFlowTest do
 
   alias JidoMurmur.AgentHelper
   alias JidoMurmur.LLM
+  alias JidoMurmur.Observability.SessionCache
+  alias JidoMurmur.Observability.Store
   alias JidoMurmur.Runner
   alias JidoMurmur.StreamingPlugin
   alias JidoMurmur.Workspaces
 
+  @turn_table :jido_murmur_obs_turns
+  @llm_span_table :jido_murmur_obs_llm_spans
+
   setup do
     ensure_ets_tables()
+    LLM.Mock.clear_response()
 
     original_profiles = Application.get_env(:jido_murmur, :profiles, [])
     Application.put_env(:jido_murmur, :profiles, [JidoMurmur.TestAgent])
@@ -23,6 +29,7 @@ defmodule JidoMurmur.Integration.MessageFlowTest do
     Application.put_env(:jido_murmur, :skip_hibernate, true)
 
     on_exit(fn ->
+      LLM.Mock.clear_response()
       Application.put_env(:jido_murmur, :profiles, original_profiles)
       Application.put_env(:jido_murmur, :llm_adapter, JidoMurmur.LLM.Mock)
       Application.put_env(:jido_murmur, :skip_hibernate, true)
@@ -64,6 +71,45 @@ defmodule JidoMurmur.Integration.MessageFlowTest do
     assert_receive %Jido.Signal{type: "murmur.message.completed"}, 10_000
   end
 
+  test "root turn attrs are present while the request is active", %{session: session} do
+    assert {:ok, _pid} = AgentHelper.start_agent(session)
+    Phoenix.PubSub.subscribe(JidoMurmur.pubsub(), JidoMurmur.Topics.agent_messages(session.workspace_id, session.id))
+
+    pause_ref = make_ref()
+
+    LLM.Mock.set_response(%{
+      content: "Integration test response",
+      notify: self(),
+      pause_after: :start,
+      pause_ref: pause_ref
+    })
+
+    assert :queued = Runner.send_message(session, "Hello from integration test")
+
+    assert_receive(
+      {:mock_llm_phase, :started, %{request_id: request_id, call_id: call_id, waiter_pid: waiter_pid}},
+      10_000
+    )
+
+    assert [{^request_id, turn}] = :ets.lookup(@turn_table, request_id)
+    assert turn.agent_id == session.id
+    assert turn.agent_name == session.display_name
+    assert turn.workspace_id == session.workspace_id
+    assert turn.session_id == session.id
+    assert turn.input_value == "Hello from integration test"
+
+    assert [{^call_id, llm_record}] = :ets.lookup(@llm_span_table, call_id)
+    assert llm_record.request_id == request_id
+    assert llm_record.input_attrs["llm.input_messages.0.message.role"] == "user"
+    assert llm_record.input_attrs["llm.input_messages.0.message.content"] == "Hello from integration test"
+
+    send(waiter_pid, {:release_mock_llm, pause_ref})
+    assert_receive %Jido.Signal{type: "murmur.message.completed"}, 10_000
+
+    assert :ets.lookup(@turn_table, request_id) == []
+    assert :ets.lookup(@llm_span_table, call_id) == []
+  end
+
   test "agent helper subscribe works for all topics", %{session: session} do
     assert :ok = AgentHelper.subscribe(session)
   end
@@ -79,6 +125,13 @@ defmodule JidoMurmur.Integration.MessageFlowTest do
 
     unless :ets.whereis(:jido_murmur_pending_messages) != :undefined do
       :ets.new(:jido_murmur_pending_messages, [:named_table, :public, :duplicate_bag])
+    end
+
+    SessionCache.create_table()
+    Store.create_tables()
+
+    for table <- [@turn_table, @llm_span_table] do
+      :ets.delete_all_objects(table)
     end
   rescue
     ArgumentError -> :ok

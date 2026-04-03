@@ -1,7 +1,7 @@
 defmodule JidoMurmur.Telemetry.ReqLLMTracerTest do
   use ExUnit.Case, async: false
 
-  alias JidoMurmur.ObsTracer.Cache, as: ObsCache
+  alias JidoMurmur.Observability.SessionCache
   alias JidoMurmur.Telemetry.ReqLLMTracer
 
   @table JidoMurmur.Telemetry.ReqLLMTracer
@@ -12,7 +12,7 @@ defmodule JidoMurmur.Telemetry.ReqLLMTracerTest do
       :ets.new(@table, [:named_table, :public, :set, read_concurrency: true])
     end
 
-    # Ensure ObsTracer.Cache table exists for session/agent enrichment tests
+    # Ensure session cache table exists for session/agent enrichment tests
     if :ets.whereis(:jido_murmur_obs_sessions) == :undefined do
       :ets.new(:jido_murmur_obs_sessions, [:named_table, :public, :set, read_concurrency: true])
     end
@@ -652,14 +652,13 @@ defmodule JidoMurmur.Telemetry.ReqLLMTracerTest do
 
   # --- US4: Session grouping (T026, T028) ---
 
-  describe "US4 - session enrichment via ObsTracer.Cache" do
+  describe "US4 - session enrichment via SessionCache" do
     test "start event with agent_id in Logger.metadata adds session.id" do
       request_id = "us4-session-#{System.unique_integer([:positive])}"
       agent_id = "agent-#{System.unique_integer([:positive])}"
       workspace_id = "workspace-#{System.unique_integer([:positive])}"
 
-      # Populate the ObsTracer.Cache with agent data
-      ObsCache.put(agent_id, workspace_id, "TestAgent")
+      SessionCache.put(agent_id, workspace_id, "TestAgent")
 
       # Set agent_id in Logger metadata (simulating what agent processes do)
       Logger.metadata(agent_id: agent_id)
@@ -689,7 +688,7 @@ defmodule JidoMurmur.Telemetry.ReqLLMTracerTest do
       agent_id = "agent-#{System.unique_integer([:positive])}"
       workspace_id = "ws-#{System.unique_integer([:positive])}"
 
-      ObsCache.put(agent_id, workspace_id, "CrossAgent")
+      SessionCache.put(agent_id, workspace_id, "CrossAgent")
       Logger.metadata(agent_id: agent_id)
 
       :telemetry.execute(
@@ -722,7 +721,7 @@ defmodule JidoMurmur.Telemetry.ReqLLMTracerTest do
       request_id = "us5-name-#{System.unique_integer([:positive])}"
       agent_id = "agent-#{System.unique_integer([:positive])}"
 
-      ObsCache.put(agent_id, "ws-123", "Bob")
+      SessionCache.put(agent_id, "ws-123", "Bob")
       Logger.metadata(agent_id: agent_id)
 
       :telemetry.execute(
@@ -770,8 +769,8 @@ defmodule JidoMurmur.Telemetry.ReqLLMTracerTest do
       agent_id = "agent-callers-#{System.unique_integer([:positive])}"
       workspace_id = "ws-callers-#{System.unique_integer([:positive])}"
 
-      # Populate ObsTracer.Cache with the BASE agent_id (no suffix)
-      ObsCache.put(agent_id, workspace_id, "CallerAgent")
+      # Populate SessionCache with the BASE agent_id (no suffix)
+      SessionCache.put(agent_id, workspace_id, "CallerAgent")
 
       jido_mod = Application.fetch_env!(:jido_murmur, :jido_mod)
       registry = Module.concat(jido_mod, Registry)
@@ -808,7 +807,7 @@ defmodule JidoMurmur.Telemetry.ReqLLMTracerTest do
 
       Task.await(task)
 
-      # Should find the suffixed key, strip the suffix, and resolve via ObsCache
+      # Should find the suffixed key, strip the suffix, and resolve via SessionCache
       assert [{^request_id, _span, agent_context}] = :ets.lookup(@table, request_id)
       assert agent_context == %{workspace_id: workspace_id, display_name: "CallerAgent"}
 
@@ -870,6 +869,15 @@ defmodule JidoMurmur.Telemetry.ReqLLMTracerTest do
 
       assert result["llm.input_messages.0.message.role"] == "user"
     end
+
+    test "tool messages preserve name and tool_call_id" do
+      messages = [%{role: :tool, tool_call_id: "call_123", name: "get_weather", content: ~s({"temp":18})}]
+      result = ReqLLMTracer.flatten_input_messages(messages)
+
+      assert result["llm.input_messages.0.message.role"] == "tool"
+      assert result["llm.input_messages.0.message.name"] == "get_weather"
+      assert result["llm.input_messages.0.message.tool_call_id"] == "call_123"
+    end
   end
 
   describe "flatten_output_messages/1" do
@@ -886,15 +894,25 @@ defmodule JidoMurmur.Telemetry.ReqLLMTracerTest do
         %{
           role: "assistant",
           content: nil,
-          tool_calls: [%{function: %{name: "get_weather", arguments: %{city: "Amsterdam"}}}]
+          tool_calls: [%{id: "tool_1", function: %{name: "get_weather", arguments: %{city: "Amsterdam"}}}]
         }
       ]
 
       result = ReqLLMTracer.flatten_output_messages(messages)
 
       assert result["llm.output_messages.0.message.role"] == "assistant"
+      assert result["llm.output_messages.0.message.tool_calls.0.tool_call.id"] == "tool_1"
       assert result["llm.output_messages.0.message.tool_calls.0.tool_call.function.name"] == "get_weather"
       assert result["llm.output_messages.0.message.tool_calls.0.tool_call.function.arguments"] == ~s({"city":"Amsterdam"})
+    end
+
+    test "tool-role output preserves name and tool_call_id" do
+      messages = [%{role: "tool", name: "get_weather", tool_call_id: "tool_1", content: ~s({"temp":18})}]
+      result = ReqLLMTracer.flatten_output_messages(messages)
+
+      assert result["llm.output_messages.0.message.role"] == "tool"
+      assert result["llm.output_messages.0.message.name"] == "get_weather"
+      assert result["llm.output_messages.0.message.tool_call_id"] == "tool_1"
     end
 
     test "empty output" do

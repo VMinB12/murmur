@@ -39,6 +39,7 @@ defmodule JidoMurmur.Observability.Store do
   def finish_turn(request_id, attrs) do
     with {:ok, turn} <- fetch_turn(request_id) do
       response = Map.get(attrs, :response)
+
       span_attrs =
         %{"murmur.injected_message_count" => Map.get(turn, :injected_message_count, 0)}
         |> maybe_put("output.value", format_output(response), Observability.capture_content?())
@@ -409,10 +410,14 @@ defmodule JidoMurmur.Observability.Store do
 
   defp llm_start_attrs(metadata, turn) do
     model_name = ReqLLMTracer.model_name(metadata)
+    provider = ReqLLMTracer.provider(metadata)
+    system = ReqLLMTracer.system(metadata)
 
     %{
       "openinference.span.kind" => "LLM",
       "llm.model_name" => model_name,
+      "llm.provider" => provider,
+      "llm.system" => system,
       "gen_ai.system" => ReqLLMTracer.provider(metadata),
       "gen_ai.request.model" => model_name,
       "session.id" => turn && turn.session_id,
@@ -513,7 +518,10 @@ defmodule JidoMurmur.Observability.Store do
   defp maybe_store_tool_inputs(tool_calls) when is_list(tool_calls) do
     Enum.each(tool_calls, fn tool_call ->
       if is_binary(tool_call[:id]) do
-        :ets.insert(@tool_input_table, {tool_call[:id], %{name: tool_call[:name], arguments: tool_call[:arguments]}})
+        :ets.insert(
+          @tool_input_table,
+          {tool_call[:id], %{id: tool_call[:id], name: tool_call[:name], arguments: tool_call[:arguments]}}
+        )
       end
     end)
   end

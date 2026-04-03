@@ -84,51 +84,14 @@ defmodule JidoMurmur.Telemetry.ReqLLMTracer do
 
   @doc false
   def flatten_input_messages(messages) when is_list(messages) do
-    messages
-    |> Enum.with_index()
-    |> Enum.reduce(%{}, fn {msg, idx}, acc ->
-      role = to_string(msg[:role] || msg["role"] || "")
-      content = extract_content(msg[:content] || msg["content"])
-
-      base =
-        acc
-        |> Map.put("llm.input_messages.#{idx}.message.role", role)
-        |> maybe_put("llm.input_messages.#{idx}.message.content", content)
-
-      # tool calls on input messages (e.g. assistant messages with tool_calls in history)
-      tool_calls = msg[:tool_calls] || msg["tool_calls"]
-
-      if is_list(tool_calls) and tool_calls != [] do
-        Map.merge(base, flatten_tool_calls(idx, tool_calls, :input))
-      else
-        base
-      end
-    end)
+    flatten_messages(messages, :input, "")
   end
 
   def flatten_input_messages(_), do: %{}
 
   @doc false
   def flatten_output_messages(messages) when is_list(messages) do
-    messages
-    |> Enum.with_index()
-    |> Enum.reduce(%{}, fn {msg, idx}, acc ->
-      role = to_string(msg[:role] || msg["role"] || "assistant")
-      content = extract_content(msg[:content] || msg["content"])
-
-      base =
-        acc
-        |> Map.put("llm.output_messages.#{idx}.message.role", role)
-        |> maybe_put("llm.output_messages.#{idx}.message.content", content)
-
-      tool_calls = msg[:tool_calls] || msg["tool_calls"]
-
-      if is_list(tool_calls) and tool_calls != [] do
-        Map.merge(base, flatten_tool_calls(idx, tool_calls, :output))
-      else
-        base
-      end
-    end)
+    flatten_messages(messages, :output, "assistant")
   end
 
   def flatten_output_messages(_), do: %{}
@@ -143,23 +106,74 @@ defmodule JidoMurmur.Telemetry.ReqLLMTracer do
       func = tc[:function] || tc["function"] || %{}
       name = func[:name] || func["name"]
       args = func[:arguments] || func["arguments"]
+      id = tc[:id] || tc["id"]
 
-      encoded_args =
-        case args do
-          a when is_map(a) -> Jason.encode!(a)
-          a when is_binary(a) -> a
-          _ -> nil
-        end
+      encoded_args = encode_jsonish(args)
 
-      base_key = "#{prefix}.#{msg_idx}.message.tool_calls.#{tc_idx}.tool_call.function"
+      tool_call_key = "#{prefix}.#{msg_idx}.message.tool_calls.#{tc_idx}.tool_call"
+      function_key = "#{tool_call_key}.function"
 
       acc
-      |> maybe_put("#{base_key}.name", name)
-      |> maybe_put("#{base_key}.arguments", encoded_args)
+      |> maybe_put("#{tool_call_key}.id", id)
+      |> maybe_put("#{function_key}.name", name)
+      |> maybe_put("#{function_key}.arguments", encoded_args)
     end)
   end
 
   def flatten_tool_calls(_msg_idx, _tool_calls, _direction), do: %{}
+
+  defp flatten_messages(messages, direction, default_role) do
+    messages
+    |> Enum.with_index()
+    |> Enum.reduce(%{}, fn {msg, idx}, acc ->
+      Map.merge(acc, flatten_message(msg, idx, direction, default_role))
+    end)
+  end
+
+  defp flatten_message(msg, idx, direction, default_role) do
+    prefix = message_prefix(direction, idx)
+    tool_calls = msg[:tool_calls] || msg["tool_calls"]
+
+    prefix
+    |> flatten_message_base(msg, default_role)
+    |> maybe_merge_tool_calls(idx, tool_calls, direction)
+  end
+
+  defp flatten_message_base(prefix, msg, default_role) do
+    %{}
+    |> Map.put("#{prefix}.message.role", message_role(msg, default_role))
+    |> maybe_put("#{prefix}.message.content", message_content(msg))
+    |> maybe_put("#{prefix}.message.name", message_name(msg))
+    |> maybe_put("#{prefix}.message.tool_call_id", message_tool_call_id(msg))
+    |> maybe_put("#{prefix}.message.function_call_name", message_function_call_name(msg))
+    |> maybe_put(
+      "#{prefix}.message.function_call_arguments_json",
+      encode_jsonish(message_function_call_arguments(msg))
+    )
+  end
+
+  defp maybe_merge_tool_calls(base, _idx, tool_calls, _direction) when tool_calls in [nil, []], do: base
+
+  defp maybe_merge_tool_calls(base, idx, tool_calls, direction) do
+    Map.merge(base, flatten_tool_calls(idx, tool_calls, direction))
+  end
+
+  defp message_prefix(:input, idx), do: "llm.input_messages.#{idx}"
+  defp message_prefix(:output, idx), do: "llm.output_messages.#{idx}"
+
+  defp message_role(msg, default_role), do: to_string(map_value(msg, :role, default_role))
+  defp message_content(msg), do: extract_content(map_value(msg, :content))
+  defp message_name(msg), do: map_value(msg, :name)
+  defp message_tool_call_id(msg), do: map_value(msg, :tool_call_id)
+  defp message_function_call_name(msg), do: map_value(msg, :function_call_name)
+
+  defp message_function_call_arguments(msg) do
+    map_value(msg, :function_call_arguments_json) || map_value(msg, :function_call_arguments)
+  end
+
+  defp map_value(msg, key, default \\ nil) do
+    Map.get(msg, key, Map.get(msg, Atom.to_string(key), default))
+  end
 
   @doc false
   def extract_content(content) when is_binary(content) and content != "", do: content
@@ -309,6 +323,18 @@ defmodule JidoMurmur.Telemetry.ReqLLMTracer do
     end)
   end
 
+  def extract_response_messages(%{context: %{messages: messages}}) when is_list(messages) do
+    messages
+    |> Enum.filter(fn msg ->
+      role = to_string(msg[:role] || msg["role"] || "")
+      role == "assistant"
+    end)
+  end
+
+  def extract_response_messages(%{"context" => %{"messages" => messages}}) when is_list(messages) do
+    extract_response_messages(%{context: %{messages: messages}})
+  end
+
   def extract_response_messages(%{text: text}) when is_binary(text) do
     [%{role: "assistant", content: text}]
   end
@@ -335,6 +361,8 @@ defmodule JidoMurmur.Telemetry.ReqLLMTracer do
   def provider(%{provider: p}) when is_binary(p), do: p
   def provider(_), do: "unknown"
 
+  def system(metadata), do: provider(metadata)
+
   defp output_text(%{response_summary: %{text: text}}) when is_binary(text) and text != "", do: text
 
   defp output_text(%{response_summary: %{text_bytes: bytes}}) when is_integer(bytes) and bytes > 0,
@@ -344,4 +372,8 @@ defmodule JidoMurmur.Telemetry.ReqLLMTracer do
 
   defp maybe_put(map, _key, nil), do: map
   defp maybe_put(map, key, val), do: Map.put(map, key, val)
+
+  defp encode_jsonish(value) when is_map(value), do: Jason.encode!(value)
+  defp encode_jsonish(value) when is_binary(value), do: value
+  defp encode_jsonish(_), do: nil
 end

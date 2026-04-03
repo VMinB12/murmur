@@ -49,7 +49,13 @@ defmodule JidoMurmur.Observability do
   def fail_turn(request_id, reason, attrs \\ %{}), do: Store.fail_turn(request_id, reason, attrs)
   def record_signal(signal, context), do: Store.record_signal(signal, context)
   def record_injected_messages(agent_id, envelopes), do: Store.record_injected_messages(agent_id, envelopes)
-    def record_prepared_llm_input(call_id, messages), do: Store.record_prepared_llm_input(call_id, messages)
+    def record_prepared_llm_input(%{llm_call_id: call_id}, messages) when is_binary(call_id) and is_list(messages),
+      do: Store.record_prepared_llm_input(call_id, messages)
+
+    def record_prepared_llm_input(call_id, messages) when is_binary(call_id) and is_list(messages),
+      do: Store.record_prepared_llm_input(call_id, messages)
+
+    def record_prepared_llm_input(_call_id_or_state, _messages), do: :ok
   def record_req_llm_start(metadata, agent_context \\ nil), do: Store.record_req_llm_start(metadata, agent_context)
   def record_req_llm_stop(measurements, metadata), do: Store.record_req_llm_stop(measurements, metadata)
   def record_req_llm_exception(metadata), do: Store.record_req_llm_exception(metadata)

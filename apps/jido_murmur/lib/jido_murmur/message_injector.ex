@@ -31,7 +31,7 @@ defmodule JidoMurmur.MessageInjector do
       |> inject_team_instructions(workspace_id, sender_name)
       |> inject_pending_messages(agent_id)
 
-    record_prepared_input(state, messages)
+    Observability.record_prepared_llm_input(state, messages)
 
     if messages == request.messages do
       {:ok, %{}}
@@ -68,10 +68,4 @@ defmodule JidoMurmur.MessageInjector do
         messages ++ injected
     end
   end
-
-  defp record_prepared_input(%{llm_call_id: call_id}, messages) when is_binary(call_id) and is_list(messages) do
-    Observability.record_prepared_llm_input(call_id, messages)
-  end
-
-  defp record_prepared_input(_state, _messages), do: :ok
 end

@@ -29,7 +29,7 @@ defmodule JidoSql.RequestTransformer do
 
       schema_text ->
         messages = inject_schema(merged_request.messages, schema_text)
-        record_prepared_input(state, messages)
+        Observability.record_prepared_llm_input(state, messages)
         {:ok, Map.put(base_overrides, :messages, messages)}
     end
   end
@@ -45,10 +45,4 @@ defmodule JidoSql.RequestTransformer do
         [%{role: :system, content: "You are a SQL assistant." <> suffix} | other]
     end
   end
-
-  defp record_prepared_input(%{llm_call_id: call_id}, messages) when is_binary(call_id) and is_list(messages) do
-    Observability.record_prepared_llm_input(call_id, messages)
-  end
-
-  defp record_prepared_input(_state, _messages), do: :ok
 end

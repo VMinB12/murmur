@@ -21,17 +21,20 @@ defmodule JidoMurmur.Observability.Store do
   @pending_req_llm_start_table :jido_murmur_obs_pending_req_llm_starts
 
   def create_tables do
-    ensure_table(@turn_table)
-    ensure_table(@agent_turn_table)
-    ensure_table(@llm_span_table)
-    ensure_table(@tool_span_table)
-    ensure_table(@tool_input_table)
-    ensure_table(@req_llm_lookup_table)
-    ensure_table(@pending_llm_call_table)
-    ensure_table(@pending_agent_llm_call_table)
-    ensure_table(@pending_global_llm_call_table)
-    ensure_table(@prepared_llm_input_table)
-    ensure_table(@pending_req_llm_start_table)
+    [
+      @turn_table,
+      @agent_turn_table,
+      @llm_span_table,
+      @tool_span_table,
+      @tool_input_table,
+      @req_llm_lookup_table,
+      @pending_llm_call_table,
+      @pending_agent_llm_call_table,
+      @pending_global_llm_call_table,
+      @prepared_llm_input_table,
+      @pending_req_llm_start_table
+    ]
+    |> Enum.each(&ensure_table/1)
   end
 
   def record_prepared_llm_input(call_id, messages) when is_binary(call_id) and is_list(messages) do
@@ -538,19 +541,9 @@ defmodule JidoMurmur.Observability.Store do
   end
 
   defp apply_req_llm_start_to_call(call_id, metadata) do
-    input_attrs =
-      case request_payload_messages(metadata) do
-        messages when is_list(messages) and messages != [] ->
-          ReqLLMTracer.flatten_input_messages(messages)
-          |> maybe_put("input.value", ReqLLMTracer.extract_input_value(messages), Observability.capture_content?())
-
-        _ ->
-          %{}
-      end
-
-    update_span(@llm_span_table, call_id, fn record ->
-      Map.update(record, :input_attrs, input_attrs, &Map.merge(&1, input_attrs))
-    end)
+    request_payload_messages(metadata)
+    |> input_attrs_for_messages()
+    |> merge_input_attrs(call_id)
   end
 
   defp apply_prepared_llm_input(call_id) when is_binary(call_id) do
@@ -567,13 +560,9 @@ defmodule JidoMurmur.Observability.Store do
 
   defp maybe_apply_prepared_llm_input(call_id, messages) do
     if span_exists?(call_id) do
-      input_attrs =
-        ReqLLMTracer.flatten_input_messages(messages)
-        |> maybe_put("input.value", ReqLLMTracer.extract_input_value(messages), Observability.capture_content?())
-
-      update_span(@llm_span_table, call_id, fn record ->
-        Map.update(record, :input_attrs, input_attrs, &Map.merge(input_attrs, &1))
-      end)
+      messages
+      |> input_attrs_for_messages()
+      |> merge_input_attrs(call_id, :prepared)
 
       :ets.delete(@prepared_llm_input_table, call_id)
     else
@@ -583,6 +572,29 @@ defmodule JidoMurmur.Observability.Store do
 
   defp span_exists?(call_id) do
     match?([{^call_id, _record}], :ets.lookup(@llm_span_table, call_id))
+  end
+
+  defp input_attrs_for_messages(messages) when is_list(messages) and messages != [] do
+    ReqLLMTracer.flatten_input_messages(messages)
+    |> maybe_put("input.value", ReqLLMTracer.extract_input_value(messages), Observability.capture_content?())
+  end
+
+  defp input_attrs_for_messages(_messages), do: %{}
+
+  defp merge_input_attrs(input_attrs, call_id, merge_order \\ :req_llm)
+
+  defp merge_input_attrs(input_attrs, _call_id, _merge_order) when input_attrs == %{}, do: :ok
+
+  defp merge_input_attrs(input_attrs, call_id, :req_llm) do
+    update_span(@llm_span_table, call_id, fn record ->
+      Map.update(record, :input_attrs, input_attrs, &Map.merge(&1, input_attrs))
+    end)
+  end
+
+  defp merge_input_attrs(input_attrs, call_id, :prepared) do
+    update_span(@llm_span_table, call_id, fn record ->
+      Map.update(record, :input_attrs, input_attrs, &Map.merge(input_attrs, &1))
+    end)
   end
 
   defp ensure_table(table) do

@@ -15,8 +15,8 @@ Group tasks by user-story priority (P1 first). Each group should be an independe
 - [ ] T001 Modify `apps/jido_murmur/mix.exs`, `config/config.exs`, `config/runtime.exs`, and `config/test.exs` to remove AgentObs-specific wiring, declare Murmur-owned observability configuration, and keep explicit OpenTelemetry exporter settings.
 - [ ] T002 Create `apps/jido_murmur/lib/jido_murmur/observability.ex`, `apps/jido_murmur/lib/jido_murmur/observability/tracer.ex`, and `apps/jido_murmur/lib/jido_murmur/observability/turn_context.ex` to own root turn lifecycle, active context propagation, and OpenInference-friendly attribute assembly.
 - [ ] T003 Create `apps/jido_murmur/lib/jido_murmur/observability/stream_accumulator.ex` and modify `apps/jido_murmur/lib/jido_murmur/telemetry/req_llm_tracer.ex` to capture full streamed output text, preserve ordered `llm.input_messages.*` conversation attributes, and emit structured `llm.output_messages.*` assistant-message attributes.
-- [ ] T004 Modify `apps/jido_murmur/lib/jido_murmur/runner.ex`, `apps/jido_murmur/lib/jido_murmur/observability/store.ex`, and `apps/jido_murmur/lib/jido_murmur/table_owner.ex` so each executed react loop starts and finishes exactly one root trace while LLM child spans remain visible and Phoenix-renderable beneath it.
-- [ ] T005 [P] Update `apps/jido_murmur/test/jido_murmur/telemetry/req_llm_tracer_test.exs`, `apps/jido_murmur/test/jido_murmur/runner_test.exs`, and `apps/jido_murmur/test/jido_murmur/table_owner_test.exs` to verify root trace ownership, child-span attachment, exact streamed output capture, ordered input conversation attributes, and structured assistant output messages.
+- [ ] T004 Modify `apps/jido_murmur/lib/jido_murmur/runner.ex`, `apps/jido_murmur/lib/jido_murmur/observability/store.ex`, and `apps/jido_murmur/lib/jido_murmur/table_owner.ex` so each executed react loop starts and finishes exactly one root trace while Murmur attaches LLM and tool child spans using the merged `jido_ai` telemetry hooks.
+- [ ] T005 [P] Update `apps/jido_murmur/test/jido_murmur/telemetry/req_llm_tracer_test.exs`, `apps/jido_murmur/test/jido_murmur/runner_test.exs`, and `apps/jido_murmur/test/jido_murmur/table_owner_test.exs` to verify root trace ownership, child-span attachment from Jido.AI telemetry, exact streamed output capture, ordered input conversation attributes, and structured assistant output messages.
 
 ### P1 — Steering Injection And Idle-Start Semantics
 
@@ -37,8 +37,13 @@ Group tasks by user-story priority (P1 first). Each group should be an independe
 
 ### P1 — Phoenix Message Rendering Contract
 
-- [ ] T014 Modify `apps/jido_murmur/lib/jido_murmur/observability/store.ex` and `apps/jido_murmur/lib/jido_murmur/telemetry/req_llm_tracer.ex` so Phoenix renders message-oriented input and output views for LLM spans instead of only plain text fields.
-- [ ] T015 [P] Update `apps/jido_murmur/test/jido_murmur/telemetry/req_llm_tracer_test.exs` and `apps/jido_murmur/test/jido_murmur/integration/jido_interplay_test.exs` to verify system, user, assistant, assistant-tool-call, and tool-role messages survive end to end in the exported span attributes.
+- [ ] T014 Modify `apps/jido_murmur/lib/jido_murmur/observability/store.ex`, `apps/jido_murmur/lib/jido_murmur/telemetry/req_llm_tracer.ex`, and a new Jido.AI telemetry bridge under `apps/jido_murmur/lib/jido_murmur/telemetry/` so Phoenix renders message-oriented input and output views for LLM spans instead of only plain text fields.
+- [ ] T015 [P] Update `apps/jido_murmur/test/jido_murmur/telemetry/req_llm_tracer_test.exs`, `apps/jido_murmur/test/jido_murmur/integration/jido_interplay_test.exs`, and focused telemetry tests to verify system, user, assistant, assistant-tool-call, and tool-role messages survive end to end in the exported LLM and tool span attributes.
+
+### P1 — Telemetry Integration Refresh
+
+- [ ] T016 Modify `apps/murmur_demo/lib/murmur/application.ex` and create a Jido.AI telemetry bridge in `apps/jido_murmur/lib/jido_murmur/telemetry/` that attaches to the merged `[:jido, :ai, :request|llm|tool, ...]` lifecycle events at startup.
+- [ ] T017 Update `apps/jido_murmur/lib/jido_murmur/streaming_plugin.ex` and related integration tests so Murmur receives `ai.tool.started` alongside the existing runtime signals.
 
 ## Completion Criteria
 

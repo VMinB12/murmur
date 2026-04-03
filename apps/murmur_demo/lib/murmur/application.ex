@@ -5,6 +5,7 @@ defmodule Murmur.Application do
 
   use Application
 
+  alias JidoMurmur.Telemetry.JidoAITracer
   alias JidoMurmur.Telemetry.ReqLLMTracer
 
   @impl true
@@ -14,6 +15,7 @@ defmodule Murmur.Application do
     end
 
     Jido.Telemetry.setup()
+  JidoAITracer.attach()
     ReqLLMTracer.attach()
     JidoTasks.Config.validate!()
 

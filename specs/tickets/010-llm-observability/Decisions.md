@@ -61,3 +61,11 @@ No open questions at this time.
 **Date**: 2026-04-03
 
 **Rationale**: Text-only `output.value` is not enough for the Phoenix trace view. Developers need to inspect the assistant reply in the same structural format as the model conversation, and tool-calling responses need their tool calls preserved as output-message data rather than flattened away.
+
+### Q8: How should ticket 010 proceed after the latest `jido_ai` telemetry work landed?
+
+**Decision**: Use the merged Jido.AI request, LLM, and tool lifecycle telemetry as the supported integration surface for Murmur child spans and continue ticket 010 without patching `jido_ai`.
+
+**Date**: 2026-04-03
+
+**Rationale**: Issue #210 and its merged follow-up work added the missing public lifecycle hooks Murmur needed: canonical `[:jido, :ai, :request|llm|tool, ...]` telemetry plus `ai.tool.started` in the live ReAct path. That is enough to build nested child spans from Murmur without forking or hot-fixing the dependency. The remaining work is correlation and payload assembly, not an upstream blocker on lifecycle visibility.

@@ -6,13 +6,13 @@
 
 **As a** developer debugging agent behavior, **I want** each executed react loop to appear as its own trace with nested LLM and tool activity, **so that** I can inspect exactly what the agent did during one turn of work.
 
-**Independent test**: Send one message to an idle agent that performs at least one tool call; the observability backend shows exactly one new trace for that turn, with one root turn span and nested child spans for all LLM and tool work.
+**Independent test**: Send one message to an idle agent that performs at least one tool call; the observability backend shows exactly one new trace for that turn, with one root turn span and nested child spans for LLM and tool work.
 
 ### US-2: Preserve full developer-visible input conversations and assistant outputs (Priority: P1)
 
 **As a** developer diagnosing bad agent behavior, **I want** traces to include the exact ordered input conversation the runtime sent to the model and the structured assistant message the runtime received back, plus token, latency, and error data, **so that** I can understand what the model and tools actually saw and returned.
 
-**Independent test**: Run a turn with system instructions, user messages, prior assistant messages with tool calls, tool messages, and a streamed or non-streamed model response; the Phoenix trace view exposes the ordered LLM input conversation and a structured assistant output message with any tool calls, along with usage, duration, and error data.
+**Independent test**: Run a turn with system instructions, user messages, prior assistant messages with tool calls, tool messages, and a streamed or non-streamed model response; the LLM child span exposes the ordered input conversation and a structured assistant output message with any tool calls, along with usage, duration, and error data.
 
 ### US-3: Keep steering messages inside the active turn (Priority: P1)
 

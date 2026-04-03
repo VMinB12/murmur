@@ -9,3 +9,6 @@
 - Added `data-contract.md` as the ticket-local OpenInference export contract, using the provided Python attribute reference as the vocabulary baseline and narrowing it to the Murmur span kinds and Phoenix rendering needs relevant to ticket 010.
 - Confirmed the latest Phoenix result still shows only the root turn span because the live `jido_ai` ReAct runtime does not expose a usable public child-span lifecycle for LLM and tool execution, even though it tracks `llm_call_id`, `tool_call_id`, and internal runtime events.
 - Recorded an upstream-ready issue draft in `github-issue-jido-ai-react-runtime-child-spans.md` rather than hot-patching `jido_ai`, since the missing observability surface is in the dependency runtime itself.
+- Re-evaluated the blocker after updating dependencies and reviewing `jido_ai` issue #210 plus the merged follow-up work now present locally.
+- Confirmed that the live ReAct path now emits canonical Jido.AI request, LLM, and tool lifecycle telemetry and also exposes `ai.tool.started`, which gives Murmur a supported integration surface for real child spans without patching the dependency.
+- Updated ticket 010 back to a child-span-first implementation plan. The remaining work is Murmur-side telemetry bridging and payload correlation, not an upstream blocker on lifecycle visibility.

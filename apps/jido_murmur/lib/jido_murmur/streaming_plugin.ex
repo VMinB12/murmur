@@ -16,6 +16,7 @@ defmodule JidoMurmur.StreamingPlugin do
     signal_patterns: [
       "ai.llm.delta",
       "ai.llm.response",
+      "ai.tool.started",
       "ai.tool.result",
       "ai.request.started",
       "ai.request.completed",

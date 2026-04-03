@@ -17,13 +17,14 @@ defmodule Murmur.Agents.MessageInjectorTest do
   use ExUnit.Case, async: true
 
   alias JidoMurmur.MessageInjector
+  alias JidoMurmur.Observability.Store
   alias JidoMurmur.PendingQueue
 
   # Minimal stubs for the ReAct runner types.
   # The transformer receives these as arguments.
   defmodule FakeState do
     @moduledoc false
-    defstruct [:run_id, :request_id, :iteration, :context]
+    defstruct [:run_id, :request_id, :iteration, :context, :llm_call_id]
   end
 
   defmodule FakeConfig do
@@ -32,6 +33,7 @@ defmodule Murmur.Agents.MessageInjectorTest do
   end
 
   setup do
+    Store.create_tables()
     session_id = Ecto.UUID.generate()
     {:ok, session_id: session_id}
   end
@@ -150,6 +152,29 @@ defmodule Murmur.Agents.MessageInjectorTest do
       # Only :messages is overridden
       refute Map.has_key?(overrides, :llm_opts)
       refute Map.has_key?(overrides, :tools)
+    end
+
+    test "records prepared messages for the current llm_call_id", ctx do
+      call_id = "llm-call-#{System.unique_integer([:positive])}"
+
+      request = %{
+        messages: [%{role: :user, content: "hi"}],
+        llm_opts: [temperature: 0.5],
+        tools: %{}
+      }
+
+      runtime_context = %{agent_id: ctx.session_id}
+
+      assert {:ok, _overrides} =
+               MessageInjector.transform_request(
+                 request,
+                 %FakeState{iteration: 1, llm_call_id: call_id},
+                 %FakeConfig{},
+                 runtime_context
+               )
+
+      assert [{^call_id, messages}] = :ets.lookup(:jido_murmur_obs_prepared_llm_inputs, call_id)
+      assert messages == request.messages
     end
   end
 

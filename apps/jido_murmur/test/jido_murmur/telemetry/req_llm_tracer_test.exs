@@ -1,10 +1,14 @@
 defmodule JidoMurmur.Telemetry.ReqLLMTracerTest do
   use ExUnit.Case, async: false
 
+  alias JidoMurmur.Observability
   alias JidoMurmur.Observability.SessionCache
+  alias JidoMurmur.Observability.Store
+  alias JidoMurmur.Telemetry.JidoAITracer
   alias JidoMurmur.Telemetry.ReqLLMTracer
 
   @table JidoMurmur.Telemetry.ReqLLMTracer
+  @llm_span_table :jido_murmur_obs_llm_spans
 
   setup do
     # Ensure the ETS table exists (might already exist from app startup)
@@ -17,9 +21,19 @@ defmodule JidoMurmur.Telemetry.ReqLLMTracerTest do
       :ets.new(:jido_murmur_obs_sessions, [:named_table, :public, :set, read_concurrency: true])
     end
 
+    Store.create_tables()
+
     # Attach handler; ignore errors if already attached
     try do
       ReqLLMTracer.attach()
+    rescue
+      _ -> :ok
+    catch
+      _, _ -> :ok
+    end
+
+    try do
+      JidoAITracer.attach()
     rescue
       _ -> :ok
     catch
@@ -34,6 +48,10 @@ defmodule JidoMurmur.Telemetry.ReqLLMTracerTest do
 
       if :ets.whereis(:jido_murmur_obs_sessions) != :undefined do
         :ets.delete_all_objects(:jido_murmur_obs_sessions)
+      end
+
+      if :ets.whereis(@llm_span_table) != :undefined do
+        :ets.delete_all_objects(@llm_span_table)
       end
     end)
 
@@ -109,6 +127,173 @@ defmodule JidoMurmur.Telemetry.ReqLLMTracerTest do
         %{system_time: System.system_time()},
         %{model: %{id: "test", provider: "test"}}
       )
+    end
+
+    test "links ReqLLM payloads to queued Jido.AI llm spans by agent when ReqLLM request ids differ" do
+      request_id = "jido-ai-turn-#{System.unique_integer([:positive])}"
+      req_llm_request_id = "req-llm-#{System.unique_integer([:positive])}"
+      call_id = "llm-call-#{System.unique_integer([:positive])}"
+      agent_id = "agent-#{System.unique_integer([:positive])}"
+      workspace_id = "workspace-#{System.unique_integer([:positive])}"
+
+      SessionCache.put(agent_id, workspace_id, "Trace Agent")
+
+      Store.start_turn(%{
+        request_id: request_id,
+        agent_id: agent_id,
+        agent_name: "Trace Agent",
+        session_id: agent_id,
+        workspace_id: workspace_id,
+        interaction_id: "interaction-#{System.unique_integer([:positive])}",
+        input_value: "queued request"
+      })
+
+      :telemetry.execute(
+        [:jido, :ai, :llm, :start],
+        %{system_time: System.system_time()},
+        %{request_id: request_id, llm_call_id: call_id, model: %{id: "openai:gpt-5-mini", provider: "openai"}}
+      )
+
+      Observability.clear_active_llm_call_id()
+      Logger.metadata(agent_id: agent_id)
+
+      :telemetry.execute(
+        [:req_llm, :request, :start],
+        %{system_time: System.system_time()},
+        start_metadata(req_llm_request_id,
+          request_payload: %{messages: [%{role: "user", content: "queued request"}]}
+        )
+      )
+
+      assert [{^call_id, llm_record}] = :ets.lookup(@llm_span_table, call_id)
+      assert llm_record.input_attrs["llm.input_messages.0.message.role"] == "user"
+      assert llm_record.input_attrs["llm.input_messages.0.message.content"] == "queued request"
+
+      Logger.metadata(agent_id: nil)
+      Store.finish_turn(request_id, %{response: "done"})
+    end
+
+    test "captures input messages when ReqLLM request start happens before llm start telemetry" do
+      request_id = "jido-ai-turn-#{System.unique_integer([:positive])}"
+      req_llm_request_id = "req-llm-#{System.unique_integer([:positive])}"
+      call_id = "llm-call-#{System.unique_integer([:positive])}"
+      agent_id = "agent-#{System.unique_integer([:positive])}"
+      workspace_id = "workspace-#{System.unique_integer([:positive])}"
+
+      SessionCache.put(agent_id, workspace_id, "Trace Agent")
+
+      Store.start_turn(%{
+        request_id: request_id,
+        agent_id: agent_id,
+        agent_name: "Trace Agent",
+        session_id: agent_id,
+        workspace_id: workspace_id,
+        interaction_id: "interaction-#{System.unique_integer([:positive])}",
+        input_value: "pre-start request"
+      })
+
+      Logger.metadata(agent_id: agent_id)
+
+      :telemetry.execute(
+        [:req_llm, :request, :start],
+        %{system_time: System.system_time()},
+        start_metadata(req_llm_request_id,
+          request_payload: %{messages: [%{role: "user", content: "pre-start request"}]}
+        )
+      )
+
+      :telemetry.execute(
+        [:jido, :ai, :llm, :start],
+        %{system_time: System.system_time()},
+        %{request_id: request_id, llm_call_id: call_id, model: %{id: "openai:gpt-5-mini", provider: "openai"}}
+      )
+
+      assert [{^call_id, llm_record}] = :ets.lookup(@llm_span_table, call_id)
+      assert llm_record.input_attrs["llm.input_messages.0.message.content"] == "pre-start request"
+
+      Logger.metadata(agent_id: nil)
+      Store.finish_turn(request_id, %{response: "done"})
+    end
+
+    test "captures input messages when ReqLLM request start happens after llm start telemetry without agent context" do
+      request_id = "jido-ai-turn-#{System.unique_integer([:positive])}"
+      req_llm_request_id = "req-llm-#{System.unique_integer([:positive])}"
+      call_id = "llm-call-#{System.unique_integer([:positive])}"
+      agent_id = "agent-#{System.unique_integer([:positive])}"
+      workspace_id = "workspace-#{System.unique_integer([:positive])}"
+
+      SessionCache.put(agent_id, workspace_id, "Trace Agent")
+
+      Store.start_turn(%{
+        request_id: request_id,
+        agent_id: agent_id,
+        agent_name: "Trace Agent",
+        session_id: agent_id,
+        workspace_id: workspace_id,
+        interaction_id: "interaction-#{System.unique_integer([:positive])}",
+        input_value: "late request"
+      })
+
+      :telemetry.execute(
+        [:jido, :ai, :llm, :start],
+        %{system_time: System.system_time()},
+        %{request_id: request_id, llm_call_id: call_id, model: %{id: "openai:gpt-5-mini", provider: "openai"}}
+      )
+
+      Logger.metadata(agent_id: nil)
+
+      :telemetry.execute(
+        [:req_llm, :request, :start],
+        %{system_time: System.system_time()},
+        start_metadata(req_llm_request_id,
+          request_payload: %{messages: [%{role: "user", content: "late request"}]}
+        )
+      )
+
+      assert [{^call_id, llm_record}] = :ets.lookup(@llm_span_table, call_id)
+      assert llm_record.input_attrs["llm.input_messages.0.message.content"] == "late request"
+
+      Store.finish_turn(request_id, %{response: "done"})
+    end
+
+    test "captures prepared input messages without ReqLLM start telemetry" do
+      request_id = "jido-ai-turn-#{System.unique_integer([:positive])}"
+      call_id = "llm-call-#{System.unique_integer([:positive])}"
+      agent_id = "agent-#{System.unique_integer([:positive])}"
+      workspace_id = "workspace-#{System.unique_integer([:positive])}"
+
+      SessionCache.put(agent_id, workspace_id, "Trace Agent")
+
+      Store.start_turn(%{
+        request_id: request_id,
+        agent_id: agent_id,
+        agent_name: "Trace Agent",
+        session_id: agent_id,
+        workspace_id: workspace_id,
+        interaction_id: "interaction-#{System.unique_integer([:positive])}",
+        input_value: "prepared request"
+      })
+
+      Observability.record_prepared_llm_input(call_id, [
+        %{role: :assistant, tool_calls: [%{id: "tool-1", name: "tell", arguments: %{message: "prepared request"}}]},
+        %{role: :tool, tool_call_id: "tool-1", name: "tell", content: ~s({"ok":true})},
+        %{role: :user, content: "prepared request"}
+      ])
+
+      :telemetry.execute(
+        [:jido, :ai, :llm, :start],
+        %{system_time: System.system_time()},
+        %{request_id: request_id, llm_call_id: call_id, model: %{id: "openai:gpt-5-mini", provider: "openai"}}
+      )
+
+      assert [{^call_id, llm_record}] = :ets.lookup(@llm_span_table, call_id)
+      assert llm_record.input_attrs["llm.input_messages.0.message.role"] == "assistant"
+      assert llm_record.input_attrs["llm.input_messages.0.message.tool_calls.0.tool_call.function.name"] == "tell"
+      assert llm_record.input_attrs["llm.input_messages.1.message.role"] == "tool"
+      assert llm_record.input_attrs["llm.input_messages.2.message.content"] == "prepared request"
+      assert llm_record.input_attrs["input.value"] == "prepared request"
+
+      Store.finish_turn(request_id, %{response: "done"})
     end
   end
 
@@ -670,7 +855,7 @@ defmodule JidoMurmur.Telemetry.ReqLLMTracerTest do
       )
 
       assert [{^request_id, _span, agent_context}] = :ets.lookup(@table, request_id)
-      assert agent_context == %{workspace_id: workspace_id, display_name: "TestAgent"}
+      assert agent_context == %{agent_id: agent_id, workspace_id: workspace_id, display_name: "TestAgent"}
 
       # Clean up Logger metadata
       Logger.metadata(agent_id: nil)
@@ -809,7 +994,7 @@ defmodule JidoMurmur.Telemetry.ReqLLMTracerTest do
 
       # Should find the suffixed key, strip the suffix, and resolve via SessionCache
       assert [{^request_id, _span, agent_context}] = :ets.lookup(@table, request_id)
-      assert agent_context == %{workspace_id: workspace_id, display_name: "CallerAgent"}
+      assert agent_context == %{agent_id: agent_id, workspace_id: workspace_id, display_name: "CallerAgent"}
 
       # Clean up
       :telemetry.execute(
@@ -947,6 +1132,28 @@ defmodule JidoMurmur.Telemetry.ReqLLMTracerTest do
       result = ReqLLMTracer.flatten_tool_calls(0, tool_calls, :input)
 
       assert result["llm.input_messages.0.message.tool_calls.0.tool_call.function.arguments"] == ~s({"query":"test"})
+    end
+
+    test "flat Jido tool call shape preserves name and arguments" do
+      tool_calls = [%{id: "tool_1", name: "tell", arguments: %{target_agent: "bob", message: "hello"}}]
+      result = ReqLLMTracer.flatten_tool_calls(0, tool_calls, :output)
+
+      assert result["llm.output_messages.0.message.tool_calls.0.tool_call.id"] == "tool_1"
+      assert result["llm.output_messages.0.message.tool_calls.0.tool_call.function.name"] == "tell"
+
+      assert result["llm.output_messages.0.message.tool_calls.0.tool_call.function.arguments"] ==
+               ~s({"message":"hello","target_agent":"bob"})
+    end
+
+    test "ReqLLM.ToolCall structs are flattened without crashing" do
+      tool_calls = [ReqLLM.ToolCall.new("tool_1", "tell", ~s({"target_agent":"bob","message":"hello"}))]
+      result = ReqLLMTracer.flatten_tool_calls(0, tool_calls, :output)
+
+      assert result["llm.output_messages.0.message.tool_calls.0.tool_call.id"] == "tool_1"
+      assert result["llm.output_messages.0.message.tool_calls.0.tool_call.function.name"] == "tell"
+
+      assert result["llm.output_messages.0.message.tool_calls.0.tool_call.function.arguments"] ==
+               ~s({"target_agent":"bob","message":"hello"})
     end
   end
 

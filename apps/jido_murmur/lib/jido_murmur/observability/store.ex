@@ -14,6 +14,11 @@ defmodule JidoMurmur.Observability.Store do
   @tool_span_table :jido_murmur_obs_tool_spans
   @tool_input_table :jido_murmur_obs_tool_inputs
   @req_llm_lookup_table :jido_murmur_obs_req_llm_lookup
+  @pending_llm_call_table :jido_murmur_obs_pending_llm_calls
+  @pending_agent_llm_call_table :jido_murmur_obs_pending_agent_llm_calls
+  @pending_global_llm_call_table :jido_murmur_obs_pending_global_llm_calls
+  @prepared_llm_input_table :jido_murmur_obs_prepared_llm_inputs
+  @pending_req_llm_start_table :jido_murmur_obs_pending_req_llm_starts
 
   def create_tables do
     ensure_table(@turn_table)
@@ -22,7 +27,20 @@ defmodule JidoMurmur.Observability.Store do
     ensure_table(@tool_span_table)
     ensure_table(@tool_input_table)
     ensure_table(@req_llm_lookup_table)
+    ensure_table(@pending_llm_call_table)
+    ensure_table(@pending_agent_llm_call_table)
+    ensure_table(@pending_global_llm_call_table)
+    ensure_table(@prepared_llm_input_table)
+    ensure_table(@pending_req_llm_start_table)
   end
+
+  def record_prepared_llm_input(call_id, messages) when is_binary(call_id) and is_list(messages) do
+    :ets.insert(@prepared_llm_input_table, {call_id, messages})
+    apply_prepared_llm_input(call_id)
+    :ok
+  end
+
+  def record_prepared_llm_input(_call_id, _messages), do: :ok
 
   def start_turn(attrs) do
     if Observability.enabled?() do
@@ -97,6 +115,11 @@ defmodule JidoMurmur.Observability.Store do
         }
 
         :ets.insert(@llm_span_table, {call_id, record})
+    enqueue_pending_llm_call(metadata[:request_id], call_id)
+    enqueue_pending_agent_llm_call(turn, call_id)
+    enqueue_pending_global_llm_call(call_id)
+        apply_prepared_llm_input(call_id)
+    adopt_pending_req_llm_start(call_id, turn)
         %{kind: :llm, call_id: call_id}
 
       _ ->
@@ -164,24 +187,14 @@ defmodule JidoMurmur.Observability.Store do
     :ok
   end
 
-  def record_req_llm_start(metadata) do
-    with call_id when is_binary(call_id) <- Observability.current_active_llm_call_id(),
-         request_id when is_binary(request_id) <- metadata[:request_id] do
-      :ets.insert(@req_llm_lookup_table, {request_id, call_id})
+  def record_req_llm_start(metadata, agent_context \\ nil) do
+    with request_id when is_binary(request_id) <- metadata[:request_id],
+         call_id when is_binary(call_id) <- bind_req_llm_call(request_id, agent_context) do
+      apply_req_llm_start_to_call(call_id, metadata)
 
-      input_attrs =
-        case get_in(metadata, [:request_payload, :messages]) do
-          messages when is_list(messages) and messages != [] ->
-            ReqLLMTracer.flatten_input_messages(messages)
-            |> maybe_put("input.value", ReqLLMTracer.extract_input_value(messages), Observability.capture_content?())
-
-          _ ->
-            %{}
-        end
-
-      update_span(@llm_span_table, call_id, fn record ->
-        Map.update(record, :input_attrs, input_attrs, &Map.merge(&1, input_attrs))
-      end)
+    else
+      _ ->
+        enqueue_pending_req_llm_start(agent_context, metadata)
     end
 
     :ok
@@ -210,6 +223,8 @@ defmodule JidoMurmur.Observability.Store do
       update_span(@llm_span_table, call_id, fn record ->
         %{record | error: %{kind: :error, reason: metadata[:error]}, completed?: true}
       end)
+
+      :ets.delete(@req_llm_lookup_table, request_id)
     end
 
     :ok
@@ -221,6 +236,10 @@ defmodule JidoMurmur.Observability.Store do
 
   def record_signal(%{type: "ai.usage", data: data}, _context) do
     record_usage(data)
+  end
+
+  def record_signal(%{type: "ai.tool.started", data: data}, _context) do
+    record_tool_started(data)
   end
 
   def record_signal(%{type: "ai.llm.response", data: data}, _context) do
@@ -280,6 +299,24 @@ defmodule JidoMurmur.Observability.Store do
 
   defp record_usage(_), do: :ok
 
+  defp record_tool_started(%{call_id: call_id} = data) when is_binary(call_id) do
+    info = %{id: call_id, name: Map.get(data, :tool_name), arguments: Map.get(data, :arguments)}
+    :ets.insert(@tool_input_table, {call_id, info})
+
+    with {:ok, record} <- fetch_span(@tool_span_table, call_id) do
+      attrs =
+        %{}
+        |> maybe_put("tool.name", info.name)
+        |> maybe_put("input.value", encode_input(info), Observability.capture_content?())
+
+      Span.set_attributes(record.span_ctx, attrs)
+    end
+
+    :ok
+  end
+
+  defp record_tool_started(_), do: :ok
+
   defp complete_llm_span(%{call_id: call_id, result: result} = data) when is_binary(call_id) do
     with {:ok, record} <- fetch_span(@llm_span_table, call_id) do
       case result do
@@ -290,6 +327,7 @@ defmodule JidoMurmur.Observability.Store do
         other -> finalize_llm_error(record, other)
       end
 
+      :ets.delete(@req_llm_lookup_table, record.request_id)
       delete_span(@llm_span_table, call_id)
     end
 
@@ -368,6 +406,7 @@ defmodule JidoMurmur.Observability.Store do
       end
 
       Span.end_span(record.span_ctx)
+      :ets.delete(@tool_input_table, call_id)
       delete_span(@tool_span_table, call_id)
     end
 
@@ -482,6 +521,9 @@ defmodule JidoMurmur.Observability.Store do
   defp cleanup_turn(turn) do
     :ets.delete(@turn_table, turn.request_id)
     :ets.delete(@agent_turn_table, turn.agent_id)
+    :ets.delete(@req_llm_lookup_table, turn.request_id)
+    :ets.delete(@pending_llm_call_table, turn.request_id)
+    :ets.delete(@pending_agent_llm_call_table, turn.agent_id)
   end
 
   defp update_turn(request_id, fun) do
@@ -493,6 +535,54 @@ defmodule JidoMurmur.Observability.Store do
       [{^key, record}] -> :ets.insert(table, {key, fun.(record)})
       [] -> :ok
     end
+  end
+
+  defp apply_req_llm_start_to_call(call_id, metadata) do
+    input_attrs =
+      case request_payload_messages(metadata) do
+        messages when is_list(messages) and messages != [] ->
+          ReqLLMTracer.flatten_input_messages(messages)
+          |> maybe_put("input.value", ReqLLMTracer.extract_input_value(messages), Observability.capture_content?())
+
+        _ ->
+          %{}
+      end
+
+    update_span(@llm_span_table, call_id, fn record ->
+      Map.update(record, :input_attrs, input_attrs, &Map.merge(&1, input_attrs))
+    end)
+  end
+
+  defp apply_prepared_llm_input(call_id) when is_binary(call_id) do
+    case :ets.lookup(@prepared_llm_input_table, call_id) do
+      [{^call_id, messages}] when is_list(messages) ->
+        maybe_apply_prepared_llm_input(call_id, messages)
+
+      _ ->
+        :ok
+    end
+  end
+
+  defp apply_prepared_llm_input(_call_id), do: :ok
+
+  defp maybe_apply_prepared_llm_input(call_id, messages) do
+    if span_exists?(call_id) do
+      input_attrs =
+        ReqLLMTracer.flatten_input_messages(messages)
+        |> maybe_put("input.value", ReqLLMTracer.extract_input_value(messages), Observability.capture_content?())
+
+      update_span(@llm_span_table, call_id, fn record ->
+        Map.update(record, :input_attrs, input_attrs, &Map.merge(input_attrs, &1))
+      end)
+
+      :ets.delete(@prepared_llm_input_table, call_id)
+    else
+      :ok
+    end
+  end
+
+  defp span_exists?(call_id) do
+    match?([{^call_id, _record}], :ets.lookup(@llm_span_table, call_id))
   end
 
   defp ensure_table(table) do
@@ -542,6 +632,229 @@ defmodule JidoMurmur.Observability.Store do
       [{^request_id, call_id}] -> call_id
       [] -> nil
     end
+  end
+
+  defp enqueue_pending_llm_call(request_id, call_id)
+       when is_binary(request_id) and is_binary(call_id) do
+    pending =
+      case :ets.lookup(@pending_llm_call_table, request_id) do
+        [{^request_id, call_ids}] -> call_ids
+        [] -> []
+      end
+
+    :ets.insert(@pending_llm_call_table, {request_id, pending ++ [call_id]})
+  end
+
+  defp enqueue_pending_llm_call(_request_id, _call_id), do: :ok
+
+  defp enqueue_pending_agent_llm_call(%{agent_id: agent_id}, call_id)
+       when is_binary(agent_id) and is_binary(call_id) do
+    pending =
+      case :ets.lookup(@pending_agent_llm_call_table, agent_id) do
+        [{^agent_id, call_ids}] -> call_ids
+        [] -> []
+      end
+
+    :ets.insert(@pending_agent_llm_call_table, {agent_id, pending ++ [call_id]})
+  end
+
+  defp enqueue_pending_agent_llm_call(_turn, _call_id), do: :ok
+
+  defp enqueue_pending_global_llm_call(call_id) when is_binary(call_id) do
+    pending =
+      case :ets.lookup(@pending_global_llm_call_table, :queue) do
+        [{:queue, call_ids}] -> call_ids
+        [] -> []
+      end
+
+    :ets.insert(@pending_global_llm_call_table, {:queue, pending ++ [call_id]})
+  end
+
+  defp enqueue_pending_global_llm_call(_call_id), do: :ok
+
+  defp bind_req_llm_call(request_id, agent_context) do
+    call_id =
+      normalize_call_id(Observability.current_active_llm_call_id()) ||
+        pop_pending_llm_call(request_id) ||
+        pop_pending_agent_llm_call(agent_context) ||
+        pop_pending_global_llm_call() ||
+        lookup_req_llm_call(request_id)
+
+    if is_binary(call_id) do
+      :ets.insert(@req_llm_lookup_table, {request_id, call_id})
+      drop_pending_llm_call(request_id, call_id)
+      drop_pending_agent_llm_call(agent_context, call_id)
+      drop_pending_global_llm_call(call_id)
+    end
+
+    call_id
+  end
+
+  defp normalize_call_id(call_id) when is_binary(call_id), do: call_id
+  defp normalize_call_id(_call_id), do: nil
+
+  defp pop_pending_llm_call(request_id) do
+    case :ets.lookup(@pending_llm_call_table, request_id) do
+      [{^request_id, [call_id | rest]}] ->
+        if rest == [] do
+          :ets.delete(@pending_llm_call_table, request_id)
+        else
+          :ets.insert(@pending_llm_call_table, {request_id, rest})
+        end
+
+        call_id
+
+      _ ->
+        nil
+    end
+  end
+
+  defp drop_pending_llm_call(request_id, call_id) do
+    case :ets.lookup(@pending_llm_call_table, request_id) do
+      [{^request_id, call_ids}] ->
+        remaining = List.delete(call_ids, call_id)
+
+        if remaining == [] do
+          :ets.delete(@pending_llm_call_table, request_id)
+        else
+          :ets.insert(@pending_llm_call_table, {request_id, remaining})
+        end
+
+      [] ->
+        :ok
+    end
+  end
+
+  defp pop_pending_agent_llm_call(%{agent_id: agent_id}) when is_binary(agent_id) do
+    case :ets.lookup(@pending_agent_llm_call_table, agent_id) do
+      [{^agent_id, [call_id | rest]}] ->
+        if rest == [] do
+          :ets.delete(@pending_agent_llm_call_table, agent_id)
+        else
+          :ets.insert(@pending_agent_llm_call_table, {agent_id, rest})
+        end
+
+        call_id
+
+      _ ->
+        nil
+    end
+  end
+
+  defp pop_pending_agent_llm_call(_agent_context), do: nil
+
+  defp drop_pending_agent_llm_call(%{agent_id: agent_id}, call_id) when is_binary(agent_id) do
+    case :ets.lookup(@pending_agent_llm_call_table, agent_id) do
+      [{^agent_id, call_ids}] ->
+        remaining = List.delete(call_ids, call_id)
+
+        if remaining == [] do
+          :ets.delete(@pending_agent_llm_call_table, agent_id)
+        else
+          :ets.insert(@pending_agent_llm_call_table, {agent_id, remaining})
+        end
+
+      [] ->
+        :ok
+    end
+  end
+
+  defp drop_pending_agent_llm_call(_agent_context, _call_id), do: :ok
+
+  defp pop_pending_global_llm_call do
+    case :ets.lookup(@pending_global_llm_call_table, :queue) do
+      [{:queue, [call_id | rest]}] ->
+        if rest == [] do
+          :ets.delete(@pending_global_llm_call_table, :queue)
+        else
+          :ets.insert(@pending_global_llm_call_table, {:queue, rest})
+        end
+
+        call_id
+
+      _ ->
+        nil
+    end
+  end
+
+  defp drop_pending_global_llm_call(call_id) when is_binary(call_id) do
+    case :ets.lookup(@pending_global_llm_call_table, :queue) do
+      [{:queue, call_ids}] ->
+        remaining = List.delete(call_ids, call_id)
+
+        if remaining == [] do
+          :ets.delete(@pending_global_llm_call_table, :queue)
+        else
+          :ets.insert(@pending_global_llm_call_table, {:queue, remaining})
+        end
+
+      [] ->
+        :ok
+    end
+  end
+
+  defp drop_pending_global_llm_call(_call_id), do: :ok
+
+  defp enqueue_pending_req_llm_start(agent_context, metadata) when is_map(metadata) do
+    pending =
+      case :ets.lookup(@pending_req_llm_start_table, :queue) do
+        [{:queue, entries}] -> entries
+        [] -> []
+      end
+
+    entry = %{agent_id: agent_context && agent_context[:agent_id], metadata: metadata}
+    :ets.insert(@pending_req_llm_start_table, {:queue, pending ++ [entry]})
+  end
+
+  defp adopt_pending_req_llm_start(call_id, turn) when is_binary(call_id) do
+    case pop_pending_req_llm_start(turn && turn.agent_id) do
+      %{metadata: metadata} when is_map(metadata) ->
+        request_id = metadata[:request_id]
+
+        if is_binary(request_id) do
+          :ets.insert(@req_llm_lookup_table, {request_id, call_id})
+        end
+
+        drop_pending_global_llm_call(call_id)
+        apply_req_llm_start_to_call(call_id, metadata)
+
+      _ ->
+        :ok
+    end
+  end
+
+  defp adopt_pending_req_llm_start(_call_id, _turn), do: :ok
+
+  defp pop_pending_req_llm_start(agent_id) do
+    case :ets.lookup(@pending_req_llm_start_table, :queue) do
+      [{:queue, entries}] when is_list(entries) and entries != [] ->
+        {entry, remaining} = take_pending_req_llm_start(entries, agent_id)
+
+        if remaining == [] do
+          :ets.delete(@pending_req_llm_start_table, :queue)
+        else
+          :ets.insert(@pending_req_llm_start_table, {:queue, remaining})
+        end
+
+        entry
+
+      _ ->
+        nil
+    end
+  end
+
+  defp take_pending_req_llm_start(entries, agent_id) when is_binary(agent_id) do
+    case Enum.split_while(entries, &(&1.agent_id != agent_id)) do
+      {before, [entry | after_entries]} -> {entry, before ++ after_entries}
+      {_before, []} -> {hd(entries), tl(entries)}
+    end
+  end
+
+  defp take_pending_req_llm_start([entry | rest], _agent_id), do: {entry, rest}
+
+  defp request_payload_messages(metadata) do
+    request_payload = metadata[:request_payload] || metadata["request_payload"] || %{}
+    Map.get(request_payload, :messages) || Map.get(request_payload, "messages") || []
   end
 
   defp normalize_usage(nil), do: nil

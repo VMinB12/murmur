@@ -47,6 +47,22 @@ defmodule JidoMurmur.StreamingPluginTest do
       assert_receive %Jido.Signal{type: "ai.tool.result", subject: "/agents/" <> _}
     end
 
+    test "handles ai.tool.started signal" do
+      workspace_id = Ecto.UUID.generate()
+      session_id = Ecto.UUID.generate()
+      topic = StreamingPlugin.stream_topic(workspace_id, session_id)
+      Phoenix.PubSub.subscribe(JidoMurmur.pubsub(), topic)
+
+      signal =
+        Jido.Signal.new!("ai.tool.started", %{tool_name: "search", arguments: %{query: "phoenix"}},
+          source: "/test"
+        )
+
+      assert {:ok, :continue} = StreamingPlugin.handle_signal(signal, build_context(session_id, workspace_id))
+
+      assert_receive %Jido.Signal{type: "ai.tool.started", subject: "/agents/" <> _}
+    end
+
     test "handles ai.request.started signal" do
       workspace_id = Ecto.UUID.generate()
       session_id = Ecto.UUID.generate()

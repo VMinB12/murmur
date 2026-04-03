@@ -45,7 +45,7 @@ defmodule JidoMurmur.Telemetry.ReqLLMTracer do
     request_id = metadata[:request_id]
     agent_context = resolve_agent_context()
 
-    Observability.record_req_llm_start(metadata)
+    Observability.record_req_llm_start(metadata, agent_context)
 
     if request_id do
       :ets.insert(@table, {request_id, make_ref(), agent_context})
@@ -103,10 +103,10 @@ defmodule JidoMurmur.Telemetry.ReqLLMTracer do
     tool_calls
     |> Enum.with_index()
     |> Enum.reduce(%{}, fn {tc, tc_idx}, acc ->
-      func = tc[:function] || tc["function"] || %{}
-      name = func[:name] || func["name"]
-      args = func[:arguments] || func["arguments"]
-      id = tc[:id] || tc["id"]
+      func = tool_call_field(tc, :function) || %{}
+      name = tool_call_field(func, :name) || tool_call_field(tc, :name) || tool_call_field(tc, :function_name)
+      args = tool_call_field(func, :arguments) || tool_call_field(tc, :arguments) || tool_call_field(tc, :args)
+      id = tool_call_field(tc, :id)
 
       encoded_args = encode_jsonish(args)
 
@@ -121,6 +121,12 @@ defmodule JidoMurmur.Telemetry.ReqLLMTracer do
   end
 
   def flatten_tool_calls(_msg_idx, _tool_calls, _direction), do: %{}
+
+  defp tool_call_field(value, key) when is_map(value) do
+    Map.get(value, key) || Map.get(value, Atom.to_string(key))
+  end
+
+  defp tool_call_field(_value, _key), do: nil
 
   defp flatten_messages(messages, direction, default_role) do
     messages
@@ -253,7 +259,7 @@ defmodule JidoMurmur.Telemetry.ReqLLMTracer do
 
         case SessionCache.lookup(base_id) do
           {workspace_id, display_name} ->
-            %{workspace_id: workspace_id, display_name: display_name}
+            %{agent_id: base_id, workspace_id: workspace_id, display_name: display_name}
 
           nil ->
             nil

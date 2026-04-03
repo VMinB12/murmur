@@ -11,11 +11,12 @@ Group tasks by user-story priority (P1 first). Each group should be an independe
 
 ### P1 — Root Turn Traces And Payload Fidelity
 
+- [ ] T000 Create `specs/tickets/010-llm-observability/data-contract.md` to define the OpenInference-aligned span attribute contract for agent, LLM, and tool spans, including Phoenix message-rendering requirements.
 - [ ] T001 Modify `apps/jido_murmur/mix.exs`, `config/config.exs`, `config/runtime.exs`, and `config/test.exs` to remove AgentObs-specific wiring, declare Murmur-owned observability configuration, and keep explicit OpenTelemetry exporter settings.
 - [ ] T002 Create `apps/jido_murmur/lib/jido_murmur/observability.ex`, `apps/jido_murmur/lib/jido_murmur/observability/tracer.ex`, and `apps/jido_murmur/lib/jido_murmur/observability/turn_context.ex` to own root turn lifecycle, active context propagation, and OpenInference-friendly attribute assembly.
-- [ ] T003 Create `apps/jido_murmur/lib/jido_murmur/observability/stream_accumulator.ex` and modify `apps/jido_murmur/lib/jido_murmur/telemetry/req_llm_tracer.ex` to capture full streamed output text and attach child LLM spans to the active turn trace.
-- [ ] T004 Modify `apps/jido_murmur/lib/jido_murmur/runner.ex` and `apps/jido_murmur/lib/jido_murmur/table_owner.ex` so each executed react loop starts and finishes exactly one root trace and provisions the ETS state required by the new observability subsystem.
-- [ ] T005 [P] Update `apps/jido_murmur/test/jido_murmur/telemetry/req_llm_tracer_test.exs`, `apps/jido_murmur/test/jido_murmur/runner_test.exs`, and `apps/jido_murmur/test/jido_murmur/table_owner_test.exs` to verify root trace ownership, child-span attachment, and exact streamed output capture.
+- [ ] T003 Create `apps/jido_murmur/lib/jido_murmur/observability/stream_accumulator.ex` and modify `apps/jido_murmur/lib/jido_murmur/telemetry/req_llm_tracer.ex` to capture full streamed output text, preserve ordered `llm.input_messages.*` conversation attributes, and emit structured `llm.output_messages.*` assistant-message attributes.
+- [ ] T004 Modify `apps/jido_murmur/lib/jido_murmur/runner.ex`, `apps/jido_murmur/lib/jido_murmur/observability/store.ex`, and `apps/jido_murmur/lib/jido_murmur/table_owner.ex` so each executed react loop starts and finishes exactly one root trace while LLM child spans remain visible and Phoenix-renderable beneath it.
+- [ ] T005 [P] Update `apps/jido_murmur/test/jido_murmur/telemetry/req_llm_tracer_test.exs`, `apps/jido_murmur/test/jido_murmur/runner_test.exs`, and `apps/jido_murmur/test/jido_murmur/table_owner_test.exs` to verify root trace ownership, child-span attachment, exact streamed output capture, ordered input conversation attributes, and structured assistant output messages.
 
 ### P1 — Steering Injection And Idle-Start Semantics
 
@@ -33,6 +34,11 @@ Group tasks by user-story priority (P1 first). Each group should be an independe
 
 - [ ] T012 Create `apps/jido_murmur/lib/jido_murmur/observability/interaction.ex` and modify `apps/jido_murmur/lib/jido_murmur/runner.ex`, `apps/jido_murmur/lib/jido_murmur/tell_action.ex`, and `apps/jido_murmur/lib/jido_murmur/message_injector.ex` to propagate a dedicated `interaction_id` alongside workspace and team correlation metadata.
 - [ ] T013 [P] Update `apps/jido_murmur/test/jido_murmur/integration/message_flow_test.exs`, `apps/jido_murmur/test/jido_murmur/integration/jido_interplay_test.exs`, and `apps/jido_murmur/test/jido_murmur/tell_action_test.exs` to verify multi-agent fan-out remains filterable and causally linked without collapsing trace boundaries.
+
+### P1 — Phoenix Message Rendering Contract
+
+- [ ] T014 Modify `apps/jido_murmur/lib/jido_murmur/observability/store.ex` and `apps/jido_murmur/lib/jido_murmur/telemetry/req_llm_tracer.ex` so Phoenix renders message-oriented input and output views for LLM spans instead of only plain text fields.
+- [ ] T015 [P] Update `apps/jido_murmur/test/jido_murmur/telemetry/req_llm_tracer_test.exs` and `apps/jido_murmur/test/jido_murmur/integration/jido_interplay_test.exs` to verify system, user, assistant, assistant-tool-call, and tool-role messages survive end to end in the exported span attributes.
 
 ## Completion Criteria
 

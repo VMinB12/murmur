@@ -45,3 +45,19 @@ No open questions at this time.
 **Date**: 2026-04-02
 
 **Rationale**: This keeps local debugging high-fidelity while making non-development environments opt in deliberately when the extra visibility is worth the sensitivity trade-off.
+
+### Q6: Where should full conversation structure live in the exported traces?
+
+**Decision**: Root agent-turn spans may remain summary-oriented, but LLM child spans are the canonical place for full ordered input conversations and structured assistant output messages.
+
+**Date**: 2026-04-03
+
+**Rationale**: The Phoenix UI renders message-oriented views from LLM span attributes, not from a generic turn-summary text field. Keeping the root span compact avoids duplicating long conversations while making the detailed LLM spans the place where developers inspect system, user, assistant, tool, and tool-call structure.
+
+### Q7: Should assistant output be exported as a message even when the runtime mainly accumulates plain streamed text?
+
+**Decision**: Yes. The implementation must materialize a structured assistant output message for every completed LLM span, including tool-call metadata when present.
+
+**Date**: 2026-04-03
+
+**Rationale**: Text-only `output.value` is not enough for the Phoenix trace view. Developers need to inspect the assistant reply in the same structural format as the model conversation, and tool-calling responses need their tool calls preserved as output-message data rather than flattened away.

@@ -8,11 +8,11 @@
 
 **Independent test**: Send one message to an idle agent that performs at least one tool call; the observability backend shows exactly one new trace for that turn, with one root turn span and nested child spans for all LLM and tool work.
 
-### US-2: Preserve full developer-visible inputs and outputs (Priority: P1)
+### US-2: Preserve full developer-visible input conversations and assistant outputs (Priority: P1)
 
-**As a** developer diagnosing bad agent behavior, **I want** traces to include the exact request and response payloads the runtime used, plus token, latency, and error data, **so that** I can understand what the model and tools actually saw and returned.
+**As a** developer diagnosing bad agent behavior, **I want** traces to include the exact ordered input conversation the runtime sent to the model and the structured assistant message the runtime received back, plus token, latency, and error data, **so that** I can understand what the model and tools actually saw and returned.
 
-**Independent test**: Run a turn with a prompt, a streamed or non-streamed model response, and a tool call; the trace data exposes the effective LLM input messages, assistant output, tool arguments, tool result, usage, duration, and any errors.
+**Independent test**: Run a turn with system instructions, user messages, prior assistant messages with tool calls, tool messages, and a streamed or non-streamed model response; the Phoenix trace view exposes the ordered LLM input conversation and a structured assistant output message with any tool calls, along with usage, duration, and error data.
 
 ### US-3: Keep steering messages inside the active turn (Priority: P1)
 
@@ -43,7 +43,11 @@
 - [ ] Each root trace represents exactly one executed react loop, not each individual inbound message.
 - [ ] If multiple pending messages are drained and processed in one loop, they appear within the same root trace.
 - [ ] The root trace exposes the executing agent identity and enough context to determine which conversation or session it belongs to.
-- [ ] Every LLM call executed during the loop appears as a child span with the effective input messages sent to the model, the returned output available to the runtime, latency, usage, finish state, and error details when applicable.
+- [ ] Every LLM call executed during the loop appears as a visible child span beneath the root turn span, with the effective input conversation sent to the model, the returned assistant output available to the runtime, latency, usage, finish state, and error details when applicable.
+- [ ] The effective LLM input is preserved as an ordered message conversation rather than only a flattened `input.value` string, including system messages, user messages, assistant messages, assistant tool calls, and tool-role messages when they were part of the model input.
+- [ ] The LLM output is preserved as a structured assistant message rather than only a flattened `output.value` string.
+- [ ] When the assistant output contains tool calls, those tool calls are visible as assistant-message tool call data in Phoenix.
+- [ ] Tool-role messages remain visible inside subsequent LLM input conversations rather than being collapsed into plain text summaries.
 - [ ] Streamed LLM responses expose the accumulated assistant output content in traces instead of only a byte-count or placeholder summary.
 - [ ] Every tool execution appears as a child span with tool identity, input, output, duration, retries or timeout state, and errors when applicable.
 - [ ] Steering messages injected while an agent is already running do not create a new root trace.
@@ -52,7 +56,7 @@
 - [ ] Cross-agent work started by another agent includes enough causation metadata to identify the originating agent and originating trace or interaction.
 - [ ] Multiple traces belonging to the same long-lived agent conversation share one stable session identifier.
 - [ ] Team or workspace correlation metadata is attached consistently enough for developers to filter related traces across agents.
-- [ ] The resulting trace and session model renders correctly in Arize Phoenix's trace-oriented and session-oriented views.
+- [ ] The resulting trace and session model renders correctly in Arize Phoenix's trace-oriented and session-oriented views, including Phoenix's message-oriented input and output rendering for LLM spans.
 - [ ] The observability model avoids duplicate traces for the same react loop when multiple instrumentation layers observe the same underlying work.
 - [ ] Developers can inspect exact input and output content by default in development-oriented environments, with any redaction or suppression behavior being explicit and configurable.
 
@@ -62,7 +66,7 @@
 
 - A Murmur-owned observability model for agent turns, LLM calls, tool calls, injected messages, and errors
 - Clear runtime semantics for spans, traces, sessions, and cross-agent correlation
-- Trace data that supports deep debugging of agent input, output, token usage, latency, and failures
+- Trace data that supports deep debugging of agent input conversations, assistant outputs, token usage, latency, and failures
 - Compatibility with Arize Phoenix trace and session views
 - Replacement of the current AgentObs-based tracing path where needed to achieve the desired runtime semantics
 

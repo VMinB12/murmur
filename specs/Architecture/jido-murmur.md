@@ -95,9 +95,10 @@ All plugins use `Jido.Plugin`, declaration-ordered:
 
 ### Observability
 
-- `ObsTracer` — Custom `Jido.Observe.Tracer` enriching spans with workspace/agent identity
-- `ObsTracer.Cache` — ETS lookup for agent_id → (workspace_id, display_name)
-- `ReqLLMTracer` — Telemetry integration for LLM calls
+- See [observability.md](observability.md) for the current observability model.
+- `Runner` owns root turn boundaries and exports discussion-scoped `session.id` values.
+- `ConversationCache` keeps direct chat grouped into one active discussion until inactivity timeout rollover.
+- `ReqLLMTracer` feeds detailed LLM telemetry into Murmur-owned span state.
 
 ### ETS Tables (owned by TableOwner GenServer)
 
@@ -105,7 +106,7 @@ All plugins use `Jido.Plugin`, declaration-ordered:
 |-------|---------|
 | `:jido_murmur_pending_messages` | Message queue for active agents |
 | `:jido_murmur_active_runners` | Track active drain-loop sessions |
-| `ObsCache` | Agent identity metadata for tracer |
+| `:jido_murmur_obs_conversations` | Active direct-chat discussion id per agent session |
 
 ## Data Models
 

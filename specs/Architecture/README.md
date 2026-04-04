@@ -66,6 +66,7 @@ Murmur is a real-time multi-agent chat platform built as an Elixir/Phoenix umbre
 ## Sub-documents
 
 - [ecosystem.md](ecosystem.md) — How packages compose into a full application
+- [observability.md](observability.md) — Trace boundaries, Phoenix session grouping, discussion lifecycle, and cross-agent correlation
 - [jido-murmur.md](jido-murmur.md) — Core backend: Runner, Storage, Schemas, Plugins
 - [jido-murmur-web.md](jido-murmur-web.md) — LiveView component library
 - [jido-artifacts.md](jido-artifacts.md) — Artifact emission and management system

@@ -6,7 +6,7 @@
 
 | Metric | Value |
 |--------|-------|
-| Active tickets | 2 |
+| Active tickets | 4 |
 | Last updated | 2026-04-04 |
 
 ## Active Tickets
@@ -14,7 +14,9 @@
 | # | Title | Status | Owner |
 |---|-------|--------|-------|
 | 009 | [Data Contract Enforcement](tickets/009-data-contract-enforcement/) | specifying | — |
-| 011 | [Frontend Architecture Review](tickets/011-frontend-architecture-review/) | research | — |
+| 011 | [Frontend Architecture Review](tickets/011-frontend-architecture-review/) | specifying | — |
+| 012 | [Native ReAct Steering Adoption](tickets/012-native-react-steering-adoption/) | specifying | — |
+| 013 | [Agent-Centric Phoenix Sessions](tickets/013-agent-centric-phoenix-sessions/) | specifying | — |
 
 ## Recently Completed
 

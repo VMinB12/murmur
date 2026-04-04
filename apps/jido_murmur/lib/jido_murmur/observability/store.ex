@@ -1,5 +1,5 @@
 defmodule JidoMurmur.Observability.Store do
-  @moduledoc false
+  @moduledoc "Internal observability span storage and lifecycle helpers."
 
   require OpenTelemetry.Tracer, as: Tracer
 
@@ -61,7 +61,7 @@ defmodule JidoMurmur.Observability.Store do
 
       span_attrs =
         %{"murmur.injected_message_count" => Map.get(turn, :injected_message_count, 0)}
-        |> maybe_put("output.value", format_output(response), Observability.capture_content?())
+        |> maybe_put("output.value", Observability.captured_content(format_output(response)))
 
       Span.set_attributes(turn.span_ctx, span_attrs)
 
@@ -111,16 +111,15 @@ defmodule JidoMurmur.Observability.Store do
           streamed_thinking: "",
           finish_reason: nil,
           fallback_output_attrs: %{},
-          error: nil,
-          completed?: false
+          error: nil
         }
 
         :ets.insert(@llm_span_table, {call_id, record})
-    enqueue_pending_llm_call(metadata[:request_id], call_id)
-    enqueue_pending_agent_llm_call(turn, call_id)
-    enqueue_pending_global_llm_call(call_id)
+        enqueue_pending_llm_call(metadata[:request_id], call_id)
+        enqueue_pending_agent_llm_call(turn, call_id)
+        enqueue_pending_global_llm_call(call_id)
         apply_prepared_llm_input(call_id)
-    adopt_pending_req_llm_start(call_id, turn)
+        adopt_pending_req_llm_start(call_id, turn)
         %{kind: :llm, call_id: call_id}
 
       _ ->
@@ -144,8 +143,7 @@ defmodule JidoMurmur.Observability.Store do
           span_ctx: span_ctx,
           metadata: metadata,
           duration_ms: nil,
-          error: nil,
-          completed?: false
+          error: nil
         }
 
         :ets.insert(@tool_span_table, {call_id, record})
@@ -158,7 +156,7 @@ defmodule JidoMurmur.Observability.Store do
 
   def mark_llm_span_complete(call_id, measurements) do
     update_span(@llm_span_table, call_id, fn record ->
-      %{record | duration_ms: duration_ms(measurements), completed?: true}
+      %{record | duration_ms: duration_ms(measurements)}
     end)
 
     :ok
@@ -166,7 +164,7 @@ defmodule JidoMurmur.Observability.Store do
 
   def mark_llm_span_error(call_id, kind, reason) do
     update_span(@llm_span_table, call_id, fn record ->
-      %{record | error: %{kind: kind, reason: reason}, completed?: true}
+      %{record | error: %{kind: kind, reason: reason}}
     end)
 
     :ok
@@ -174,7 +172,7 @@ defmodule JidoMurmur.Observability.Store do
 
   def mark_tool_span_complete(call_id, measurements) do
     update_span(@tool_span_table, call_id, fn record ->
-      %{record | duration_ms: duration_ms(measurements), completed?: true}
+      %{record | duration_ms: duration_ms(measurements)}
     end)
 
     :ok
@@ -182,7 +180,7 @@ defmodule JidoMurmur.Observability.Store do
 
   def mark_tool_span_error(call_id, kind, reason) do
     update_span(@tool_span_table, call_id, fn record ->
-      %{record | error: %{kind: kind, reason: reason}, completed?: true}
+      %{record | error: %{kind: kind, reason: reason}}
     end)
 
     :ok
@@ -222,7 +220,7 @@ defmodule JidoMurmur.Observability.Store do
     with request_id when is_binary(request_id) <- metadata[:request_id],
          call_id when is_binary(call_id) <- lookup_req_llm_call(request_id) do
       update_span(@llm_span_table, call_id, fn record ->
-        %{record | error: %{kind: :error, reason: metadata[:error]}, completed?: true}
+        %{record | error: %{kind: :error, reason: metadata[:error]}}
       end)
 
       :ets.delete(@req_llm_lookup_table, request_id)
@@ -264,7 +262,7 @@ defmodule JidoMurmur.Observability.Store do
           }
           |> maybe_put("murmur.sender_name", Map.get(envelope, :sender_name))
           |> maybe_put("murmur.sender_trace_id", Map.get(envelope, :sender_trace_id))
-          |> maybe_put("murmur.message.content", Map.get(envelope, :content), Observability.capture_content?())
+          |> maybe_put("murmur.message.content", Observability.captured_content(Map.get(envelope, :content)))
 
         Span.add_event(turn.span_ctx, "murmur.injected_message", attrs)
       end)
@@ -308,7 +306,7 @@ defmodule JidoMurmur.Observability.Store do
       attrs =
         %{}
         |> maybe_put("tool.name", info.name)
-        |> maybe_put("input.value", encode_input(info), Observability.capture_content?())
+        |> maybe_put("input.value", Observability.captured_content(encode_input(info)))
 
       Span.set_attributes(record.span_ctx, attrs)
     end
@@ -353,8 +351,11 @@ defmodule JidoMurmur.Observability.Store do
       |> Map.merge(Map.get(record, :input_attrs, %{}))
       |> Map.merge(Map.get(record, :fallback_output_attrs, %{}))
       |> Map.merge(ReqLLMTracer.flatten_output_messages([output_message]))
-      |> maybe_put("output.value", output_text, Observability.capture_content?())
-      |> maybe_put("murmur.llm.thinking_content", pick_thinking_text(turn, record), Observability.capture_content?())
+      |> maybe_put("output.value", Observability.captured_content(output_text))
+      |> maybe_put(
+        "murmur.llm.thinking_content",
+        Observability.captured_content(pick_thinking_text(turn, record))
+      )
       |> maybe_put("gen_ai.response.finish_reasons", finish_reason_string(record.finish_reason))
       |> maybe_put("llm.latency_ms", record.duration_ms)
       |> Map.merge(usage_attrs(usage))
@@ -383,8 +384,8 @@ defmodule JidoMurmur.Observability.Store do
 
       attrs =
         %{}
-        |> maybe_put("input.value", encode_input(input_info), Observability.capture_content?())
-        |> maybe_put("output.value", Turn.format_tool_result_content(result), Observability.capture_content?())
+        |> maybe_put("input.value", Observability.captured_content(encode_input(input_info)))
+        |> maybe_put("output.value", Observability.captured_content(Turn.format_tool_result_content(result)))
         |> maybe_put("llm.latency_ms", record.duration_ms)
 
       case result do
@@ -440,7 +441,7 @@ defmodule JidoMurmur.Observability.Store do
       "murmur.interaction_id" => turn.interaction_id,
       "murmur.message_count" => turn.message_count
     }
-    |> maybe_put("input.value", turn.input_value, Observability.capture_content?())
+    |> maybe_put("input.value", Observability.captured_content(turn.input_value))
     |> maybe_put("murmur.triggered_by_trace_id", turn.triggered_by_trace_id)
     |> maybe_put("murmur.sender_name", turn.sender_name)
   end
@@ -567,16 +568,14 @@ defmodule JidoMurmur.Observability.Store do
     match?([{^call_id, _record}], :ets.lookup(@llm_span_table, call_id))
   end
 
-  defp input_attrs_for_messages(messages) when is_list(messages) and messages != [] do
+  defp input_attrs_for_messages([_ | _] = messages) do
     ReqLLMTracer.flatten_input_messages(messages)
-    |> maybe_put("input.value", ReqLLMTracer.extract_input_value(messages), Observability.capture_content?())
+    |> maybe_put("input.value", Observability.captured_content(ReqLLMTracer.extract_input_value(messages)))
   end
 
   defp input_attrs_for_messages(_messages), do: %{}
 
   defp merge_input_attrs(input_attrs, call_id, merge_order \\ :req_llm)
-
-  defp merge_input_attrs(input_attrs, _call_id, _merge_order) when input_attrs == %{}, do: :ok
 
   defp merge_input_attrs(input_attrs, call_id, :req_llm) do
     update_span(@llm_span_table, call_id, fn record ->
@@ -591,10 +590,12 @@ defmodule JidoMurmur.Observability.Store do
   end
 
   defp ensure_table(table) do
-    if :ets.whereis(table) == :undefined do
-      :ets.new(table, [:named_table, :public, :set, read_concurrency: true])
-    else
-      table
+    case :ets.whereis(table) do
+      :undefined ->
+        :ets.new(table, [:named_table, :public, :set, read_concurrency: true])
+
+      _ ->
+        table
     end
   end
 
@@ -612,11 +613,15 @@ defmodule JidoMurmur.Observability.Store do
 
   defp maybe_store_tool_inputs(tool_calls) when is_list(tool_calls) do
     Enum.each(tool_calls, fn tool_call ->
-      if is_binary(tool_call[:id]) do
-        :ets.insert(
-          @tool_input_table,
-          {tool_call[:id], %{id: tool_call[:id], name: tool_call[:name], arguments: tool_call[:arguments]}}
-        )
+      case tool_call[:id] do
+        tool_call_id when is_binary(tool_call_id) ->
+          :ets.insert(
+            @tool_input_table,
+            {tool_call_id, %{id: tool_call_id, name: tool_call[:name], arguments: tool_call[:arguments]}}
+          )
+
+        _ ->
+          :ok
       end
     end)
   end
@@ -681,11 +686,15 @@ defmodule JidoMurmur.Observability.Store do
         pop_pending_global_llm_call() ||
         lookup_req_llm_call(request_id)
 
-    if is_binary(call_id) do
-      :ets.insert(@req_llm_lookup_table, {request_id, call_id})
-      drop_pending_llm_call(request_id, call_id)
-      drop_pending_agent_llm_call(agent_context, call_id)
-      drop_pending_global_llm_call(call_id)
+    case call_id do
+      resolved_call_id when is_binary(resolved_call_id) ->
+        :ets.insert(@req_llm_lookup_table, {request_id, resolved_call_id})
+        drop_pending_llm_call(request_id, resolved_call_id)
+        drop_pending_agent_llm_call(agent_context, resolved_call_id)
+        drop_pending_global_llm_call(resolved_call_id)
+
+      _ ->
+        :ok
     end
 
     call_id
@@ -697,10 +706,12 @@ defmodule JidoMurmur.Observability.Store do
   defp pop_pending_llm_call(request_id) do
     case :ets.lookup(@pending_llm_call_table, request_id) do
       [{^request_id, [call_id | rest]}] ->
-        if rest == [] do
-          :ets.delete(@pending_llm_call_table, request_id)
-        else
-          :ets.insert(@pending_llm_call_table, {request_id, rest})
+        case rest do
+          [] ->
+            :ets.delete(@pending_llm_call_table, request_id)
+
+          _ ->
+            :ets.insert(@pending_llm_call_table, {request_id, rest})
         end
 
         call_id
@@ -715,10 +726,12 @@ defmodule JidoMurmur.Observability.Store do
       [{^request_id, call_ids}] ->
         remaining = List.delete(call_ids, call_id)
 
-        if remaining == [] do
-          :ets.delete(@pending_llm_call_table, request_id)
-        else
-          :ets.insert(@pending_llm_call_table, {request_id, remaining})
+        case remaining do
+          [] ->
+            :ets.delete(@pending_llm_call_table, request_id)
+
+          _ ->
+            :ets.insert(@pending_llm_call_table, {request_id, remaining})
         end
 
       [] ->
@@ -729,10 +742,12 @@ defmodule JidoMurmur.Observability.Store do
   defp pop_pending_agent_llm_call(%{agent_id: agent_id}) when is_binary(agent_id) do
     case :ets.lookup(@pending_agent_llm_call_table, agent_id) do
       [{^agent_id, [call_id | rest]}] ->
-        if rest == [] do
-          :ets.delete(@pending_agent_llm_call_table, agent_id)
-        else
-          :ets.insert(@pending_agent_llm_call_table, {agent_id, rest})
+        case rest do
+          [] ->
+            :ets.delete(@pending_agent_llm_call_table, agent_id)
+
+          _ ->
+            :ets.insert(@pending_agent_llm_call_table, {agent_id, rest})
         end
 
         call_id
@@ -749,10 +764,12 @@ defmodule JidoMurmur.Observability.Store do
       [{^agent_id, call_ids}] ->
         remaining = List.delete(call_ids, call_id)
 
-        if remaining == [] do
-          :ets.delete(@pending_agent_llm_call_table, agent_id)
-        else
-          :ets.insert(@pending_agent_llm_call_table, {agent_id, remaining})
+        case remaining do
+          [] ->
+            :ets.delete(@pending_agent_llm_call_table, agent_id)
+
+          _ ->
+            :ets.insert(@pending_agent_llm_call_table, {agent_id, remaining})
         end
 
       [] ->
@@ -765,10 +782,12 @@ defmodule JidoMurmur.Observability.Store do
   defp pop_pending_global_llm_call do
     case :ets.lookup(@pending_global_llm_call_table, :queue) do
       [{:queue, [call_id | rest]}] ->
-        if rest == [] do
-          :ets.delete(@pending_global_llm_call_table, :queue)
-        else
-          :ets.insert(@pending_global_llm_call_table, {:queue, rest})
+        case rest do
+          [] ->
+            :ets.delete(@pending_global_llm_call_table, :queue)
+
+          _ ->
+            :ets.insert(@pending_global_llm_call_table, {:queue, rest})
         end
 
         call_id
@@ -783,18 +802,18 @@ defmodule JidoMurmur.Observability.Store do
       [{:queue, call_ids}] ->
         remaining = List.delete(call_ids, call_id)
 
-        if remaining == [] do
-          :ets.delete(@pending_global_llm_call_table, :queue)
-        else
-          :ets.insert(@pending_global_llm_call_table, {:queue, remaining})
+        case remaining do
+          [] ->
+            :ets.delete(@pending_global_llm_call_table, :queue)
+
+          _ ->
+            :ets.insert(@pending_global_llm_call_table, {:queue, remaining})
         end
 
       [] ->
         :ok
     end
   end
-
-  defp drop_pending_global_llm_call(_call_id), do: :ok
 
   defp enqueue_pending_req_llm_start(agent_context, metadata) when is_map(metadata) do
     pending =
@@ -810,10 +829,12 @@ defmodule JidoMurmur.Observability.Store do
   defp adopt_pending_req_llm_start(call_id, turn) when is_binary(call_id) do
     case pop_pending_req_llm_start(turn && turn.agent_id) do
       %{metadata: metadata} when is_map(metadata) ->
-        request_id = metadata[:request_id]
+        case metadata[:request_id] do
+          request_id when is_binary(request_id) ->
+            :ets.insert(@req_llm_lookup_table, {request_id, call_id})
 
-        if is_binary(request_id) do
-          :ets.insert(@req_llm_lookup_table, {request_id, call_id})
+          _ ->
+            :ok
         end
 
         drop_pending_global_llm_call(call_id)
@@ -826,13 +847,15 @@ defmodule JidoMurmur.Observability.Store do
 
   defp pop_pending_req_llm_start(agent_id) do
     case :ets.lookup(@pending_req_llm_start_table, :queue) do
-      [{:queue, entries}] when is_list(entries) and entries != [] ->
+      [{:queue, [_ | _] = entries}] ->
         {entry, remaining} = take_pending_req_llm_start(entries, agent_id)
 
-        if remaining == [] do
-          :ets.delete(@pending_req_llm_start_table, :queue)
-        else
-          :ets.insert(@pending_req_llm_start_table, {:queue, remaining})
+        case remaining do
+          [] ->
+            :ets.delete(@pending_req_llm_start_table, :queue)
+
+          _ ->
+            :ets.insert(@pending_req_llm_start_table, {:queue, remaining})
         end
 
         entry
@@ -860,21 +883,19 @@ defmodule JidoMurmur.Observability.Store do
   defp normalize_usage(usage) when is_map(usage), do: Map.new(usage)
   defp normalize_usage(_), do: nil
 
-  defp pick_output_text(turn, record) do
-    cond do
-      is_binary(turn.text) and turn.text != "" -> turn.text
-      is_binary(record.streamed_text) and record.streamed_text != "" -> record.streamed_text
-      true -> nil
-    end
-  end
+  defp pick_output_text(%{text: text}, _record) when is_binary(text) and byte_size(text) > 0, do: text
+  defp pick_output_text(_turn, %{streamed_text: text}) when is_binary(text) and byte_size(text) > 0, do: text
+  defp pick_output_text(_turn, _record), do: nil
 
-  defp pick_thinking_text(turn, record) do
-    cond do
-      is_binary(turn.thinking_content) and turn.thinking_content != "" -> turn.thinking_content
-      is_binary(record.streamed_thinking) and record.streamed_thinking != "" -> record.streamed_thinking
-      true -> nil
-    end
-  end
+  defp pick_thinking_text(%{thinking_content: text}, _record)
+       when is_binary(text) and byte_size(text) > 0,
+       do: text
+
+  defp pick_thinking_text(_turn, %{streamed_thinking: text})
+       when is_binary(text) and byte_size(text) > 0,
+       do: text
+
+  defp pick_thinking_text(_turn, _record), do: nil
 
   defp encode_input(nil), do: nil
   defp encode_input(%{arguments: arguments}) when is_binary(arguments), do: arguments
@@ -901,9 +922,6 @@ defmodule JidoMurmur.Observability.Store do
 
   defp maybe_put(map, _key, nil), do: map
   defp maybe_put(map, key, value), do: Map.put(map, key, value)
-  defp maybe_put(map, _key, _value, false), do: map
-  defp maybe_put(map, _key, nil, _enabled), do: map
-  defp maybe_put(map, key, value, true), do: Map.put(map, key, value)
 
   defp elem_or_nil(nil, _index), do: nil
   defp elem_or_nil(tuple, index), do: elem(tuple, index)

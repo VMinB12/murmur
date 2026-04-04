@@ -24,7 +24,7 @@ defmodule JidoMurmur.Observability do
 
   @spec enabled?() :: boolean()
   def enabled? do
-    case Process.get(@enabled_override_key, :__unset__) do
+    case runtime_override(@enabled_override_key) do
       false -> false
       true -> true
       :__unset__ -> truthy_observability_config(:enabled, true)
@@ -33,11 +33,15 @@ defmodule JidoMurmur.Observability do
 
   @spec capture_content?() :: boolean()
   def capture_content? do
-    case Process.get(@capture_content_override_key, :__unset__) do
+    case runtime_override(@capture_content_override_key) do
       false -> false
       true -> true
       :__unset__ -> truthy_observability_config(:capture_content, true)
     end
+  end
+
+  def captured_content(value) do
+    if capture_content?(), do: value, else: nil
   end
 
   def next_interaction_id, do: Uniq.UUID.uuid7()
@@ -93,4 +97,6 @@ defmodule JidoMurmur.Observability do
       _ -> true
     end
   end
+
+  defp runtime_override(key), do: :persistent_term.get(key, :__unset__)
 end

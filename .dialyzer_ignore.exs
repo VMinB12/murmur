@@ -15,6 +15,5 @@
   {Path.expand("deps/jido_ai/lib/jido_ai/agent.ex"),
    "Call to missing or private function Jido.AI.Reasoning.ReAct.steer/3."},
   {Path.expand("deps/jido_ai/lib/jido_ai/agent.ex"),
-   "Call to missing or private function Jido.AI.Reasoning.ReAct.inject/3."},
-  {"lib/jido_murmur/observability/store.ex", "The pattern can never match the type true."}
+   "Call to missing or private function Jido.AI.Reasoning.ReAct.inject/3."}
 ]

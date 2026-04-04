@@ -25,11 +25,63 @@ import {LiveSocket} from "phoenix_live_view"
 import {hooks as colocatedHooks} from "phoenix-colocated/murmur"
 import topbar from "../vendor/topbar"
 
+const ChatInput = {
+  mounted() {
+    this.form = this.el.closest("form")
+
+    this.el.addEventListener("input", () => this.resize())
+    this.el.addEventListener("keydown", e => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault()
+
+        if (this.el.value.trim() !== "") {
+          this.form.requestSubmit()
+        }
+      }
+    })
+
+    this.form.addEventListener("submit", () => {
+      requestAnimationFrame(() => {
+        this.form.reset()
+        this.resize()
+      })
+    })
+
+    this.resize()
+  },
+  resize() {
+    this.el.style.height = "auto"
+    const max = 6 * parseFloat(getComputedStyle(this.el).lineHeight || 20)
+    this.el.style.height = `${Math.min(this.el.scrollHeight, max)}px`
+  },
+}
+
+const hooks = {
+  AutoScroll: {
+    mounted() {
+      this.scrollToBottom()
+      this.observer = new MutationObserver(() => this.scrollToBottom())
+      this.observer.observe(this.el, {childList: true, subtree: true})
+    },
+    updated() {
+      this.scrollToBottom()
+    },
+    destroyed() {
+      if (this.observer) this.observer.disconnect()
+    },
+    scrollToBottom() {
+      this.el.scrollTop = this.el.scrollHeight
+    },
+  },
+  ChatInput,
+  "JidoMurmurWeb.Components.MessageInput.ChatInput": ChatInput,
+}
+
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
   params: {_csrf_token: csrfToken},
-  hooks: {...colocatedHooks},
+  hooks: {...hooks, ...colocatedHooks},
 })
 
 // Show progress bar on live navigation and form submits

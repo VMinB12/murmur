@@ -41,7 +41,7 @@ Three pre-built profiles in `Murmur.Agents.Profiles`:
 
 ## Artifact Renderers
 
-Custom artifact rendering in `MurmurWeb.Components.Artifacts`:
+Demo-owned artifact rendering is registered in `MurmurWeb.Artifacts.Registry` and surfaced through `MurmurWeb.Components.Artifacts`:
 
 | Artifact Type | Renderer | Display |
 |---------------|----------|---------|
@@ -49,6 +49,8 @@ Custom artifact rendering in `MurmurWeb.Components.Artifacts`:
 | `displayed_paper` | `PdfViewer` | Embedded PDF viewer |
 | `sql_results` | `SqlResults` | Paginated query results table |
 | `*` | `Generic` | Fallback for unrecognized types |
+
+Artifact-specific follow-up behavior lives in `MurmurWeb.Artifacts.Actions`, which currently handles SQL re-execution without pushing `jido_sql` assumptions down into `jido_murmur_web`.
 
 ## Key Modules
 
@@ -61,16 +63,25 @@ Custom artifact rendering in `MurmurWeb.Components.Artifacts`:
 | `MurmurWeb.Router` | Route definitions |
 | `WorkspaceLive` | Multi-agent chat orchestrator |
 | `WorkspaceListLive` | Workspace CRUD |
+| `MurmurWeb.Live.WorkspaceState` | Workspace-only state projection and persistence helpers |
+| `MurmurWeb.Components.Workspace.*` | Demo-owned split/unified workspace presentation modules |
 
 ## WorkspaceLive Architecture
 
 The main LiveView handles:
 - Agent lifecycle (`add_agent`, `clear_team`, `ensure_agent_started`)
 - Message streaming from agents via PubSub subscriptions
-- Artifact panel dispatching and activation
+- Artifact panel activation and delegation into demo-owned artifact actions
 - Task board toggle and creation
 - Signal handling: `LLMResponse`, `MessageReceived`, `TaskCreated`, `TaskUpdated`
 - Split-view and unified-view chat UI modes
+
+`WorkspaceLive` now delegates:
+
+- Reusable chat and artifact shell rendering to `jido_murmur_web`
+- Demo-specific workspace presentation to `MurmurWeb.Components.Workspace.Header`, `SplitView`, and `UnifiedView`
+- Artifact-specific rendering and actions to `MurmurWeb.Components.Artifacts`, `MurmurWeb.Artifacts.Registry`, and `MurmurWeb.Artifacts.Actions`
+- Non-rendering message and artifact loading logic to `MurmurWeb.Live.WorkspaceState`
 
 ## Dependencies
 

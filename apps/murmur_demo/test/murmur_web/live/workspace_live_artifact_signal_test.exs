@@ -134,5 +134,30 @@ defmodule MurmurWeb.WorkspaceLiveArtifactSignalTest do
       assert html =~ "2 rows"
       assert html =~ "5 rows"
     end
+
+    test "unknown artifact types fall back to the generic renderer", %{
+      conn: conn,
+      workspace: workspace,
+      session: session
+    } do
+      {:ok, view, _html} = live(conn, ~p"/workspaces/#{workspace.id}")
+
+      metadata = %{"status" => "ok", "count" => 2}
+
+      Phoenix.PubSub.broadcast!(
+        Murmur.PubSub,
+        Topics.agent_artifacts(workspace.id, session.id),
+        artifact_signal(session.id, "metadata", envelope(metadata, session.id))
+      )
+
+      assert has_element?(view, ~s|button[phx-value-name="metadata"]|, "metadata")
+
+      html = render(view)
+      assert html =~ "metadata"
+      assert html =~ "status"
+      assert html =~ "ok"
+      assert html =~ "count"
+      assert html =~ "2"
+    end
   end
 end

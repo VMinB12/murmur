@@ -3,6 +3,7 @@ defmodule JidoMurmurWeb.Components.ChatTest do
 
   import Phoenix.LiveViewTest
 
+  alias JidoMurmur.UITurn.ToolCall
   alias JidoMurmurWeb.Components.ChatMessage
   alias JidoMurmurWeb.Components.ChatStream
   alias JidoMurmurWeb.Components.MessageInput
@@ -21,6 +22,7 @@ defmodule JidoMurmurWeb.Components.ChatTest do
       assert html =~ "Hello, agent!"
       assert html =~ "You"
       assert html =~ "bg-primary"
+      assert html =~ "chat-bubble"
       assert html =~ "msg-msg-1"
     end
 
@@ -36,6 +38,7 @@ defmodule JidoMurmurWeb.Components.ChatTest do
 
       assert html =~ "I can help with that."
       assert html =~ "bg-base-200"
+      assert html =~ "chat-start"
       assert html =~ "msg-msg-2"
     end
 
@@ -53,6 +56,7 @@ defmodule JidoMurmurWeb.Components.ChatTest do
       assert html =~ "Let me analyze this..."
       assert html =~ "Thinking..."
       assert html =~ "hero-light-bulb"
+      assert html =~ "collapse"
     end
 
     test "renders tool calls" do
@@ -73,6 +77,30 @@ defmodule JidoMurmurWeb.Components.ChatTest do
       assert html =~ "Completed"
       assert html =~ "add_task"
       assert html =~ "Error"
+    end
+
+    test "renders UITurn tool call structs without Access errors" do
+      message = %{
+        id: "msg-struct-tool-call",
+        role: "assistant",
+        content: "",
+        sender_name: nil,
+        tool_calls: [
+          %ToolCall{
+            id: "call-1",
+            name: "tell",
+            args: %{"target_agent" => "bob", "message" => "Hi"},
+            result: ~s({"ok":true}),
+            status: :completed
+          }
+        ]
+      }
+
+      html = render_component(&ChatMessage.chat_message/1, message: message)
+
+      assert html =~ "tell"
+      assert html =~ "target_agent"
+      assert html =~ ~s({&quot;ok&quot;:true})
     end
 
     test "renders usage tooltip" do
@@ -147,6 +175,7 @@ defmodule JidoMurmurWeb.Components.ChatTest do
       assert html =~ "Hello world"
       assert html =~ "animate-pulse"
       assert html =~ "assistant"
+      assert html =~ "chat-bubble"
     end
 
     test "renders thinking state" do
@@ -173,6 +202,28 @@ defmodule JidoMurmurWeb.Components.ChatTest do
       assert html =~ "search_papers"
       assert html =~ "Completed"
       assert html =~ "3 results"
+    end
+
+    test "renders UITurn tool call structs in streaming state" do
+      stream = %{
+        content: "",
+        thinking: "",
+        tool_calls: [
+          %ToolCall{
+            id: "call-2",
+            name: "tell",
+            args: %{"target_agent" => "bob", "message" => "Hi"},
+            result: nil,
+            status: :running
+          }
+        ]
+      }
+
+      html = render_component(&ChatStream.chat_stream/1, stream: stream)
+
+      assert html =~ "tell"
+      assert html =~ "target_agent"
+      assert html =~ "Running"
     end
 
     test "renders nothing when stream is empty" do

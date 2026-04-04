@@ -14,7 +14,7 @@ if Code.ensure_loaded?(Igniter) do
 
       * `chat` — ChatMessage, ChatStream, MessageInput, StreamingIndicator
       * `workspace` — WorkspaceList, AgentSelector, AgentHeader
-      * `artifacts` — ArtifactPanel (includes Generic, PaperList, PdfViewer sub-renderers)
+      * `artifacts` — ArtifactPanel with Generic fallback renderer
       * `all` — All components from all groups
 
     Components are copied into `lib/<app>_web/components/jido_murmur/` with your
@@ -28,9 +28,21 @@ if Code.ensure_loaded?(Igniter) do
     import Mix.Generator
 
     @component_groups %{
-      "chat" => ~w(chat_message chat_stream message_input streaming_indicator),
-      "workspace" => ~w(workspace_list agent_selector agent_header),
-      "artifacts" => ~w(artifact_panel)
+      "chat" => [
+        %{template: "chat_message.ex", target: "chat_message.ex"},
+        %{template: "chat_stream.ex", target: "chat_stream.ex"},
+        %{template: "message_input.ex", target: "message_input.ex"},
+        %{template: "streaming_indicator.ex", target: "streaming_indicator.ex"}
+      ],
+      "workspace" => [
+        %{template: "workspace_list.ex", target: "workspace_list.ex"},
+        %{template: "agent_selector.ex", target: "agent_selector.ex"},
+        %{template: "agent_header.ex", target: "agent_header.ex"}
+      ],
+      "artifacts" => [
+        %{template: "artifact_panel.ex", target: "artifact_panel.ex"},
+        %{template: Path.join("artifact_panel", "generic.ex"), target: Path.join("artifact_panel", "generic.ex")}
+      ]
     }
 
     @impl Mix.Task
@@ -47,12 +59,16 @@ if Code.ensure_loaded?(Igniter) do
 
       File.mkdir_p!(target_dir)
 
-      for component <- components do
-        source = template_path(component)
-        target = Path.join(target_dir, "#{component}.ex")
+      for %{template: template, target: relative_target} <- components do
+        source = template_path(template)
+        target = Path.join(target_dir, relative_target)
+
+        target
+        |> Path.dirname()
+        |> File.mkdir_p!()
 
         if File.exists?(target) do
-          Mix.shell().info("#{component}.ex already exists, skipping.")
+          Mix.shell().info("#{relative_target} already exists, skipping.")
         else
           contents = EEx.eval_file(source, assigns: %{app_module: app_module})
           create_file(target, contents)
@@ -92,7 +108,7 @@ if Code.ensure_loaded?(Igniter) do
     end
 
     defp template_path(component) do
-      Application.app_dir(:jido_murmur_web, "priv/templates/components/#{component}.ex")
+      Application.app_dir(:jido_murmur_web, Path.join("priv/templates/components", component))
     end
   end
 else

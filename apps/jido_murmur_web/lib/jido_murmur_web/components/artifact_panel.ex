@@ -3,9 +3,10 @@ defmodule JidoMurmurWeb.Components.ArtifactPanel do
   Artifact panel with tab bar and detail view.
 
   Includes a configurable renderer registry that dispatches to type-specific
-  renderer modules based on artifact name. Ships with built-in renderers for
-  `"papers"` (PaperList), `"displayed_paper"` (PdfViewer), and a generic
-  fallback for unknown types.
+  renderer modules based on artifact name. The generic package does not ship
+  domain-specific renderers; consumers provide any specialized artifact
+  renderers through the `:renderers` assign and fall back to `Generic` for
+  unknown types.
 
   ## Example
 
@@ -35,17 +36,14 @@ defmodule JidoMurmurWeb.Components.ArtifactPanel do
   import JidoMurmurWeb, only: [icon: 1]
 
   alias JidoMurmurWeb.Components.ArtifactPanel.Generic
-  alias JidoMurmurWeb.Components.ArtifactPanel.PaperList
-  alias JidoMurmurWeb.Components.ArtifactPanel.PdfViewer
-
-  @default_renderers %{
-    "papers" => PaperList,
-    "displayed_paper" => PdfViewer
-  }
 
   defp extract_data(%Envelope{data: inner}), do: inner
+  defp extract_data(data), do: data
   defp empty_artifact?(nil), do: true
   defp empty_artifact?(%Envelope{data: data}), do: data == nil or data == [] or data == %{}
+
+  defp renderer_for(%{name: name, renderers: renderers}) when is_map(renderers), do: Map.get(renderers, name)
+  defp renderer_for(_assigns), do: nil
 
   # --- Badge dispatcher ---
 
@@ -57,7 +55,7 @@ defmodule JidoMurmurWeb.Components.ArtifactPanel do
   attr :renderers, :map, default: %{}
 
   def artifact_badge(assigns) do
-    renderer = Map.get(assigns.renderers, assigns.name) || Map.get(@default_renderers, assigns.name)
+    renderer = renderer_for(assigns)
     badge_fn = if renderer, do: &renderer.badge/1, else: &Generic.badge/1
     badge_fn.(%{assigns | data: extract_data(assigns.data)})
   end
@@ -71,7 +69,7 @@ defmodule JidoMurmurWeb.Components.ArtifactPanel do
   attr :renderers, :map, default: %{}
 
   def artifact_detail(assigns) do
-    renderer = Map.get(assigns.renderers, assigns.name) || Map.get(@default_renderers, assigns.name)
+    renderer = renderer_for(assigns)
     detail_fn = if renderer, do: &renderer.detail/1, else: &Generic.detail/1
     detail_fn.(%{assigns | data: extract_data(assigns.data)})
   end

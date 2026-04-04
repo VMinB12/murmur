@@ -74,10 +74,10 @@ defmodule MurmurDemo.MixProject do
       "ecto.reset": ["ecto.drop", "ecto.setup"],
       test: ["ecto.create --quiet", "ecto.migrate --quiet", "test"],
       "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
-      "assets.build": ["compile", "tailwind murmur", "esbuild murmur"],
+      "assets.build": ["compile", "tailwind murmur_demo", "esbuild murmur_demo"],
       "assets.deploy": [
-        "tailwind murmur --minify",
-        "esbuild murmur --minify",
+        "tailwind murmur_demo --minify",
+        "esbuild murmur_demo --minify",
         "phx.digest"
       ]
     ]

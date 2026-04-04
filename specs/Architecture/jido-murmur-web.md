@@ -25,8 +25,6 @@ import JidoMurmurWeb.Components  # imports all 10 component functions
 | `WorkspaceList` | `workspace_list/1` | Sidebar navigation list of workspaces |
 | `ArtifactPanel` | `artifact_panel/1` | Tabbed side panel for artifacts with badge + detail dispatching |
 | `ArtifactPanel.Generic` | `badge/1`, `detail/1` | Fallback renderer for unknown artifact types |
-| `ArtifactPanel.PaperList` | `badge/1`, `detail/1` | arXiv paper list renderer |
-| `ArtifactPanel.PdfViewer` | `badge/1`, `detail/1` | Single PDF viewer renderer |
 
 ## Design Patterns
 
@@ -41,13 +39,18 @@ Components accept event name attributes (`on_submit`, `on_remove`) for customiza
 ### Renderer Registry (ArtifactPanel)
 
 ```elixir
-@default_renderers %{
-  "papers" => PaperList,
-  "displayed_paper" => PdfViewer
+renderers = %{
+  "custom_type" => MyAppWeb.Components.Artifacts.CustomType
 }
 ```
 
-Renderers passed via the `renderers` assign override/extend defaults. The dispatcher looks up the renderer by artifact type and delegates to `badge/1` or `detail/1`.
+`ArtifactPanel` is intentionally domain-agnostic. Consuming applications pass the renderer registry they want, and unknown artifact types fall back to `ArtifactPanel.Generic`. The shared package does not ship SQL-, arXiv-, or plugin-specific artifact assumptions.
+
+### Workspace Shell Boundaries
+
+- Shared chat primitives (`ChatMessage`, `ChatStream`, `MessageInput`, `AgentHeader`) provide the reusable interaction model and DaisyUI-aligned presentation primitives.
+- `ArtifactPanel` owns generic artifact shell concerns only: badge dispatch, detail dispatch, active artifact state, and safe fallback rendering.
+- Consumer applications are responsible for plugin-specific renderers, artifact follow-up actions, and any orchestration that depends on domain packages.
 
 ### Color Customization
 
@@ -68,7 +71,7 @@ mix jido_murmur_web.install all
 # Or selective groups:
 mix jido_murmur_web.install chat        # ChatMessage, ChatStream, MessageInput, StreamingIndicator
 mix jido_murmur_web.install workspace   # WorkspaceList, AgentSelector, AgentHeader
-mix jido_murmur_web.install artifacts   # ArtifactPanel + renderers
+mix jido_murmur_web.install artifacts   # ArtifactPanel + generic fallback renderer
 ```
 
 Uses Igniter for idempotent code generation with namespace substitution.

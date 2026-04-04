@@ -1,0 +1,112 @@
+defmodule MurmurWeb.Live.WorkspaceState do
+  @moduledoc """
+  Shared state projection and persistence helpers for the workspace UI.
+  """
+
+  alias JidoArtifacts.Envelope
+  alias JidoMurmur.Catalog
+  alias JidoMurmur.UITurn
+
+  @spec load_messages_for_session(map()) :: list()
+  def load_messages_for_session(session) do
+    pid = Murmur.Jido.whereis(session.id)
+
+    if pid do
+      case Jido.AgentServer.state(pid) do
+        {:ok, %{agent: agent}} -> project_thread(agent)
+        _ -> load_messages_from_storage(session)
+      end
+    else
+      load_messages_from_storage(session)
+    end
+  end
+
+  @spec load_artifacts_for_session(map()) :: map()
+  def load_artifacts_for_session(session) do
+    pid = Murmur.Jido.whereis(session.id)
+
+    if pid do
+      case Jido.AgentServer.state(pid) do
+        {:ok, %{agent: agent}} -> extract_artifacts(agent)
+        _ -> load_artifacts_from_storage(session)
+      end
+    else
+      load_artifacts_from_storage(session)
+    end
+  end
+
+  @spec project_thread(map()) :: list()
+  def project_thread(agent) do
+    thread = get_in_thread(agent)
+
+    if thread do
+      UITurn.project_entries(thread.entries)
+    else
+      []
+    end
+  end
+
+  @spec extract_artifacts(map()) :: map()
+  def extract_artifacts(%{state: %{artifacts: artifacts}}) when is_map(artifacts), do: artifacts
+  def extract_artifacts(_agent), do: %{}
+
+  @spec artifact_present?(term()) :: boolean()
+  def artifact_present?(%Envelope{data: data}), do: data not in [nil, [], %{}]
+  def artifact_present?(_artifact), do: false
+
+  @spec unified_timeline(map(), list()) :: list()
+  def unified_timeline(messages_map, agent_sessions) do
+    session_index = Map.new(agent_sessions, &{&1.id, &1})
+
+    messages_map
+    |> Enum.flat_map(fn {session_id, messages} ->
+      session = Map.get(session_index, session_id)
+      agent_name = if session, do: session.display_name, else: "unknown"
+      profile_id = if session, do: session.agent_profile_id
+
+      Enum.map(messages, fn message ->
+        Map.merge(message, %{
+          session_id: session_id,
+          agent_name: agent_name,
+          agent_color: Catalog.agent_color(profile_id, agent_name)
+        })
+      end)
+    end)
+    |> Enum.sort_by(& &1.id)
+  end
+
+  @spec hibernate_agent(String.t()) :: :ok
+  def hibernate_agent(session_id) when is_binary(session_id) do
+    case Murmur.Jido.whereis(session_id) do
+      nil ->
+        :ok
+
+      _pid ->
+        case Jido.AgentServer.state(Murmur.Jido.whereis(session_id)) do
+          {:ok, %{agent: agent}} -> Murmur.Jido.hibernate(agent)
+          _ -> :ok
+        end
+    end
+  end
+
+  defp load_messages_from_storage(session) do
+    agent_module = Catalog.agent_module(session.agent_profile_id)
+
+    case Murmur.Jido.thaw(agent_module, session.id) do
+      {:ok, agent} -> project_thread(agent)
+      {:error, :not_found} -> []
+    end
+  end
+
+  defp load_artifacts_from_storage(session) do
+    agent_module = Catalog.agent_module(session.agent_profile_id)
+
+    case Murmur.Jido.thaw(agent_module, session.id) do
+      {:ok, agent} -> extract_artifacts(agent)
+      {:error, :not_found} -> %{}
+    end
+  end
+
+  defp get_in_thread(%{state: %{__thread__: thread}}) when not is_nil(thread), do: thread
+  defp get_in_thread(_agent), do: nil
+end

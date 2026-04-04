@@ -33,26 +33,22 @@ defmodule JidoMurmurWeb.Components.ChatMessage do
     <div
       id={"msg-#{@message.id}"}
       class={[
-        "flex flex-col gap-0.5",
-        if(@message.role == "user", do: "items-end", else: "items-start")
+        "chat",
+        if(@message.role == "user", do: "chat-end", else: "chat-start")
       ]}
     >
-      <span class="text-[10px] uppercase tracking-wider text-base-content/40 px-1">
+      <div class="chat-header mb-1 text-[10px] uppercase tracking-wider text-base-content/40 px-1">
         {@message.sender_name || @message.role}
-      </span>
+      </div>
 
       <%!-- Thinking trace (collapsible) --%>
       <%= if Map.get(@message, :thinking) do %>
-        <details class="w-full max-w-[85%] group">
-          <summary class="flex items-center gap-1.5 cursor-pointer text-xs text-base-content/50 hover:text-base-content/70 px-1 py-0.5 transition-colors">
+        <details class="collapse collapse-arrow w-full max-w-[85%] border border-base-300/50 bg-base-200/30 shadow-sm">
+          <summary class="collapse-title flex min-h-0 items-center gap-1.5 py-2 pr-10 text-xs text-base-content/60">
             <.icon name="hero-light-bulb" class="w-3 h-3" />
             <span>Thinking...</span>
-            <.icon
-              name="hero-chevron-right"
-              class="w-3 h-3 transition-transform group-open:rotate-90"
-            />
           </summary>
-          <div class="mt-1 rounded-lg bg-base-200/50 border border-base-300/50 px-3 py-2 text-xs text-base-content/60 whitespace-pre-wrap break-words">
+          <div class="collapse-content px-4 pb-3 text-xs text-base-content/70 whitespace-pre-wrap break-words">
             {@message.thinking}
           </div>
         </details>
@@ -60,32 +56,28 @@ defmodule JidoMurmurWeb.Components.ChatMessage do
 
       <%!-- Tool calls (collapsible) --%>
       <%= for tc <- Map.get(@message, :tool_calls, []) do %>
-        <details class="w-full max-w-[85%] group">
-          <summary class="flex items-center gap-1.5 cursor-pointer text-xs px-1 py-0.5 transition-colors hover:text-base-content/70">
+        <details class="collapse collapse-arrow w-full max-w-[85%] border border-base-300/50 bg-base-200/20 shadow-sm">
+          <summary class="collapse-title flex min-h-0 items-center gap-1.5 py-2 pr-10 text-xs text-base-content/70">
             <.icon name="hero-wrench-screwdriver" class="w-3 h-3 text-base-content/50" />
             <span class="font-medium">{tc.name}</span>
             <.tool_status status={tc.status} />
-            <.icon
-              name="hero-chevron-right"
-              class="w-3 h-3 text-base-content/40 transition-transform group-open:rotate-90"
-            />
           </summary>
-          <div class="mt-1 rounded-lg border border-base-300/50 text-xs overflow-hidden">
-            <%= if tc[:args] && tc.args != %{} do %>
+          <div class="collapse-content px-0 pb-0 text-xs overflow-hidden">
+            <%= if tool_call_args?(tc) do %>
               <div class="bg-base-200/30 px-3 py-1.5 border-b border-base-300/50">
                 <span class="text-[10px] uppercase tracking-wider text-base-content/40">
                   Arguments
                 </span>
-                <pre class="mt-0.5 text-base-content/70 whitespace-pre-wrap break-words">{Jason.encode!(tc.args, pretty: true)}</pre>
+                <pre class="mt-0.5 text-base-content/70 whitespace-pre-wrap break-words">{Jason.encode!(tool_call_args(tc), pretty: true)}</pre>
               </div>
             <% end %>
-            <%= if tc[:result] do %>
+            <%= if tool_call_result?(tc) do %>
               <div class="bg-base-200/20 px-3 py-1.5">
                 <span class="text-[10px] uppercase tracking-wider text-base-content/40">
                   Result
                 </span>
                 <div class="mt-0.5 text-base-content/70 whitespace-pre-wrap break-words">
-                  {tc.result}
+                  {tool_call_result(tc)}
                 </div>
               </div>
             <% end %>
@@ -99,16 +91,19 @@ defmodule JidoMurmurWeb.Components.ChatMessage do
           @message.role == "user" and @message.sender_name != "You" and
             @message.sender_name != nil %>
         <div class={[
-          "rounded-xl px-3 py-2 text-sm max-w-[85%] break-words",
+          "chat-bubble px-3 py-2 text-sm max-w-[85%] break-words shadow-sm",
           cond do
+            @message.role != "user" and @color ->
+              [@color.bg, "border border-base-300/30 text-base-content prose prose-sm max-w-none"]
+
             @message.role != "user" ->
-              "bg-base-200 text-base-content rounded-bl-sm prose prose-sm max-w-none"
+              "bg-base-200 text-base-content prose prose-sm max-w-none"
 
             inter_agent? && @color ->
-              [@color.dot, "text-white rounded-br-sm whitespace-pre-wrap"]
+              [@color.dot, "text-white whitespace-pre-wrap"]
 
             true ->
-              "bg-primary text-primary-content rounded-br-sm whitespace-pre-wrap"
+              "chat-bubble-primary bg-primary text-primary-content whitespace-pre-wrap"
           end
         ]}>
           <%= if @message.role == "user" do %>
@@ -149,7 +144,7 @@ defmodule JidoMurmurWeb.Components.ChatMessage do
 
   defp usage_tooltip(assigns) do
     ~H"""
-    <div class="group/usage relative inline-flex items-center px-1">
+    <div class="chat-footer mt-1 group/usage relative inline-flex items-center px-1">
       <.icon
         name="hero-information-circle"
         class="w-3 h-3 text-base-content/30 hover:text-base-content/60 cursor-help transition-colors"
@@ -177,4 +172,19 @@ defmodule JidoMurmurWeb.Components.ChatMessage do
 
   defp render_content(content, nil), do: content
   defp render_content(content, renderer) when is_function(renderer, 1), do: renderer.(content)
+
+  defp tool_call_args(tool_call), do: Map.get(tool_call, :args) || %{}
+
+  defp tool_call_args?(tool_call) do
+    args = tool_call_args(tool_call)
+
+    cond do
+      is_map(args) -> map_size(args) > 0
+      is_list(args) -> args != []
+      true -> args not in [nil, ""]
+    end
+  end
+
+  defp tool_call_result(tool_call), do: Map.get(tool_call, :result)
+  defp tool_call_result?(tool_call), do: tool_call_result(tool_call) not in [nil, ""]
 end

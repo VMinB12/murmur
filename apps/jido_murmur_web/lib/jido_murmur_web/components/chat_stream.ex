@@ -28,18 +28,17 @@ defmodule JidoMurmurWeb.Components.ChatStream do
     ~H"""
     <%!-- Streaming thinking --%>
     <%= if @stream.thinking != "" do %>
-      <div class="flex flex-col gap-0.5 items-start">
-        <details open class="w-full max-w-[85%] group">
-          <summary class="flex items-center gap-1.5 cursor-pointer text-xs text-base-content/50 hover:text-base-content/70 px-1 py-0.5 transition-colors">
+      <div class="chat chat-start">
+        <div class="chat-header mb-1 text-[10px] uppercase tracking-wider text-base-content/40 px-1">
+          thinking
+        </div>
+        <details open class="collapse collapse-arrow w-full max-w-[85%] border border-base-300/50 bg-base-200/30 shadow-sm">
+          <summary class="collapse-title flex min-h-0 items-center gap-1.5 py-2 pr-10 text-xs text-base-content/60">
             <.icon name="hero-light-bulb" class="w-3 h-3" />
             <span>Thinking...</span>
             <span class="loading loading-dots loading-xs text-base-content/40"></span>
-            <.icon
-              name="hero-chevron-right"
-              class="w-3 h-3 transition-transform group-open:rotate-90"
-            />
           </summary>
-          <div class="mt-1 rounded-lg bg-base-200/50 border border-base-300/50 px-3 py-2 text-xs text-base-content/60 whitespace-pre-wrap break-words">
+          <div class="collapse-content px-4 pb-3 text-xs text-base-content/70 whitespace-pre-wrap break-words">
             {@stream.thinking}
           </div>
         </details>
@@ -48,9 +47,9 @@ defmodule JidoMurmurWeb.Components.ChatStream do
 
     <%!-- Streaming tool calls --%>
     <%= for tc <- @stream.tool_calls do %>
-      <div class="flex flex-col gap-0.5 items-start">
-        <details open class="w-full max-w-[85%] group">
-          <summary class="flex items-center gap-1.5 cursor-pointer text-xs px-1 py-0.5 transition-colors hover:text-base-content/70">
+      <div class="chat chat-start">
+        <details open class="collapse collapse-arrow w-full max-w-[85%] border border-base-300/50 bg-base-200/20 shadow-sm">
+          <summary class="collapse-title flex min-h-0 items-center gap-1.5 py-2 pr-10 text-xs text-base-content/70">
             <.icon name="hero-wrench-screwdriver" class="w-3 h-3 text-base-content/50" />
             <span class="font-medium">{tc.name}</span>
             <%= cond do %>
@@ -62,31 +61,27 @@ defmodule JidoMurmurWeb.Components.ChatStream do
               <% true -> %>
                 <span class="text-error/70 text-[10px]">Error</span>
             <% end %>
-            <.icon
-              name="hero-chevron-right"
-              class="w-3 h-3 text-base-content/40 transition-transform group-open:rotate-90"
-            />
           </summary>
-          <%= if tc[:args] && tc[:args] != %{} && tc.status == :running do %>
-            <div class="mt-1 rounded-lg border border-base-300/50 text-xs overflow-hidden">
+          <%= if tool_call_args?(tc) && tc.status == :running do %>
+            <div class="collapse-content px-0 pb-0 text-xs overflow-hidden">
               <div class="bg-base-200/20 px-3 py-1.5">
                 <span class="text-[10px] uppercase tracking-wider text-base-content/40">
                   Arguments
                 </span>
                 <div class="mt-0.5 text-base-content/70 whitespace-pre-wrap break-words font-mono text-[11px]">
-                  {Jason.encode!(tc.args, pretty: true)}
+                  {Jason.encode!(tool_call_args(tc), pretty: true)}
                 </div>
               </div>
             </div>
           <% end %>
-          <%= if tc[:result] do %>
-            <div class="mt-1 rounded-lg border border-base-300/50 text-xs overflow-hidden">
+          <%= if tool_call_result?(tc) do %>
+            <div class="collapse-content px-0 pb-0 text-xs overflow-hidden">
               <div class="bg-base-200/20 px-3 py-1.5">
                 <span class="text-[10px] uppercase tracking-wider text-base-content/40">
                   Result
                 </span>
                 <div class="mt-0.5 text-base-content/70 whitespace-pre-wrap break-words">
-                  {tc.result}
+                  {tool_call_result(tc)}
                 </div>
               </div>
             </div>
@@ -97,12 +92,12 @@ defmodule JidoMurmurWeb.Components.ChatStream do
 
     <%!-- Streaming tokens --%>
     <%= if @stream.content != "" do %>
-      <div class="flex flex-col gap-0.5 items-start">
-        <span class="text-[10px] uppercase tracking-wider text-base-content/40 px-1">
+      <div class="chat chat-start">
+        <div class="chat-header mb-1 text-[10px] uppercase tracking-wider text-base-content/40 px-1">
           assistant
-        </span>
+        </div>
         <div class={[
-          "rounded-xl rounded-bl-sm px-3 py-2 text-sm max-w-[85%] whitespace-pre-wrap break-words",
+          "chat-bubble px-3 py-2 text-sm max-w-[85%] whitespace-pre-wrap break-words shadow-sm",
           if(@color, do: ["border border-base-300/30", @color.bg], else: "bg-base-200 text-base-content")
         ]}>
           {@stream.content}
@@ -113,4 +108,19 @@ defmodule JidoMurmurWeb.Components.ChatStream do
     <% end %>
     """
   end
+
+  defp tool_call_args(tool_call), do: Map.get(tool_call, :args) || %{}
+
+  defp tool_call_args?(tool_call) do
+    args = tool_call_args(tool_call)
+
+    cond do
+      is_map(args) -> map_size(args) > 0
+      is_list(args) -> args != []
+      true -> args not in [nil, ""]
+    end
+  end
+
+  defp tool_call_result(tool_call), do: Map.get(tool_call, :result)
+  defp tool_call_result?(tool_call), do: tool_call_result(tool_call) not in [nil, ""]
 end

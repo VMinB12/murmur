@@ -1,7 +1,7 @@
 ---
 id: "011"
 title: "Frontend Architecture Review — murmur_web & murmur_demo"
-status: planned
+status: done
 owner: ""
 created: 2026-04-01
 updated: 2026-04-04

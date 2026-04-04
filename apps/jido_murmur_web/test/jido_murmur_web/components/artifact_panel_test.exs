@@ -1,3 +1,28 @@
+defmodule JidoMurmurWeb.Components.ArtifactPanelTestRenderer do
+  use Phoenix.Component
+
+  attr :name, :string, required: true
+  attr :data, :any, required: true
+  attr :session_id, :string, required: true
+  attr :active?, :boolean, default: false
+
+  def badge(assigns) do
+    ~H"""
+    <span id="custom-badge">Custom: {@name}</span>
+    """
+  end
+
+  attr :name, :string, required: true
+  attr :data, :any, required: true
+  attr :session_id, :string, required: true
+
+  def detail(assigns) do
+    ~H"""
+    <div id="custom-detail">{@data["summary"]}</div>
+    """
+  end
+end
+
 defmodule JidoMurmurWeb.Components.ArtifactPanelTest do
   use ExUnit.Case, async: true
 
@@ -6,8 +31,7 @@ defmodule JidoMurmurWeb.Components.ArtifactPanelTest do
   alias JidoArtifacts.Envelope
   alias JidoMurmurWeb.Components.ArtifactPanel
   alias JidoMurmurWeb.Components.ArtifactPanel.Generic
-  alias JidoMurmurWeb.Components.ArtifactPanel.PaperList
-  alias JidoMurmurWeb.Components.ArtifactPanel.PdfViewer
+  alias JidoMurmurWeb.Components.ArtifactPanelTestRenderer
 
   defp envelope(data, source \\ "agent-1", version \\ 1) do
     Envelope.new(data, version, source, ~U[2026-01-01 00:00:00Z])
@@ -71,24 +95,22 @@ defmodule JidoMurmurWeb.Components.ArtifactPanelTest do
 
       artifacts = %{
         "s1" => %{
-          "papers" =>
-            envelope([
-              %{"title" => "Deep Learning Paper", "id" => "2301.00001", "abstract" => "Abstract text"}
-            ])
+          "insight" => envelope(%{"summary" => "Deep Learning Paper"})
         }
       }
 
-      active = %{session_id: "s1", name: "papers"}
+      active = %{session_id: "s1", name: "insight"}
 
       html =
         render_component(&ArtifactPanel.artifact_panel/1,
           artifacts: artifacts,
           active_artifact: active,
-          agent_sessions: sessions
+          agent_sessions: sessions,
+          renderers: %{"insight" => ArtifactPanelTestRenderer}
         )
 
       assert html =~ "Deep Learning Paper"
-      assert html =~ "2301.00001"
+      assert html =~ "custom-detail"
     end
 
     test "skips empty artifacts in tabs" do
@@ -116,7 +138,7 @@ defmodule JidoMurmurWeb.Components.ArtifactPanelTest do
   end
 
   describe "ArtifactPanel.artifact_badge/1" do
-    test "dispatches to PaperList for papers" do
+    test "falls back to Generic when no renderer is registered" do
       html =
         render_component(&ArtifactPanel.artifact_badge/1,
           name: "papers",
@@ -124,20 +146,8 @@ defmodule JidoMurmurWeb.Components.ArtifactPanelTest do
           session_id: "s1"
         )
 
-      assert html =~ "2 papers"
-      assert html =~ "hero-academic-cap"
-    end
-
-    test "dispatches to PdfViewer for displayed_paper" do
-      html =
-        render_component(&ArtifactPanel.artifact_badge/1,
-          name: "displayed_paper",
-          data: envelope(%{"title" => "My Paper", "id" => "2301.00001"}),
-          session_id: "s1"
-        )
-
-      assert html =~ "My Paper"
-      assert html =~ "hero-document"
+      assert html =~ "papers"
+      assert html =~ "(2)"
     end
 
     test "dispatches to Generic for unknown types" do
@@ -153,28 +163,12 @@ defmodule JidoMurmurWeb.Components.ArtifactPanelTest do
     end
 
     test "dispatches to custom renderer when provided" do
-      defmodule TestRenderer do
-        use Phoenix.Component
-
-        attr :name, :string, required: true
-        attr :data, :any, required: true
-        attr :session_id, :string, required: true
-        attr :active?, :boolean, default: false
-        attr :renderers, :map, default: %{}
-
-        def badge(assigns) do
-          ~H"""
-          <span id="custom-badge">Custom: {@name}</span>
-          """
-        end
-      end
-
       html =
         render_component(&ArtifactPanel.artifact_badge/1,
           name: "my_type",
           data: envelope("test"),
           session_id: "s1",
-          renderers: %{"my_type" => TestRenderer}
+          renderers: %{"my_type" => ArtifactPanelTestRenderer}
         )
 
       assert html =~ "custom-badge"
@@ -246,65 +240,4 @@ defmodule JidoMurmurWeb.Components.ArtifactPanelTest do
     end
   end
 
-  describe "PaperList renderer" do
-    test "renders badge with paper count" do
-      papers = [
-        %{"title" => "Paper 1", "id" => "2301.00001"},
-        %{"title" => "Paper 2", "id" => "2301.00002"}
-      ]
-
-      html = render_component(&PaperList.badge/1, data: papers, session_id: "s1")
-
-      assert html =~ "2 papers"
-      assert html =~ "hero-academic-cap"
-    end
-
-    test "renders detail with paper information" do
-      papers = [
-        %{
-          "title" => "Attention Is All You Need",
-          "id" => "1706.03762",
-          "abstract" => "The dominant sequence transduction models...",
-          "published" => "2017-06-12T00:00:00Z",
-          "url" => "https://arxiv.org/abs/1706.03762",
-          "pdf_url" => "https://arxiv.org/pdf/1706.03762"
-        }
-      ]
-
-      html = render_component(&PaperList.detail/1, data: papers, session_id: "s1")
-
-      assert html =~ "Attention Is All You Need"
-      assert html =~ "1706.03762"
-      assert html =~ "2017-06-12"
-      assert html =~ "The dominant sequence transduction models..."
-      assert html =~ "1 papers found"
-    end
-  end
-
-  describe "PdfViewer renderer" do
-    test "renders badge with paper title" do
-      data = %{"title" => "My Wonderful Paper", "id" => "2301.00001", "pdf_url" => "https://example.com/paper.pdf"}
-
-      html = render_component(&PdfViewer.badge/1, data: data, session_id: "s1")
-
-      assert html =~ "My Wonderful Paper"
-      assert html =~ "hero-document"
-    end
-
-    test "renders detail with iframe" do
-      data = %{
-        "title" => "My Paper",
-        "id" => "2301.00001",
-        "pdf_url" => "https://arxiv.org/pdf/2301.00001"
-      }
-
-      html = render_component(&PdfViewer.detail/1, data: data, session_id: "s1")
-
-      assert html =~ "My Paper"
-      assert html =~ "2301.00001"
-      assert html =~ "<iframe"
-      assert html =~ "https://arxiv.org/pdf/2301.00001"
-      assert html =~ "Open in new tab"
-    end
-  end
 end

@@ -31,16 +31,20 @@ defmodule JidoMurmurWeb.Components.MessageInput do
   attr :session_id, :string, default: nil
   attr :on_submit, :string, default: "send_message"
   attr :placeholder, :string, default: "Type a message…"
+  attr :input_id, :string, default: nil
+  attr :container_class, :string, default: "px-3 py-2 border-t border-base-300"
 
   def message_input(assigns) do
+    assigns = assign(assigns, :resolved_input_id, assigns.input_id || "#{assigns.id}-textarea")
+
     ~H"""
-    <div class="px-3 py-2 border-t border-base-300">
+    <div class={@container_class}>
       <.form for={%{}} id={@id} phx-submit={@on_submit} class="chat-input-wrap">
         <%= if @session_id do %>
           <input type="hidden" name="message[session_id]" value={@session_id} />
         <% end %>
         <textarea
-          id={"#{@id}-textarea"}
+          id={@resolved_input_id}
           name="message[content]"
           placeholder={@placeholder}
           autocomplete="off"

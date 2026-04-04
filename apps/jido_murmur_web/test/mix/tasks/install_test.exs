@@ -41,6 +41,10 @@ defmodule Mix.Tasks.JidoMurmurWeb.InstallTest do
         output = capture_io(fn -> Install.run(["artifacts"]) end)
 
         assert output =~ "artifact_panel.ex"
+
+        target_dir = Path.join(tmp_dir, "lib/jido_murmur_web_web/components/jido_murmur")
+        assert File.exists?(Path.join(target_dir, "artifact_panel.ex"))
+        assert File.exists?(Path.join(target_dir, "artifact_panel/generic.ex"))
       end)
     end
 
@@ -56,6 +60,7 @@ defmodule Mix.Tasks.JidoMurmurWeb.InstallTest do
         assert output =~ "agent_selector.ex"
         assert output =~ "agent_header.ex"
         assert output =~ "artifact_panel.ex"
+        assert output =~ "artifact_panel/generic.ex"
       end)
     end
 

@@ -5,6 +5,7 @@
 @source "../css";
 @source "../js";
 @source "../../lib/murmur_web";
+@source "../../../jido_murmur_web/lib";
 @source "../../../jido_murmur/lib/jido_murmur/catalog.ex";
 
 /* A Tailwind plugin that makes "hero-#{ICON}" classes available.

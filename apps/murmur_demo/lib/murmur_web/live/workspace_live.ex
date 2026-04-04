@@ -11,12 +11,12 @@ defmodule MurmurWeb.WorkspaceLive do
   alias JidoMurmur.Runner
   alias JidoMurmur.Signals.MessageReceived
   alias JidoMurmur.Topics
-  alias JidoMurmur.UITurn
   alias JidoMurmur.Workspaces
-  alias JidoSql.QueryResult
   alias JidoTasks.Signals.TaskCreated
   alias JidoTasks.Signals.TaskUpdated
   alias JidoTasks.Tasks
+  alias MurmurWeb.Artifacts.Actions, as: ArtifactActions
+  alias MurmurWeb.Live.WorkspaceState
 
   require Logger
 
@@ -31,12 +31,12 @@ defmodule MurmurWeb.WorkspaceLive do
     # Build initial messages and artifacts from agent state or persisted storage
     messages_map =
       Map.new(agent_sessions, fn session ->
-        {session.id, load_messages_for_session(session)}
+        {session.id, WorkspaceState.load_messages_for_session(session)}
       end)
 
     artifacts_map =
       Map.new(agent_sessions, fn session ->
-        {session.id, load_artifacts_for_session(session)}
+        {session.id, WorkspaceState.load_artifacts_for_session(session)}
       end)
 
     socket =
@@ -194,44 +194,22 @@ defmodule MurmurWeb.WorkspaceLive do
 
   def handle_event(
         "reexecute_query",
-        %{"session-id" => session_id, "sql" => sql, "index" => index_str},
+        params,
         socket
       ) do
-    index = String.to_integer(index_str)
+    case ArtifactActions.handle("reexecute_query", params, socket.assigns.artifacts) do
+      {:ok, updated_artifacts} ->
+        {:noreply, assign(socket, :artifacts, updated_artifacts)}
 
-    {result_key, result_val} =
-      case JidoSql.QueryExecutor.execute(JidoSql.Repo, sql) do
-        {:ok, %QueryResult{} = result} -> {"loaded_result", result}
-        {:error, msg} -> {"loaded_error", msg}
-      end
+      {:error, :artifact_not_found} ->
+        {:noreply, put_flash(socket, :error, "The selected SQL artifact is no longer available.")}
 
-    artifacts = socket.assigns.artifacts
-    session_artifacts = Map.get(artifacts, session_id, %{})
-    sql_artifact = session_artifacts["sql_results"]
+      {:error, :query_not_found} ->
+        {:noreply, put_flash(socket, :error, "The selected SQL query is no longer available.")}
 
-    query_list =
-      case sql_artifact do
-        %Envelope{data: data} -> data
-        nil -> []
-      end
-
-    updated_list =
-      List.update_at(query_list, index, fn item ->
-        item
-        |> Map.put(result_key, result_val)
-        |> Map.delete(if(result_key == "loaded_result", do: "loaded_error", else: "loaded_result"))
-      end)
-
-    updated_artifact =
-      case sql_artifact do
-        %Envelope{} = envelope -> %Envelope{envelope | data: updated_list}
-        nil -> Envelope.new(updated_list, 1, "workspace_live")
-      end
-
-    updated_session = Map.put(session_artifacts, "sql_results", updated_artifact)
-    updated_artifacts = Map.put(artifacts, session_id, updated_session)
-
-    {:noreply, assign(socket, :artifacts, updated_artifacts)}
+      {:error, _reason} ->
+        {:noreply, put_flash(socket, :error, "Unable to refresh the selected SQL query.")}
+    end
   end
 
   def handle_event("toggle_task_board", _params, socket) do
@@ -353,7 +331,7 @@ defmodule MurmurWeb.WorkspaceLive do
 
     messages =
       if session do
-        loaded = load_messages_for_session(session)
+        loaded = WorkspaceState.load_messages_for_session(session)
 
         if length(loaded) > length(current_messages) do
           loaded
@@ -707,69 +685,6 @@ defmodule MurmurWeb.WorkspaceLive do
 
   defp do_attach_usage(other, _usage), do: other
 
-  defp load_messages_for_session(session) do
-    pid = Murmur.Jido.whereis(session.id)
-
-    if pid do
-      case Jido.AgentServer.state(pid) do
-        {:ok, %{agent: agent}} -> project_thread(agent)
-        _ -> load_messages_from_storage(session)
-      end
-    else
-      load_messages_from_storage(session)
-    end
-  end
-
-  defp load_messages_from_storage(session) do
-    agent_module = Catalog.agent_module(session.agent_profile_id)
-
-    case Murmur.Jido.thaw(agent_module, session.id) do
-      {:ok, agent} -> project_thread(agent)
-      {:error, :not_found} -> []
-    end
-  end
-
-  defp project_thread(agent) do
-    thread = get_in_thread(agent)
-
-    if thread do
-      UITurn.project_entries(thread.entries)
-    else
-      []
-    end
-  end
-
-  defp get_in_thread(%{state: %{__thread__: thread}}) when not is_nil(thread), do: thread
-  defp get_in_thread(_), do: nil
-
-  defp load_artifacts_for_session(session) do
-    pid = Murmur.Jido.whereis(session.id)
-
-    if pid do
-      case Jido.AgentServer.state(pid) do
-        {:ok, %{agent: agent}} -> extract_artifacts(agent)
-        _ -> load_artifacts_from_storage(session)
-      end
-    else
-      load_artifacts_from_storage(session)
-    end
-  end
-
-  defp load_artifacts_from_storage(session) do
-    agent_module = Catalog.agent_module(session.agent_profile_id)
-
-    case Murmur.Jido.thaw(agent_module, session.id) do
-      {:ok, agent} -> extract_artifacts(agent)
-      {:error, :not_found} -> %{}
-    end
-  end
-
-  defp extract_artifacts(%{state: %{artifacts: artifacts}}) when is_map(artifacts), do: artifacts
-  defp extract_artifacts(_), do: %{}
-
-  defp artifact_present?(%Envelope{data: data}), do: data not in [nil, [], %{}]
-  defp artifact_present?(_), do: false
-
   defp cleanup_storage(session) do
     {adapter, opts} = Murmur.Jido.__jido_storage__()
     agent_module = Catalog.agent_module(session.agent_profile_id)
@@ -884,26 +799,6 @@ defmodule MurmurWeb.WorkspaceLive do
       _ ->
         {List.first(sessions), content}
     end
-  end
-
-  def unified_timeline(messages_map, agent_sessions) do
-    session_index = Map.new(agent_sessions, &{&1.id, &1})
-
-    messages_map
-    |> Enum.flat_map(fn {session_id, msgs} ->
-      session = Map.get(session_index, session_id)
-      agent_name = if session, do: session.display_name, else: "unknown"
-      profile_id = if session, do: session.agent_profile_id
-
-      Enum.map(msgs, fn msg ->
-        Map.merge(msg, %{
-          session_id: session_id,
-          agent_name: agent_name,
-          agent_color: Catalog.agent_color(profile_id, agent_name)
-        })
-      end)
-    end)
-    |> Enum.sort_by(& &1.id)
   end
 
   defp append_assistant_message(messages, response) do

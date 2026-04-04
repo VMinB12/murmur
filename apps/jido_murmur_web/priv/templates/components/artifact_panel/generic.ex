@@ -1,11 +1,10 @@
-defmodule JidoMurmurWeb.Components.ArtifactPanel.Generic do
+defmodule <%= @app_module %>Web.Components.ArtifactPanel.Generic do
   @moduledoc "Fallback artifact renderer for unknown types."
 
   use Phoenix.Component
 
-  import JidoMurmurWeb, only: [icon: 1]
+  import <%= @app_module %>Web.CoreComponents, only: [icon: 1]
 
-  @doc "Compact badge for the chat column."
   attr :name, :string, required: true
   attr :data, :any, required: true
   attr :session_id, :string, required: true
@@ -34,7 +33,6 @@ defmodule JidoMurmurWeb.Components.ArtifactPanel.Generic do
     """
   end
 
-  @doc "Full detail renderer for the artifact panel."
   attr :name, :string, required: true
   attr :data, :any, required: true
   attr :session_id, :string, required: true
@@ -45,26 +43,26 @@ defmodule JidoMurmurWeb.Components.ArtifactPanel.Generic do
       <div class="px-4 py-2 border-b border-base-300/50 flex items-center gap-2 shrink-0">
         <.icon name="hero-square-3-stack-3d" class="w-4 h-4 text-base-content/50" />
         <span class="text-sm font-medium">{@name}</span>
-        <%= if is_list(@data) do %>
+        <%%= if is_list(@data) do %>
           <span class="text-[11px] text-base-content/40">({length(@data)} items)</span>
-        <% end %>
+        <%% end %>
       </div>
       <div class="flex-1 overflow-y-auto px-4 py-3 text-xs text-base-content/70">
-        <%= cond do %>
-          <% is_list(@data) -> %>
+        <%%= cond do %>
+          <%% is_list(@data) -> %>
             <div class="space-y-1">
-              <%= for {item, idx} <- Enum.with_index(@data) do %>
+              <%%= for {item, idx} <- Enum.with_index(@data) do %>
                 <div class="flex gap-2 py-0.5 border-b border-base-300/30 last:border-b-0">
                   <span class="text-base-content/30 shrink-0">{idx + 1}.</span>
                   <span class="break-words min-w-0">{format_item(item)}</span>
                 </div>
-              <% end %>
+              <%% end %>
             </div>
-          <% is_map(@data) -> %>
-            <pre class="whitespace-pre-wrap break-words text-[11px]" phx-no-curly-interpolation><%= Jason.encode!(@data, pretty: true) %></pre>
-          <% true -> %>
+          <%% is_map(@data) -> %>
+            <pre class="whitespace-pre-wrap break-words text-[11px]" phx-no-curly-interpolation><%%= Jason.encode!(@data, pretty: true) %></pre>
+          <%% true -> %>
             <span class="whitespace-pre-wrap break-words">{inspect(@data)}</span>
-        <% end %>
+        <%% end %>
       </div>
     </div>
     """

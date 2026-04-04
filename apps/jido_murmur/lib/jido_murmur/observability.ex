@@ -9,6 +9,8 @@ defmodule JidoMurmur.Observability do
   alias JidoMurmur.Observability.Store
 
   @active_llm_call_key {__MODULE__, :active_llm_call_id}
+  @enabled_override_key {__MODULE__, :enabled_override}
+  @capture_content_override_key {__MODULE__, :capture_content_override}
 
   @type message_envelope :: %{
           required(:id) => String.t(),
@@ -20,14 +22,22 @@ defmodule JidoMurmur.Observability do
           optional(:sender_trace_id) => String.t() | nil
         }
 
+  @spec enabled?() :: boolean()
   def enabled? do
-    Application.get_env(:jido_murmur, :observability, [])
-    |> Keyword.get(:enabled, true)
+    case Process.get(@enabled_override_key, :__unset__) do
+      false -> false
+      true -> true
+      :__unset__ -> truthy_observability_config(:enabled, true)
+    end
   end
 
+  @spec capture_content?() :: boolean()
   def capture_content? do
-    Application.get_env(:jido_murmur, :observability, [])
-    |> Keyword.get(:capture_content, true)
+    case Process.get(@capture_content_override_key, :__unset__) do
+      false -> false
+      true -> true
+      :__unset__ -> truthy_observability_config(:capture_content, true)
+    end
   end
 
   def next_interaction_id, do: Uniq.UUID.uuid7()
@@ -49,13 +59,16 @@ defmodule JidoMurmur.Observability do
   def fail_turn(request_id, reason, attrs \\ %{}), do: Store.fail_turn(request_id, reason, attrs)
   def record_signal(signal, context), do: Store.record_signal(signal, context)
   def record_injected_messages(agent_id, envelopes), do: Store.record_injected_messages(agent_id, envelopes)
-    def record_prepared_llm_input(%{llm_call_id: call_id}, messages) when is_binary(call_id) and is_list(messages),
+
+  def record_prepared_llm_input(%{llm_call_id: call_id}, messages)
+      when is_binary(call_id) and is_list(messages),
       do: Store.record_prepared_llm_input(call_id, messages)
 
-    def record_prepared_llm_input(call_id, messages) when is_binary(call_id) and is_list(messages),
+  def record_prepared_llm_input(call_id, messages) when is_binary(call_id) and is_list(messages),
       do: Store.record_prepared_llm_input(call_id, messages)
 
-    def record_prepared_llm_input(_call_id_or_state, _messages), do: :ok
+  def record_prepared_llm_input(_call_id_or_state, _messages), do: :ok
+
   def record_req_llm_start(metadata, agent_context \\ nil), do: Store.record_req_llm_start(metadata, agent_context)
   def record_req_llm_stop(measurements, metadata), do: Store.record_req_llm_stop(measurements, metadata)
   def record_req_llm_exception(metadata), do: Store.record_req_llm_exception(metadata)
@@ -72,5 +85,12 @@ defmodule JidoMurmur.Observability do
 
   def current_active_llm_call_id do
     Process.get(@active_llm_call_key)
+  end
+
+  defp truthy_observability_config(key, default) do
+    case Application.get_env(:jido_murmur, :observability, []) |> Keyword.get(key, default) do
+      false -> false
+      _ -> true
+    end
   end
 end

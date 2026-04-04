@@ -1,0 +1,20 @@
+[
+  {Path.expand("deps/jido/lib/jido.ex"), "Call to missing or private function Jido.stop_agent/3."},
+  {Path.expand("deps/jido/lib/jido.ex"), "Call to missing or private function Jido.whereis/3."},
+  {Path.expand("deps/jido/lib/jido.ex"), "Call to missing or private function Jido.list_agents/2."},
+  {Path.expand("deps/jido/lib/jido.ex"), "Call to missing or private function Jido.agent_count/2."},
+  {Path.expand("deps/jido/lib/jido.ex"), "Call to missing or private function Jido.runtime_store_name/1."},
+  {Path.expand("deps/jido/lib/jido.ex"), "Call to missing or private function Jido.hibernate/3."},
+  {Path.expand("deps/jido/lib/jido.ex"), "Call to missing or private function Jido.thaw/4."},
+  {Path.expand("deps/jido/lib/jido/agent.ex"), "The created anonymous function has no local return."},
+  {Path.expand("deps/jido/lib/jido/agent.ex"), "The function call normalize_instruction will not succeed."},
+  {Path.expand("deps/jido_ai/lib/jido_ai/agent.ex"),
+   "Call to missing or private function Jido.AI.Request.compat_text/1."},
+  {Path.expand("deps/jido_ai/lib/jido_ai/agent.ex"),
+   "Call to missing or private function Jido.AI.Request.complete_request_from_snapshot/3."},
+  {Path.expand("deps/jido_ai/lib/jido_ai/agent.ex"),
+   "Call to missing or private function Jido.AI.Reasoning.ReAct.steer/3."},
+  {Path.expand("deps/jido_ai/lib/jido_ai/agent.ex"),
+   "Call to missing or private function Jido.AI.Reasoning.ReAct.inject/3."},
+  {"lib/jido_murmur/observability/store.ex", "The pattern can never match the type true."}
+]

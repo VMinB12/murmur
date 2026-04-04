@@ -46,13 +46,11 @@ defmodule JidoMurmur.Observability.Store do
   def record_prepared_llm_input(_call_id, _messages), do: :ok
 
   def start_turn(attrs) do
-    if Observability.enabled?() do
-      turn = build_turn(attrs)
-      span_ctx = Tracer.start_span(turn_span_name(turn), %{attributes: turn_start_attrs(turn)})
-      stored = Map.put(turn, :span_ctx, span_ctx)
-      :ets.insert(@turn_table, {turn.request_id, stored})
-      :ets.insert(@agent_turn_table, {turn.agent_id, turn.request_id})
-    end
+    turn = build_turn(attrs)
+    span_ctx = Tracer.start_span(turn_span_name(turn), %{attributes: turn_start_attrs(turn)})
+    stored = Map.put(turn, :span_ctx, span_ctx)
+    :ets.insert(@turn_table, {turn.request_id, stored})
+    :ets.insert(@agent_turn_table, {turn.agent_id, turn.request_id})
 
     :ok
   end
@@ -403,9 +401,6 @@ defmodule JidoMurmur.Observability.Store do
         {:error, reason, _effects} ->
           Span.set_attributes(record.span_ctx, Map.put(attrs, "error.message", inspect(reason)) |> Map.put("error", true))
           Span.set_status(record.span_ctx, OpenTelemetry.status(:error, inspect(reason)))
-
-        _ ->
-          Span.set_attributes(record.span_ctx, attrs)
       end
 
       Span.end_span(record.span_ctx)
@@ -438,7 +433,6 @@ defmodule JidoMurmur.Observability.Store do
     %{
       "openinference.span.kind" => "AGENT",
       "session.id" => turn.session_id,
-      "input.value" => if(Observability.capture_content?(), do: turn.input_value, else: nil),
       "murmur.agent_id" => turn.agent_id,
       "murmur.agent_name" => turn.agent_name,
       "murmur.workspace_id" => turn.workspace_id,
@@ -446,6 +440,7 @@ defmodule JidoMurmur.Observability.Store do
       "murmur.interaction_id" => turn.interaction_id,
       "murmur.message_count" => turn.message_count
     }
+    |> maybe_put("input.value", turn.input_value, Observability.capture_content?())
     |> maybe_put("murmur.triggered_by_trace_id", turn.triggered_by_trace_id)
     |> maybe_put("murmur.sender_name", turn.sender_name)
   end
@@ -556,8 +551,6 @@ defmodule JidoMurmur.Observability.Store do
     end
   end
 
-  defp apply_prepared_llm_input(_call_id), do: :ok
-
   defp maybe_apply_prepared_llm_input(call_id, messages) do
     if span_exists?(call_id) do
       messages
@@ -628,8 +621,6 @@ defmodule JidoMurmur.Observability.Store do
     end)
   end
 
-  defp maybe_store_tool_inputs(_), do: :ok
-
   defp lookup_tool_input(nil), do: nil
 
   defp lookup_tool_input(call_id) do
@@ -681,8 +672,6 @@ defmodule JidoMurmur.Observability.Store do
 
     :ets.insert(@pending_global_llm_call_table, {:queue, pending ++ [call_id]})
   end
-
-  defp enqueue_pending_global_llm_call(_call_id), do: :ok
 
   defp bind_req_llm_call(request_id, agent_context) do
     call_id =
@@ -834,8 +823,6 @@ defmodule JidoMurmur.Observability.Store do
         :ok
     end
   end
-
-  defp adopt_pending_req_llm_start(_call_id, _turn), do: :ok
 
   defp pop_pending_req_llm_start(agent_id) do
     case :ets.lookup(@pending_req_llm_start_table, :queue) do

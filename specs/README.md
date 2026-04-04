@@ -6,21 +6,21 @@
 
 | Metric | Value |
 |--------|-------|
-| Active tickets | 3 |
-| Last updated | 2026-04-03 |
+| Active tickets | 2 |
+| Last updated | 2026-04-04 |
 
 ## Active Tickets
 
 | # | Title | Status | Owner |
 |---|-------|--------|-------|
 | 009 | [Data Contract Enforcement](tickets/009-data-contract-enforcement/) | specifying | — |
-| 010 | [LLM Observability & Tracing](tickets/010-llm-observability/) | in-progress | — |
 | 011 | [Frontend Architecture Review](tickets/011-frontend-architecture-review/) | research | — |
 
 ## Recently Completed
 
 | # | Title | Completed |
 |---|-------|-----------|
+| 010 | [LLM Observability & Tracing](tickets/010-llm-observability/) | 2026-04-04 |
 | 001 | [Multi-Agent Chat Interface](tickets/001-multi-agent-chat/) | 2026-03-31 |
 | 002 | [Modular Hex Package Extraction](tickets/002-modular-hex-extraction/) | 2026-03-31 |
 | 003 | [Artifact System Extraction](tickets/003-artifact-extraction/) | 2026-03-31 |

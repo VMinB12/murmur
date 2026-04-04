@@ -12,3 +12,11 @@
 - Re-evaluated the blocker after updating dependencies and reviewing `jido_ai` issue #210 plus the merged follow-up work now present locally.
 - Confirmed that the live ReAct path now emits canonical Jido.AI request, LLM, and tool lifecycle telemetry and also exposes `ai.tool.started`, which gives Murmur a supported integration surface for real child spans without patching the dependency.
 - Updated ticket 010 back to a child-span-first implementation plan. The remaining work is Murmur-side telemetry bridging and payload correlation, not an upstream blocker on lifecycle visibility.
+
+## 2026-04-04
+
+- Simplified duplicated prepared-input observability shaping so message-to-OpenInference attribute assembly is centralized in Murmur's observability store.
+- Reworked Phoenix session grouping semantics to use the shared interaction identifier rather than the long-lived agent id, then refined direct chat further to use a discussion-scoped session key with inactivity rollover via `ConversationCache`.
+- Verified live Phoenix behavior on the `4000` app: fresh direct conversations now appear in Sessions, immediate follow-ups remain grouped, and later direct conversations roll to a new session instead of disappearing under an older row.
+- Revalidated the focused observability suite and the repository quality gate. `mix precommit` passed across all umbrella apps with the pre-existing low-confidence Sobelow warning in `apps/murmur_demo/lib/murmur_web/helpers/markdown.ex` unchanged.
+- Closed ticket 010 after aligning the ticket README, task list, changelog, and project dashboard with the shipped behavior.

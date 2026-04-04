@@ -10,10 +10,12 @@ All notable changes to this project are documented here. Entries are in reverse 
 - SQL agent plugin (`jido_sql`) for natural-language-to-SQL queries
 - Architecture documentation for all 7 umbrella packages
 - Ecosystem composition guide
-- Tickets 009 (Data Contract Enforcement) and 010 (LLM Observability) on roadmap
+- Ticket 009 (Data Contract Enforcement) on roadmap
 
 ### Changed
 
+- Replaced AgentObs-era tracing with Murmur-owned turn, LLM, and tool observability that renders ordered LLM input/output conversations correctly in Arize Phoenix
+- Grouped direct-chat traces into discussion-scoped Phoenix sessions with inactivity rollover while preserving explicit cross-agent interaction propagation
 - Moved existing tickets 001-008 to `specs/tickets/` and marked as done
 - Moved `docs/` research files into their respective ticket folders
 

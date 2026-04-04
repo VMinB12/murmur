@@ -84,6 +84,10 @@ defmodule JidoMurmur.RunnerTest do
     unless :ets.whereis(:jido_murmur_pending_messages) != :undefined do
       :ets.new(:jido_murmur_pending_messages, [:named_table, :public, :duplicate_bag])
     end
+
+    unless :ets.whereis(:jido_murmur_obs_conversations) != :undefined do
+      :ets.new(:jido_murmur_obs_conversations, [:named_table, :public, :set])
+    end
   rescue
     ArgumentError -> :ok
   end

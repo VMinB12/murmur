@@ -11,6 +11,7 @@ defmodule JidoMurmur.TableOwner do
     GenServer.start_link(__MODULE__, opts, name: __MODULE__)
   end
 
+  alias JidoMurmur.Observability.ConversationCache
   alias JidoMurmur.Observability.SessionCache
   alias JidoMurmur.Observability.Store
 
@@ -18,6 +19,7 @@ defmodule JidoMurmur.TableOwner do
   def init(_opts) do
     :ets.new(:jido_murmur_pending_messages, [:named_table, :public, :duplicate_bag])
     :ets.new(:jido_murmur_active_runners, [:set, :public, :named_table])
+    ConversationCache.create_table()
     SessionCache.create_table()
     Store.create_tables()
     {:ok, %{}}

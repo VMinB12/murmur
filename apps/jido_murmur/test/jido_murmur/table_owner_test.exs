@@ -10,6 +10,7 @@ defmodule JidoMurmur.TableOwnerTest do
         for table <- [
               :jido_murmur_pending_messages,
               :jido_murmur_active_runners,
+            :jido_murmur_obs_conversations,
               :jido_murmur_obs_turns,
               :jido_murmur_obs_agent_turns,
               :jido_murmur_obs_llm_spans,
@@ -35,6 +36,7 @@ defmodule JidoMurmur.TableOwnerTest do
     test "creates ETS tables on init" do
       assert :ets.whereis(:jido_murmur_pending_messages) != :undefined
       assert :ets.whereis(:jido_murmur_active_runners) != :undefined
+      assert :ets.whereis(:jido_murmur_obs_conversations) != :undefined
       assert :ets.whereis(:jido_murmur_obs_turns) != :undefined
       assert :ets.whereis(:jido_murmur_obs_llm_spans) != :undefined
       assert :ets.whereis(:jido_murmur_obs_sessions) != :undefined
@@ -60,6 +62,7 @@ defmodule JidoMurmur.TableOwnerTest do
     test "tables are public" do
       assert :ets.info(:jido_murmur_pending_messages)[:protection] == :public
       assert :ets.info(:jido_murmur_active_runners)[:protection] == :public
+      assert :ets.info(:jido_murmur_obs_conversations)[:protection] == :public
       assert :ets.info(:jido_murmur_obs_turns)[:protection] == :public
       assert :ets.info(:jido_murmur_obs_sessions)[:protection] == :public
     end
@@ -67,6 +70,7 @@ defmodule JidoMurmur.TableOwnerTest do
     test "tables are named tables" do
       assert :ets.info(:jido_murmur_pending_messages)[:named_table] == true
       assert :ets.info(:jido_murmur_active_runners)[:named_table] == true
+      assert :ets.info(:jido_murmur_obs_conversations)[:named_table] == true
       assert :ets.info(:jido_murmur_obs_turns)[:named_table] == true
       assert :ets.info(:jido_murmur_obs_sessions)[:named_table] == true
     end

@@ -26,11 +26,11 @@
 
 **Independent test**: Send a tell message to an idle target agent and verify that the receiving agent creates a new trace linked back to the originating agent or trace.
 
-### US-5: Group turn traces into one long-lived agent conversation session (Priority: P1)
+### US-5: Group related turn traces into one discussion session (Priority: P1)
 
-**As a** developer reviewing an agent over time, **I want** separate turn traces for that agent to be grouped into one session, **so that** I can inspect both individual turns and the broader conversation history without collapsing them into one trace.
+**As a** developer reviewing a single interaction across one or more agents, **I want** related turn traces to be grouped into one session, **so that** I can inspect both individual turns and the broader discussion without collapsing everything in a workspace into one trace.
 
-**Independent test**: Send two sequential messages to the same agent; the trace view shows two distinct traces and the session view groups both traces under the same long-lived conversation session.
+**Independent test**: Start a short Alice-to-Bob interaction that produces multiple turn traces; the trace view shows separate traces and the session view groups those traces under one discussion session keyed by the shared interaction.
 
 ### US-6: Correlate work across a workspace or team without flattening trace boundaries (Priority: P2)
 
@@ -54,7 +54,7 @@
 - [ ] When an injected steering message changes the active turn, that change is visible inside the active trace.
 - [ ] A message that starts work on an idle agent creates a new root trace for the receiving agent.
 - [ ] Cross-agent work started by another agent includes enough causation metadata to identify the originating agent and originating trace or interaction.
-- [ ] Multiple traces belonging to the same long-lived agent conversation share one stable session identifier.
+- [ ] Multiple traces belonging to the same interaction share one stable discussion session identifier; direct chat reuses that identifier only while the discussion remains active and rolls to a new identifier after inactivity, while cross-agent workflows continue to use explicitly propagated interaction ids.
 - [ ] Team or workspace correlation metadata is attached consistently enough for developers to filter related traces across agents.
 - [ ] The resulting trace and session model renders correctly in Arize Phoenix's trace-oriented and session-oriented views, including Phoenix's message-oriented input and output rendering for LLM spans.
 - [ ] The observability model avoids duplicate traces for the same react loop when multiple instrumentation layers observe the same underlying work.

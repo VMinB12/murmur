@@ -14,6 +14,7 @@ defmodule JidoMurmur.Runner do
 
   alias JidoMurmur.Catalog
   alias JidoMurmur.Observability
+  alias JidoMurmur.Observability.ConversationCache
   alias JidoMurmur.PendingQueue
   alias JidoMurmur.Signals.MessageCompleted
 
@@ -42,7 +43,11 @@ defmodule JidoMurmur.Runner do
     pid = jido_mod.whereis(session.id)
 
     if pid do
-      PendingQueue.enqueue(session.id, Observability.build_message_envelope(content, opts))
+      PendingQueue.enqueue(
+        session.id,
+        Observability.build_message_envelope(content, ensure_interaction_id(session, opts))
+      )
+
       maybe_start_loop(session)
       :queued
     else
@@ -107,6 +112,7 @@ defmodule JidoMurmur.Runner do
     topic = agent_topic(session)
     combined = envelopes_to_content(envelopes)
     interaction_id = envelopes_to_interaction_id(envelopes)
+    conversation_session_id = interaction_id || session.id
     sender_trace_id = envelopes_to_sender_trace_id(envelopes)
     sender_name = envelopes_to_sender_name(envelopes)
     request_id = Uniq.UUID.uuid7()
@@ -124,7 +130,7 @@ defmodule JidoMurmur.Runner do
       request_id: request_id,
       agent_id: session.id,
       agent_name: session.display_name,
-      session_id: session.id,
+      session_id: conversation_session_id,
       workspace_id: session.workspace_id,
       interaction_id: interaction_id,
       input_value: combined,
@@ -251,6 +257,17 @@ defmodule JidoMurmur.Runner do
       source: "/jido_murmur/runner",
       subject: "/workspaces/#{session.workspace_id}/agents/#{session.id}"
     )
+  end
+
+  defp ensure_interaction_id(session, opts) do
+    interaction_id =
+      ConversationCache.resolve(session.id,
+        interaction_id: Keyword.get(opts, :interaction_id),
+        kind: Keyword.get(opts, :kind, :direct),
+        now_ms: Keyword.get(opts, :sent_at_ms, System.monotonic_time(:millisecond))
+      )
+
+    Keyword.put(opts, :interaction_id, interaction_id)
   end
 
   defp envelopes_to_content(envelopes) do

@@ -38,7 +38,7 @@ These attributes are shared across multiple span kinds when the data exists.
 | Attribute | Required | Notes |
 |---|---|---|
 | `openinference.span.kind` | Yes | One of `AGENT`, `LLM`, `TOOL` |
-| `session.id` | Yes | Stable long-lived agent conversation identity |
+| `session.id` | Yes | Phoenix session grouping key. Direct user chat reuses a discussion-scoped `murmur.interaction_id` while the conversation remains active, then rolls to a new interaction after the configured inactivity timeout; cross-agent or workflow messages use an explicitly propagated `murmur.interaction_id` |
 | `input.value` | Conditional | Summary text only; not the canonical structured conversation view |
 | `input.mime_type` | Optional | Use `text/plain` for summaries, `application/json` only when exporting a serialized JSON object |
 | `output.value` | Conditional | Summary output only; not sufficient on its own for LLM spans |
@@ -75,7 +75,7 @@ Agent-turn spans are for trace boundaries and quick scanning. They are not the p
 | Attribute | Notes |
 |---|---|
 | `openinference.span.kind = AGENT` | Required |
-| `session.id` | Agent conversation session |
+| `session.id` | Phoenix grouping key. Direct user turns default to the current discussion interaction id and roll to a new interaction after inactivity; cross-agent or workflow turns use an explicit propagated interaction id |
 | `murmur.agent_id` | Agent session id |
 | `murmur.agent_name` | Display name |
 | `murmur.workspace_id` | Workspace correlation |
@@ -117,7 +117,7 @@ LLM spans are the canonical detailed conversation spans.
 | `llm.system` | Provider/system family when known |
 | `gen_ai.system` | Keep when Phoenix/OpenInference tooling already expects it |
 | `gen_ai.request.model` | Preserve current compatibility field |
-| `session.id` | Stable agent conversation session |
+| `session.id` | Phoenix grouping key. Direct user turns default to the current discussion interaction id and roll to a new interaction after inactivity; cross-agent or workflow turns use an explicit propagated interaction id |
 | `murmur.agent_id` | Agent session id |
 | `murmur.agent_name` | Display name |
 | `murmur.workspace_id` | Workspace correlation |
@@ -210,7 +210,7 @@ Tool spans represent concrete tool execution, not the assistant's decision to re
 |---|---|
 | `openinference.span.kind = TOOL` | Required |
 | `tool.name` | Tool/function name |
-| `session.id` | Stable agent conversation session |
+| `session.id` | Phoenix grouping key. Direct user turns default to the current discussion interaction id and roll to a new interaction after inactivity; cross-agent or workflow turns use an explicit propagated interaction id |
 | `murmur.agent_id` | Agent session id |
 | `murmur.agent_name` | Display name |
 | `murmur.workspace_id` | Workspace correlation |

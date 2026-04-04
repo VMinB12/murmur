@@ -9,6 +9,19 @@ defmodule JidoMurmur.Telemetry.ReqLLMTracerTest do
 
   @table JidoMurmur.Telemetry.ReqLLMTracer
   @llm_span_table :jido_murmur_obs_llm_spans
+  @store_tables [
+    :jido_murmur_obs_turns,
+    :jido_murmur_obs_agent_turns,
+    :jido_murmur_obs_llm_spans,
+    :jido_murmur_obs_tool_spans,
+    :jido_murmur_obs_tool_inputs,
+    :jido_murmur_obs_req_llm_lookup,
+    :jido_murmur_obs_pending_llm_calls,
+    :jido_murmur_obs_pending_agent_llm_calls,
+    :jido_murmur_obs_pending_global_llm_calls,
+    :jido_murmur_obs_prepared_llm_inputs,
+    :jido_murmur_obs_pending_req_llm_starts
+  ]
 
   setup do
     # Ensure the ETS table exists (might already exist from app startup)
@@ -22,6 +35,9 @@ defmodule JidoMurmur.Telemetry.ReqLLMTracerTest do
     end
 
     Store.create_tables()
+    Enum.each(@store_tables, &clear_ets_table/1)
+    Observability.clear_active_llm_call_id()
+    Logger.metadata(agent_id: nil)
 
     # Attach handler; ignore errors if already attached
     try do
@@ -53,9 +69,19 @@ defmodule JidoMurmur.Telemetry.ReqLLMTracerTest do
       if :ets.whereis(@llm_span_table) != :undefined do
         :ets.delete_all_objects(@llm_span_table)
       end
+
+      Enum.each(@store_tables, &clear_ets_table/1)
+      Observability.clear_active_llm_call_id()
+      Logger.metadata(agent_id: nil)
     end)
 
     :ok
+  end
+
+  defp clear_ets_table(table) do
+    if :ets.whereis(table) != :undefined do
+      :ets.delete_all_objects(table)
+    end
   end
 
   defp start_metadata(request_id, opts \\ []) do

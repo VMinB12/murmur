@@ -7,6 +7,7 @@ defmodule JidoMurmur.AgentHelper do
   """
 
   alias JidoMurmur.Catalog
+  alias JidoMurmur.Observability.ConversationCache
   alias JidoMurmur.Observability.SessionCache
   alias JidoMurmur.UITurn
 
@@ -117,6 +118,7 @@ defmodule JidoMurmur.AgentHelper do
 
       adapter.delete_checkpoint(checkpoint_key, opts)
       adapter.delete_thread(session.id, opts)
+      ConversationCache.delete(session.id)
     end)
 
     :ok

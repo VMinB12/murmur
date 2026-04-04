@@ -32,9 +32,9 @@ defmodule JidoSql.MixProject do
     [
       {:ecto_sql, "~> 3.0"},
       {:postgrex, ">= 0.0.0"},
-      {:jido, "~> 2.0"},
-      {:jido_ai, "~> 2.0"},
-      {:jido_action, "~> 2.0"},
+      {:jido, "~> 2.2"},
+      {:jido_ai, "~> 2.1"},
+      {:jido_action, "~> 2.2"},
       {:jido_artifacts, in_umbrella: true},
       {:jido_murmur, in_umbrella: true},
       {:jason, "~> 1.0"}

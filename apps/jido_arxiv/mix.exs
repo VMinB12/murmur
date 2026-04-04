@@ -35,8 +35,8 @@ defmodule JidoArxiv.MixProject do
   defp deps do
     [
       {:jido_artifacts, in_umbrella: true},
-      {:jido, "~> 2.0"},
-      {:jido_action, "~> 2.0"},
+      {:jido, "~> 2.2"},
+      {:jido_action, "~> 2.2"},
       {:req, "~> 0.5"},
       {:sweet_xml, "~> 0.7"},
       {:jason, "~> 1.2"},

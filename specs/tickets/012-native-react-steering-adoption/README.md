@@ -1,7 +1,7 @@
 ---
 id: "012"
 title: "Native ReAct Steering Adoption"
-status: planned
+status: in-progress
 owner: ""
 created: 2026-04-04
 updated: 2026-04-04

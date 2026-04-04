@@ -7,3 +7,4 @@
 - Updated the recommendation to prefer a jido_ai-aligned ingress contract built on `content`, `source`, `refs`, and optional `expected_request_id`.
 - Confirmed that request transformers should remain only for Murmur-owned context shaping, not busy-run message delivery.
 - Defined `Tasks.md` around the coordinator actor, jido_ai-aligned ingress input, runtime refactor, and legacy queue removal.
+- Started implementation with ADR-002, ingress coordinator modules, LLM adapter control calls, and Runner handoff to ingress.

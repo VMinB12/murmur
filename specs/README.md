@@ -6,21 +6,21 @@
 
 | Metric | Value |
 |--------|-------|
-| Active tickets | 3 |
+| Active tickets | 2 |
 | Last updated | 2026-04-04 |
 
 ## Active Tickets
 
 | # | Title | Status | Owner |
 |---|-------|--------|-------|
-| 009 | [Data Contract Enforcement](tickets/009-data-contract-enforcement/) | specifying | — |
-| 012 | [Native ReAct Steering Adoption](tickets/012-native-react-steering-adoption/) | planned | — |
+| 012 | [Native ReAct Steering Adoption](tickets/012-native-react-steering-adoption/) | in-progress | — |
 | 013 | [Agent-Centric Phoenix Sessions](tickets/013-agent-centric-phoenix-sessions/) | specifying | — |
 
 ## Recently Completed
 
 | # | Title | Completed |
 |---|-------|-----------|
+| 009 | [Data Contract Enforcement](tickets/009-data-contract-enforcement/) | 2026-04-04 |
 | 011 | [Frontend Architecture Review](tickets/011-frontend-architecture-review/) | 2026-04-04 |
 | 010 | [LLM Observability & Tracing](tickets/010-llm-observability/) | 2026-04-04 |
 | 001 | [Multi-Agent Chat Interface](tickets/001-multi-agent-chat/) | 2026-03-31 |
@@ -36,6 +36,7 @@
 
 | ADR | Title | Date |
 |-----|-------|------|
+| ADR-002 | [Single Ingress Coordinator Actor](decisions/ADR-002-single-ingress-coordinator-actor.md) | 2026-04-04 |
 | ADR-001 | [Frontend Boundary Ownership](decisions/ADR-001-frontend-boundary-ownership.md) | 2026-04-04 |
 
 ## Navigation

@@ -6,7 +6,7 @@
 
 | Metric | Value |
 |--------|-------|
-| Active tickets | 1 |
+| Active tickets | 2 |
 | Last updated | 2026-04-05 |
 
 ## Active Tickets
@@ -14,6 +14,7 @@
 | # | Title | Status | Owner |
 |---|-------|--------|-------|
 | 013 | [Agent-Centric Phoenix Sessions](tickets/013-agent-centric-phoenix-sessions/) | specifying | — |
+| 014 | [Runtime Metadata Boundary Cleanup](tickets/014-runtime-metadata-boundary-cleanup/) | planned | — |
 
 ## Recently Completed
 
@@ -36,6 +37,7 @@
 
 | ADR | Title | Date |
 |-----|-------|------|
+| ADR-003 | [Runtime Metadata Projection Boundary](decisions/ADR-003-runtime-metadata-projection-boundary.md) | 2026-04-05 |
 | ADR-002 | [Single Ingress Coordinator Actor](decisions/ADR-002-single-ingress-coordinator-actor.md) | 2026-04-04 |
 | ADR-001 | [Frontend Boundary Ownership](decisions/ADR-001-frontend-boundary-ownership.md) | 2026-04-04 |
 

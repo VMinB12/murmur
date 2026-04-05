@@ -6,6 +6,8 @@ defmodule JidoMurmur.Signals.MessageReceived do
   Subject: `/workspaces/{wid}/agents/{sid}`
   """
 
+    alias JidoMurmur.ActorIdentity
+
   @type message_payload :: %{
           required(:id) => String.t(),
           required(:role) => String.t(),
@@ -14,6 +16,7 @@ defmodule JidoMurmur.Signals.MessageReceived do
           required(:interaction_id) => String.t(),
           required(:sender_name) => String.t(),
           required(:sender_trace_id) => String.t() | nil,
+      optional(:origin_actor) => map(),
           optional(:hop_count) => non_neg_integer()
         }
 
@@ -37,6 +40,7 @@ defmodule JidoMurmur.Signals.MessageReceived do
          :ok <- validate_kind(Map.get(message, :kind)),
          :ok <- validate_required_binary(message, :interaction_id),
          :ok <- validate_required_binary(message, :sender_name),
+         :ok <- validate_optional_actor(Map.get(message, :origin_actor)),
          :ok <- validate_optional_binary(Map.get(message, :sender_trace_id)),
          :ok <- validate_hop_count(Map.get(message, :hop_count)) do
       {:ok, message}
@@ -61,6 +65,15 @@ defmodule JidoMurmur.Signals.MessageReceived do
   defp validate_optional_binary(nil), do: :ok
   defp validate_optional_binary(value) when is_binary(value), do: :ok
   defp validate_optional_binary(_value), do: {:error, :sender_trace_id}
+
+  defp validate_optional_actor(nil), do: :ok
+
+  defp validate_optional_actor(actor) do
+    case ActorIdentity.normalize(actor) do
+      {:ok, _normalized} -> :ok
+      {:error, _reason} -> {:error, :origin_actor}
+    end
+  end
 
   defp validate_kind(value) when is_atom(value) or is_binary(value), do: :ok
   defp validate_kind(_value), do: {:error, :kind}

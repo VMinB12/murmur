@@ -7,6 +7,7 @@ defmodule JidoMurmur.Ingress.Input do
   `new/2` only when constructing canonical input directly.
   """
 
+  alias JidoMurmur.ActorIdentity
   alias JidoMurmur.Ingress.Metadata
   alias JidoMurmur.Observability
   alias JidoMurmur.Observability.ConversationCache
@@ -31,6 +32,7 @@ defmodule JidoMurmur.Ingress.Input do
           | :missing_workspace_id
           | :invalid_workspace_id
           | :invalid_sender_name
+          | :invalid_origin_actor
           | :invalid_sender_trace_id
           | :invalid_hop_count
           | :invalid_expected_request_id
@@ -68,7 +70,11 @@ defmodule JidoMurmur.Ingress.Input do
 
     new(content,
       source: %{kind: :human, via: Keyword.get(opts, :via, :workspace_live)},
-      refs: %{interaction_id: interaction_id, workspace_id: session.workspace_id}
+      refs: %{
+        interaction_id: interaction_id,
+        workspace_id: session.workspace_id,
+        origin_actor: ActorIdentity.serialize(ActorIdentity.human())
+      }
     )
   end
 
@@ -76,11 +82,13 @@ defmodule JidoMurmur.Ingress.Input do
           {:ok, t()} | {:error, validation_error()}
   def programmatic_message(session, content, opts \\ []) when is_list(opts) do
     with {:ok, via} <- normalize_via(Keyword.get(opts, :via)),
-         {:ok, extra_refs} <- normalize_extra_refs(Keyword.get(opts, :refs, %{})) do
+         {:ok, extra_refs} <- normalize_extra_refs(Keyword.get(opts, :refs, %{})),
+         {:ok, origin_actor} <- normalize_origin_actor(Keyword.get(opts, :origin_actor), Keyword.get(opts, :sender_name)) do
       refs =
         Map.merge(extra_refs, %{
           interaction_id: Keyword.get(opts, :interaction_id) || Observability.next_interaction_id(),
-          sender_name: Keyword.get(opts, :sender_name),
+          sender_name: Keyword.get(opts, :sender_name) || ActorIdentity.display_name(origin_actor),
+          origin_actor: ActorIdentity.serialize(origin_actor),
           sender_trace_id: Keyword.get(opts, :sender_trace_id),
           workspace_id: session.workspace_id
         })
@@ -151,6 +159,21 @@ defmodule JidoMurmur.Ingress.Input do
   end
 
   defp normalize_extra_refs(_), do: {:error, :invalid_refs}
+
+  defp normalize_origin_actor(nil, nil), do: {:ok, nil}
+
+  defp normalize_origin_actor(nil, sender_name) when is_binary(sender_name) do
+    {:ok, ActorIdentity.programmatic(sender_name)}
+  end
+
+  defp normalize_origin_actor(nil, _sender_name), do: {:ok, nil}
+
+  defp normalize_origin_actor(origin_actor, _sender_name) do
+    case ActorIdentity.normalize(origin_actor) do
+      {:ok, normalized} -> {:ok, normalized}
+      {:error, _reason} -> {:error, :invalid_origin_actor}
+    end
+  end
 
   defp normalize_request_id(nil), do: {:ok, nil}
   defp normalize_request_id(request_id) when is_binary(request_id), do: {:ok, request_id}

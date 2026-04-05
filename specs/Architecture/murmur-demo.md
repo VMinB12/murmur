@@ -83,6 +83,13 @@ The main LiveView handles:
 - Artifact-specific rendering and actions to `MurmurWeb.Components.Artifacts`, `MurmurWeb.Artifacts.Registry`, and `MurmurWeb.Artifacts.Actions`
 - Non-rendering message and artifact loading logic to `MurmurWeb.Live.WorkspaceState`
 
+## Canonical Display Message Usage
+
+- Demo-owned workspace views (`SplitView`, `UnifiedView`) consume canonical `JidoMurmur.DisplayMessage` values rather than repairing raw thread-entry payloads locally
+- `WorkspaceState.project_thread/1` and `WorkspaceState.unified_timeline/2` are the demo boundary for enriching display messages with session-owned agent identity and color metadata
+- `WorkspaceLive` creates optimistic local messages with `DisplayMessage.user/2` and consumes visible programmatic messages through `DisplayMessage.from_received/1`
+- Human-facing task-assignment wording is chosen in the LiveView edge while the runtime payload carries explicit `origin_actor` metadata for downstream rendering
+
 ## Dependencies
 
 ### Umbrella Packages

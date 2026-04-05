@@ -11,17 +11,21 @@ defmodule JidoMurmur.MessageInjector do
 
   @behaviour Jido.AI.Reasoning.ReAct.RequestTransformer
 
+  alias JidoMurmur.ActorIdentity
   alias JidoMurmur.Observability
   alias JidoMurmur.TeamInstructions
 
   @impl true
   def transform_request(request, state, _config, runtime_context) do
     workspace_id = runtime_context[:workspace_id]
-    sender_name = runtime_context[:sender_name]
+    actor_name =
+      runtime_context[:current_actor]
+      |> ActorIdentity.display_name()
+      |> Kernel.||(runtime_context[:sender_name])
 
     messages =
       request.messages
-      |> inject_team_instructions(workspace_id, sender_name)
+      |> inject_team_instructions(workspace_id, actor_name)
 
     Observability.record_prepared_llm_input(state, messages)
 

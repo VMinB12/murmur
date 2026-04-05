@@ -16,6 +16,7 @@ defmodule JidoMurmur.TellAction do
     ]
 
   alias Jido.Tracing.Context, as: TracingContext
+  alias JidoMurmur.ActorIdentity
   alias JidoMurmur.Config
   alias JidoMurmur.Ingress
   alias JidoMurmur.Workspaces
@@ -23,17 +24,18 @@ defmodule JidoMurmur.TellAction do
   @impl true
   def run(params, context) do
     workspace_id = context[:workspace_id]
-    sender_name = context[:sender_name]
     hop_count = context[:hop_count] || 0
     interaction_id = context[:interaction_id]
 
     with :ok <- validate_hop_count(hop_count),
+         {:ok, sender_name} <- current_actor_name(context),
          %{} = target <- Workspaces.find_agent_session_by_name(workspace_id, params.target_agent) do
       prefixed_message = "[#{sender_name}]: #{params.message}"
 
       case deliver_message(target, prefixed_message,
              interaction_id: interaction_id,
              sender_name: sender_name,
+             origin_actor: ActorIdentity.agent(sender_name),
              sender_trace_id: sender_trace_id(),
              hop_count: hop_count + 1
            ) do
@@ -59,6 +61,9 @@ defmodule JidoMurmur.TellAction do
              "Tell not sent: inter-agent hop limit (#{max_hops}) reached at hop #{hop_count}."
          }}
 
+      {:error, :missing_current_actor} ->
+        {:error, "Tell unavailable: missing current actor identity."}
+
       {:error, _} = error ->
         error
 
@@ -83,9 +88,26 @@ defmodule JidoMurmur.TellAction do
       via: :steering,
       interaction_id: Keyword.get(opts, :interaction_id),
       sender_name: Keyword.fetch!(opts, :sender_name),
+      origin_actor: Keyword.get(opts, :origin_actor),
       sender_trace_id: Keyword.get(opts, :sender_trace_id),
       refs: %{hop_count: Keyword.fetch!(opts, :hop_count)}
     )
+  end
+
+  defp current_actor_name(context) do
+    case context[:current_actor] do
+      %ActorIdentity{} = actor ->
+        case ActorIdentity.display_name(actor) do
+          name when is_binary(name) -> {:ok, name}
+          _ -> {:error, :missing_current_actor}
+        end
+
+      _ ->
+        case context[:sender_name] do
+          name when is_binary(name) -> {:ok, name}
+          _ -> {:error, :missing_current_actor}
+        end
+    end
   end
 
   defp sender_trace_id do

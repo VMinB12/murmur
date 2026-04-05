@@ -88,12 +88,7 @@ defmodule MurmurWeb.WorkspaceLive do
       topic = Topics.agent_messages(workspace_id, session_id)
 
       # Add user message to local display immediately
-      user_msg = %{
-        id: Uniq.UUID.uuid7(),
-        role: "user",
-        content: content,
-        sender_name: "You"
-      }
+      user_msg = JidoMurmur.DisplayMessage.user(content)
 
       socket =
         socket
@@ -238,7 +233,7 @@ defmodule MurmurWeb.WorkspaceLive do
           signal
         )
 
-        notify_task_assignee(workspace_id, task, "You (human)")
+        notify_task_assignee(workspace_id, task)
 
         {:noreply,
          assign(socket, :task_form, to_form(%{"title" => "", "description" => "", "assignee" => ""}, as: :task))}
@@ -363,12 +358,7 @@ defmodule MurmurWeb.WorkspaceLive do
   def handle_info(%Jido.Signal{type: "murmur.request.failed", data: data}, socket) do
     session_id = data.session_id
     reason = data.reason
-    error_msg = %{
-      id: Uniq.UUID.uuid7(),
-      role: "assistant",
-      content: "⚠️ Error: #{inspect(reason)}",
-      sender_name: nil
-    }
+    error_msg = JidoMurmur.DisplayMessage.assistant("⚠️ Error: #{inspect(reason)}")
 
     socket =
       socket
@@ -383,7 +373,7 @@ defmodule MurmurWeb.WorkspaceLive do
   @impl true
   def handle_info(%Jido.Signal{type: "murmur.message.received", data: data}, socket) do
     session_id = data.session_id
-    message = data.message
+    message = JidoMurmur.DisplayMessage.from_received(data.message)
 
     socket =
       update(socket, :messages, fn msgs ->
@@ -545,30 +535,31 @@ defmodule MurmurWeb.WorkspaceLive do
     JidoMurmur.Ingress.deliver(session, content)
   end
 
-  defp notify_task_assignee(workspace_id, task, sender_name) do
-    if task.assignee == "human" or task.assignee == sender_name do
+  defp notify_task_assignee(workspace_id, task) do
+    if task.assignee == "human" do
       :ok
     else
-      do_notify_task_assignee(workspace_id, task, sender_name)
+      do_notify_task_assignee(workspace_id, task)
     end
   end
 
-  defp do_notify_task_assignee(workspace_id, task, sender_name) do
+  defp do_notify_task_assignee(workspace_id, task) do
     case Workspaces.find_agent_session_by_name(workspace_id, task.assignee) do
       nil ->
         :ok
 
       target_session ->
-        message = build_task_notification(task, sender_name)
+        message = build_task_notification(task)
         JidoMurmur.Ingress.deliver_programmatic(target_session, message,
           via: :task_assignment,
-          sender_name: sender_name
+          sender_name: "human",
+          origin_actor: JidoMurmur.ActorIdentity.human()
         )
     end
   end
 
-  defp build_task_notification(task, sender_name) do
-    "[#{sender_name}] assigned you a task: \"#{task.title}\"" <>
+  defp build_task_notification(task) do
+    "A human assigned you a task: \"#{task.title}\"" <>
       if(task.description && task.description != "",
         do: "\nDescription: #{task.description}",
         else: ""
@@ -751,12 +742,7 @@ defmodule MurmurWeb.WorkspaceLive do
     workspace_id = socket.assigns.workspace.id
     topic = Topics.agent_messages(workspace_id, target_session.id)
 
-    user_msg = %{
-      id: Uniq.UUID.uuid7(),
-      role: "user",
-      content: content,
-      sender_name: "You"
-    }
+    user_msg = JidoMurmur.DisplayMessage.user(content)
 
     socket =
       socket
@@ -789,12 +775,7 @@ defmodule MurmurWeb.WorkspaceLive do
   defp append_assistant_message(messages, response) do
     content = extract_response_content(response)
 
-    assistant_msg = %{
-      id: Uniq.UUID.uuid7(),
-      role: "assistant",
-      content: content,
-      sender_name: nil
-    }
+    assistant_msg = JidoMurmur.DisplayMessage.assistant(content)
 
     messages ++ [assistant_msg]
   end

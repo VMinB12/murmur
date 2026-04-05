@@ -7,6 +7,7 @@ defmodule JidoMurmur.Runner do
   completion or failure, and hibernates the agent afterward.
   """
 
+  alias JidoMurmur.ActorIdentity
   alias JidoMurmur.Catalog
   alias JidoMurmur.Ingress.{Input, Metadata}
   alias JidoMurmur.Observability
@@ -68,13 +69,14 @@ defmodule JidoMurmur.Runner do
 
   defp build_run_context(session, metadata) do
     request_id = Uniq.UUID.uuid7()
+    current_actor = ActorIdentity.agent(session.display_name, id: session.id)
 
     %{
       agent_module: Catalog.agent_module(session.agent_profile_id),
       topic: agent_topic(session),
       interaction_id: metadata.interaction_id,
       request_id: request_id,
-      tool_context: Metadata.tool_context(metadata, session.display_name, request_id),
+      tool_context: Metadata.tool_context(metadata, current_actor, request_id),
       start_time: System.monotonic_time()
     }
   end
@@ -90,7 +92,7 @@ defmodule JidoMurmur.Runner do
       input_value: input.content,
       message_count: 1,
       triggered_by_trace_id: metadata.sender_trace_id,
-      sender_name: metadata.sender_name,
+      sender_name: ActorIdentity.display_name(metadata.origin_actor) || metadata.sender_name,
       hop_count: metadata.hop_count
     })
 

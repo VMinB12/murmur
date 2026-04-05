@@ -63,6 +63,12 @@ Murmur is a real-time multi-agent chat platform built as an Elixir/Phoenix umbre
 - **Phoenix PubSub for agent communication**: Agents use PubSub for real-time events. This is simple and performant in a single-node deployment but requires distributed PubSub (e.g., Redis adapter) for multi-node.
 - **PostgreSQL as single data store**: All persistence (conversations, tasks, artifacts, SQL agent queries) goes through PostgreSQL. Scales well for the expected load but may need read replicas at scale.
 
+## Canonical Boundaries
+
+- **Actor identity boundary**: Murmur now treats current actor and origin actor as explicit data, not as overloaded `sender_name` strings. Canonical ingress metadata is projected once into runtime context and visible message payloads, then reused consistently downstream.
+- **Display projection boundary**: UI consumers are expected to render canonical display messages instead of raw thread-entry payloads. Shared and demo-owned views branch on actor semantics rather than parsing content prefixes or comparing display labels such as `"You"`.
+- **Presentation-owned wording**: Human-facing labels remain a rendering concern. Runtime payloads carry actor metadata; host apps choose wording like `"You"` or `"A human"` at the UI edge.
+
 ## Sub-documents
 
 - [ecosystem.md](ecosystem.md) — How packages compose into a full application

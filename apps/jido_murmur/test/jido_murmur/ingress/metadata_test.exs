@@ -1,6 +1,7 @@
 defmodule JidoMurmur.Ingress.MetadataTest do
   use JidoMurmur.Case, async: true
 
+  alias JidoMurmur.ActorIdentity
   alias JidoMurmur.Ingress.Metadata
 
   describe "new/1" do
@@ -10,6 +11,7 @@ defmodule JidoMurmur.Ingress.MetadataTest do
                  interaction_id: "i-1",
                  workspace_id: "w-1",
                  sender_name: "Alice",
+                 origin_actor: %{kind: :agent, name: "Alice"},
                  sender_trace_id: "trace-1",
                  hop_count: 2,
                  request_origin: :tool
@@ -18,6 +20,7 @@ defmodule JidoMurmur.Ingress.MetadataTest do
       assert metadata.interaction_id == "i-1"
       assert metadata.workspace_id == "w-1"
       assert metadata.sender_name == "Alice"
+      assert metadata.origin_actor == ActorIdentity.agent("Alice")
       assert metadata.sender_trace_id == "trace-1"
       assert metadata.hop_count == 2
       assert metadata.extra == %{request_origin: :tool}
@@ -40,14 +43,18 @@ defmodule JidoMurmur.Ingress.MetadataTest do
         interaction_id: "i-1",
         workspace_id: "w-1",
         sender_name: "Alice",
+        origin_actor: ActorIdentity.agent("Alice"),
         sender_trace_id: "trace-1",
         hop_count: 3,
         extra: %{}
       }
 
-      tool_context = Metadata.tool_context(metadata, "Bob", "request-1")
+      current_actor = ActorIdentity.agent("Bob", id: "agent-1")
+      tool_context = Metadata.tool_context(metadata, current_actor, "request-1")
 
       assert tool_context.workspace_id == "w-1"
+      assert tool_context.current_actor == current_actor
+      assert tool_context.origin_actor == ActorIdentity.agent("Alice")
       assert tool_context.sender_name == "Bob"
       assert tool_context.origin_sender_name == "Alice"
       assert tool_context.sender_trace_id == "trace-1"

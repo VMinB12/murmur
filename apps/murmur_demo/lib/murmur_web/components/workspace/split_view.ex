@@ -2,6 +2,7 @@ defmodule MurmurWeb.Components.Workspace.SplitView do
   @moduledoc false
   use MurmurWeb, :html
 
+  alias JidoMurmur.DisplayMessage
   import JidoMurmurWeb.Components.AgentHeader
   import JidoMurmurWeb.Components.ChatMessage
   import JidoMurmurWeb.Components.ChatStream
@@ -114,9 +115,11 @@ defmodule MurmurWeb.Components.Workspace.SplitView do
     stream.content == "" and stream.thinking == "" and stream.tool_calls == []
   end
 
-  defp message_color(%{role: "user", sender_name: sender_name}) when sender_name not in [nil, "You"] do
-    Catalog.agent_color(nil, sender_name)
+  defp message_color(message) do
+    if DisplayMessage.external_user_message?(message) do
+      Catalog.agent_color(nil, DisplayMessage.label(message))
+    else
+      nil
+    end
   end
-
-  defp message_color(_message), do: nil
 end

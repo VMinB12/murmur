@@ -1,6 +1,7 @@
 defmodule Murmur.Agents.UITurnTest do
   use ExUnit.Case, async: true
 
+  alias JidoMurmur.ActorIdentity
   alias JidoMurmur.UITurn
   alias JidoMurmur.UITurn.ToolCall
 
@@ -17,6 +18,7 @@ defmodule Murmur.Agents.UITurnTest do
       assert user.role == "user"
       assert user.content == "Hello"
       assert user.sender_name == "You"
+      assert user.actor == ActorIdentity.human()
       assert assistant.role == "assistant"
       assert assistant.content == "Hi there!"
       assert assistant.tool_calls == []
@@ -123,15 +125,20 @@ defmodule Murmur.Agents.UITurnTest do
       assert user.content == "Hello"
     end
 
-    test "infers sender name from inter-agent message prefix" do
+    test "uses explicit origin actor metadata for inter-agent messages" do
       entries = [
-        entry(:ai_message, %{role: :user, content: "[alice]: User says hi", request_id: "r1"})
+        entry(
+          :ai_message,
+          %{role: :user, content: "User says hi", request_id: "r1"},
+          %{origin_actor: ActorIdentity.agent("alice")}
+        )
       ]
 
       result = UITurn.project_entries(entries)
       assert [user] = result
       assert user.sender_name == "alice"
-      assert user.content == "[alice]: User says hi"
+      assert user.actor == ActorIdentity.agent("alice")
+      assert user.content == "User says hi"
     end
 
     test "also supports legacy kind: :message entries" do
@@ -145,17 +152,18 @@ defmodule Murmur.Agents.UITurnTest do
       assert user.role == "user"
       assert user.content == "Legacy"
       assert user.sender_name == "You"
+      assert user.actor == ActorIdentity.human("You")
       assert assistant.content == "Reply"
     end
   end
 
   # Helper to build mock thread entries
-  defp entry(kind, payload) do
+  defp entry(kind, payload, refs \\ %{}) do
     %{
       id: Ecto.UUID.generate(),
       kind: kind,
       payload: payload,
-      refs: %{}
+      refs: refs
     }
   end
 end

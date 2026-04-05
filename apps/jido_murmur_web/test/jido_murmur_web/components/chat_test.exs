@@ -3,6 +3,7 @@ defmodule JidoMurmurWeb.Components.ChatTest do
 
   import Phoenix.LiveViewTest
 
+  alias JidoMurmur.ActorIdentity
   alias JidoMurmur.UITurn.ToolCall
   alias JidoMurmurWeb.Components.ChatMessage
   alias JidoMurmurWeb.Components.ChatStream
@@ -14,7 +15,7 @@ defmodule JidoMurmurWeb.Components.ChatTest do
         id: "msg-1",
         role: "user",
         content: "Hello, agent!",
-        sender_name: "You"
+        actor: ActorIdentity.human()
       }
 
       html = render_component(&ChatMessage.chat_message/1, message: message)
@@ -126,7 +127,7 @@ defmodule JidoMurmurWeb.Components.ChatTest do
         id: "msg-6",
         role: "user",
         content: "Cross-agent message",
-        sender_name: "ResearchBot"
+        actor: ActorIdentity.agent("ResearchBot")
       }
 
       color = %{dot: "bg-blue-500", text: "text-blue-500", bg: "bg-blue-500/10", header: ""}

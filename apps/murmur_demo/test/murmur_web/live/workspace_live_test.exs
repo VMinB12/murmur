@@ -16,6 +16,7 @@ defmodule MurmurWeb.WorkspaceLiveTest do
 
   import Phoenix.LiveViewTest
 
+  alias JidoMurmur.ActorIdentity
   alias JidoMurmur.Catalog
   alias JidoMurmur.Signals.MessageCompleted
   alias JidoMurmur.Signals.MessageReceived
@@ -572,9 +573,10 @@ defmodule MurmurWeb.WorkspaceLiveTest do
       inter_msg = %{
         id: Ecto.UUID.generate(),
         role: "user",
-        content: "[Alice]: Can you help?",
+        content: "Can you help?",
         kind: :steering,
         interaction_id: Ecto.UUID.generate(),
+        origin_actor: ActorIdentity.agent("Alice"),
         sender_name: "Alice",
         sender_trace_id: nil
       }
@@ -582,7 +584,8 @@ defmodule MurmurWeb.WorkspaceLiveTest do
       send(view.pid, build_message_received(session.id, workspace.id, inter_msg))
 
       html = render(view)
-      assert html =~ "[Alice]: Can you help?"
+      assert html =~ "Can you help?"
+      assert html =~ "Alice"
     end
   end
 

@@ -5,6 +5,7 @@ defmodule MurmurWeb.Live.WorkspaceState do
 
   alias JidoArtifacts.Envelope
   alias JidoMurmur.Catalog
+  alias JidoMurmur.DisplayMessage
   alias JidoMurmur.UITurn
 
   @spec load_messages_for_session(map()) :: list()
@@ -63,16 +64,27 @@ defmodule MurmurWeb.Live.WorkspaceState do
       session = Map.get(session_index, session_id)
       agent_name = if session, do: session.display_name, else: "unknown"
       profile_id = if session, do: session.agent_profile_id
+      agent_color = Catalog.agent_color(profile_id, agent_name)
 
       Enum.map(messages, fn message ->
-        Map.merge(message, %{
+        enriched = maybe_attach_assistant_actor(message, agent_name, session_id)
+
+        Map.merge(enriched, %{
           session_id: session_id,
           agent_name: agent_name,
-          agent_color: Catalog.agent_color(profile_id, agent_name)
+          agent_color: agent_color
         })
       end)
     end)
     |> Enum.sort_by(& &1.id)
+  end
+
+  defp maybe_attach_assistant_actor(message, agent_name, session_id) do
+    if DisplayMessage.assistant_message?(message) do
+      DisplayMessage.with_actor(message, JidoMurmur.ActorIdentity.agent(agent_name, id: session_id), sender_name: agent_name)
+    else
+      message
+    end
   end
 
   @spec hibernate_agent(String.t()) :: :ok

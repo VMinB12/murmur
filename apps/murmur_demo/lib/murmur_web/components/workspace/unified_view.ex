@@ -2,6 +2,7 @@ defmodule MurmurWeb.Components.Workspace.UnifiedView do
   @moduledoc false
   use MurmurWeb, :html
 
+  alias JidoMurmur.DisplayMessage
   import JidoMurmurWeb.Components.ChatMessage
   import JidoMurmurWeb.Components.ChatStream
   import JidoMurmurWeb.Components.MessageInput
@@ -74,7 +75,7 @@ defmodule MurmurWeb.Components.Workspace.UnifiedView do
             <%= if message.role == "user" do %>
               <div id={"unified-msg-#{message.id}"} class="ml-auto max-w-[72%]">
                 <.chat_message
-                  message={message_for_unified(message)}
+                  message={message}
                   color={message_color(message)}
                   markdown_renderer={@markdown_renderer}
                 />
@@ -91,7 +92,7 @@ defmodule MurmurWeb.Components.Workspace.UnifiedView do
                 </div>
                 <div class="min-w-0 max-w-[72%] flex-1">
                   <.chat_message
-                    message={message_for_unified(message)}
+                    message={message}
                     color={message_color(message)}
                     markdown_renderer={@markdown_renderer}
                   />
@@ -191,17 +192,13 @@ defmodule MurmurWeb.Components.Workspace.UnifiedView do
     "@#{first_name} message... or just type to send to the first agent"
   end
 
-  defp message_for_unified(%{role: "assistant", agent_name: agent_name} = message) do
-    Map.put(message, :sender_name, agent_name || message.sender_name || "assistant")
-  end
-
-  defp message_for_unified(message), do: message
-
   defp message_color(%{role: "assistant", agent_color: agent_color}), do: agent_color
 
-  defp message_color(%{role: "user", sender_name: sender_name}) when sender_name not in [nil, "You"] do
-    Catalog.agent_color(nil, sender_name)
+  defp message_color(message) do
+    if DisplayMessage.external_user_message?(message) do
+      Catalog.agent_color(nil, DisplayMessage.label(message))
+    else
+      nil
+    end
   end
-
-  defp message_color(_message), do: nil
 end

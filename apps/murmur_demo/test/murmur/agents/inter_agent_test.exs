@@ -14,6 +14,7 @@ defmodule Murmur.Agents.InterAgentTest do
   """
   use Murmur.AgentCase
 
+  alias JidoMurmur.ActorIdentity
   alias JidoMurmur.Catalog
   alias JidoMurmur.Ingress
   alias JidoMurmur.TellAction
@@ -75,7 +76,9 @@ defmodule Murmur.Agents.InterAgentTest do
       expect_llm_ask(fn _mod, _pid, content, ctx ->
         assert content == "[Alice]: What is 2+2?"
         assert ctx[:tool_context][:hop_count] == 1
-        assert ctx[:tool_context][:origin_sender_name] == "Alice"
+        assert %ActorIdentity{kind: :agent, name: "Bob", id: current_actor_id} = ctx[:tool_context][:current_actor]
+        assert current_actor_id == bob.id
+        assert %ActorIdentity{kind: :agent, name: "Alice"} = ctx[:tool_context][:origin_actor]
         assert ctx[:extra_refs][:hop_count] == 1
         {:ok, make_ref()}
       end)

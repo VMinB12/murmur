@@ -1,6 +1,7 @@
 defmodule JidoMurmur.TellActionTest do
   use JidoMurmur.Case, async: false
 
+  alias JidoMurmur.ActorIdentity
   alias JidoMurmur.TellAction
   alias JidoMurmur.Workspaces
 
@@ -9,7 +10,7 @@ defmodule JidoMurmur.TellActionTest do
       {:ok, workspace} = Workspaces.create_workspace(%{name: "tell-test"})
 
       params = %{target_agent: "NonExistent", message: "hello"}
-      context = %{workspace_id: workspace.id, sender_name: "sender", hop_count: 0}
+      context = %{workspace_id: workspace.id, current_actor: ActorIdentity.agent("sender"), hop_count: 0}
 
       assert {:error, msg} = TellAction.run(params, context)
       assert msg =~ "not found"
@@ -24,7 +25,7 @@ defmodule JidoMurmur.TellActionTest do
       })
 
       params = %{target_agent: "Target", message: "hello"}
-      context = %{workspace_id: workspace.id, sender_name: "sender", hop_count: 5}
+      context = %{workspace_id: workspace.id, current_actor: ActorIdentity.agent("sender"), hop_count: 5}
 
       assert {:ok, result} = TellAction.run(params, context)
       assert result.delivered == false
@@ -37,7 +38,7 @@ defmodule JidoMurmur.TellActionTest do
       {:ok, workspace} = Workspaces.create_workspace(%{name: "default-hop"})
 
       params = %{target_agent: "Nobody", message: "hello"}
-      context = %{workspace_id: workspace.id, sender_name: "sender"}
+      context = %{workspace_id: workspace.id, current_actor: ActorIdentity.agent("sender")}
 
       # Should fail with "not found" (not hop error), proving hop_count defaulted to 0
       assert {:error, msg} = TellAction.run(params, context)
@@ -54,7 +55,7 @@ defmodule JidoMurmur.TellActionTest do
         })
 
       params = %{target_agent: "OfflineAgent", message: "hello"}
-      context = %{workspace_id: workspace.id, sender_name: "sender", hop_count: 0}
+        context = %{workspace_id: workspace.id, current_actor: ActorIdentity.agent("sender"), hop_count: 0}
 
       assert {:error, msg} = TellAction.run(params, context)
       assert msg =~ "Failed to deliver"
@@ -75,7 +76,7 @@ defmodule JidoMurmur.TellActionTest do
       {:ok, workspace} = Workspaces.create_workspace(%{name: "configured-hop-limit"})
 
       params = %{target_agent: "Nobody", message: "hello"}
-      context = %{workspace_id: workspace.id, sender_name: "sender", hop_count: 2}
+      context = %{workspace_id: workspace.id, current_actor: ActorIdentity.agent("sender"), hop_count: 2}
 
       assert {:ok, result} = TellAction.run(params, context)
       assert result.blocked == :hop_limit_reached

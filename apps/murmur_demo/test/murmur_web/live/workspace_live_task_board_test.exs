@@ -121,8 +121,10 @@ defmodule MurmurWeb.WorkspaceLiveTaskBoardTest do
 
       assert_receive %Jido.Signal{type: "murmur.message.received", data: %{message: msg}}, 5000
       assert msg.kind == :task_assignment
-      assert msg.sender_name == "You (human)"
+      assert msg.sender_name == "human"
+      assert msg.origin_actor == %{kind: :human}
       assert msg.hop_count == 0
+      assert msg.content =~ "A human assigned you a task"
       assert msg.content =~ "Notify Alice"
     end
   end

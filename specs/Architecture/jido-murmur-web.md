@@ -52,6 +52,12 @@ renderers = %{
 - `ArtifactPanel` owns generic artifact shell concerns only: badge dispatch, detail dispatch, active artifact state, and safe fallback rendering.
 - Consumer applications are responsible for plugin-specific renderers, artifact follow-up actions, and any orchestration that depends on domain packages.
 
+### Actor-Aware Chat Rendering
+
+- `ChatMessage` renders headers and user-message styling from `JidoMurmur.DisplayMessage` helpers rather than comparing raw label strings
+- Shared components expect canonical display messages with explicit `actor` semantics
+- Presentation wording remains overridable by the consuming application because the shared library treats actor metadata as authoritative and labels as derived output
+
 ### Color Customization
 
 Components accept optional `color` maps with `:dot`, `:header`, `:text`, `:bg` keys for per-agent styling.

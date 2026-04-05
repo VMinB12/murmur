@@ -11,6 +11,7 @@ defmodule JidoMurmur.Integration.ComposableTransformerTest do
   """
   use JidoMurmur.Case, async: false
 
+  alias JidoMurmur.ActorIdentity
   alias JidoMurmur.ComposableRequestTransformer
   alias JidoMurmur.MessageInjector
   alias JidoMurmur.Workspaces
@@ -74,7 +75,7 @@ defmodule JidoMurmur.Integration.ComposableTransformerTest do
     runtime_context = %{
       agent_id: session.id,
       workspace_id: workspace.id,
-      sender_name: session.display_name
+      current_actor: ActorIdentity.agent(session.display_name, id: session.id)
     }
 
     %{

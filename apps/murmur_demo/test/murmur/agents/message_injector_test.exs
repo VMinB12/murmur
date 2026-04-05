@@ -7,6 +7,7 @@ defmodule Murmur.Agents.MessageInjectorTest do
   """
   use Murmur.DataCase, async: false
 
+  alias JidoMurmur.ActorIdentity
   alias JidoMurmur.MessageInjector
   alias JidoMurmur.Observability.Store
   alias JidoMurmur.Workspaces
@@ -66,7 +67,7 @@ defmodule Murmur.Agents.MessageInjectorTest do
         tools: %{}
       }
 
-      runtime_context = %{workspace_id: workspace.id, sender_name: session.display_name}
+      runtime_context = %{workspace_id: workspace.id, current_actor: ActorIdentity.agent(session.display_name, id: session.id)}
 
       assert {:ok, overrides} =
                MessageInjector.transform_request(
@@ -86,7 +87,7 @@ defmodule Murmur.Agents.MessageInjectorTest do
 
     test "prepends a system message when the request has none", %{workspace: workspace, session: session} do
       request = %{messages: [%{role: :user, content: "Hello"}], llm_opts: [], tools: %{}}
-      runtime_context = %{workspace_id: workspace.id, sender_name: session.display_name}
+      runtime_context = %{workspace_id: workspace.id, current_actor: ActorIdentity.agent(session.display_name, id: session.id)}
 
       assert {:ok, overrides} =
                MessageInjector.transform_request(
@@ -110,7 +111,7 @@ defmodule Murmur.Agents.MessageInjectorTest do
         tools: %{tell: true}
       }
 
-      runtime_context = %{workspace_id: workspace.id, sender_name: session.display_name}
+      runtime_context = %{workspace_id: workspace.id, current_actor: ActorIdentity.agent(session.display_name, id: session.id)}
 
       assert {:ok, overrides} =
                MessageInjector.transform_request(
@@ -134,7 +135,7 @@ defmodule Murmur.Agents.MessageInjectorTest do
         tools: %{}
       }
 
-      runtime_context = %{workspace_id: workspace.id, sender_name: session.display_name}
+      runtime_context = %{workspace_id: workspace.id, current_actor: ActorIdentity.agent(session.display_name, id: session.id)}
 
       assert {:ok, overrides} =
                MessageInjector.transform_request(

@@ -19,6 +19,7 @@
 
 | # | Title | Completed |
 |---|-------|-----------|
+| 015 | [Actor Identity And Display Projection Cleanup](tickets/015-actor-identity-and-display-projection-cleanup/) | 2026-04-05 |
 | 014 | [Runtime Metadata Boundary Cleanup](tickets/014-runtime-metadata-boundary-cleanup/) | 2026-04-05 |
 | 012 | [Native ReAct Steering Adoption](tickets/012-native-react-steering-adoption/) | 2026-04-04 |
 | 009 | [Data Contract Enforcement](tickets/009-data-contract-enforcement/) | 2026-04-04 |
@@ -37,6 +38,7 @@
 
 | ADR | Title | Date |
 |-----|-------|------|
+| ADR-004 | [Canonical Actor Identity And Display Boundary](decisions/ADR-004-canonical-actor-identity-and-display-boundary.md) | 2026-04-05 |
 | ADR-003 | [Runtime Metadata Projection Boundary](decisions/ADR-003-runtime-metadata-projection-boundary.md) | 2026-04-05 |
 | ADR-002 | [Single Ingress Coordinator Actor](decisions/ADR-002-single-ingress-coordinator-actor.md) | 2026-04-04 |
 | ADR-001 | [Frontend Boundary Ownership](decisions/ADR-001-frontend-boundary-ownership.md) | 2026-04-04 |

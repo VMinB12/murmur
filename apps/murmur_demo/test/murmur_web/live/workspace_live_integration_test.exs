@@ -15,7 +15,9 @@ defmodule MurmurWeb.WorkspaceLiveIntegrationTest do
 
   import Phoenix.LiveViewTest
 
+  alias JidoMurmur.ActorIdentity
   alias JidoMurmur.Catalog
+  alias JidoMurmur.Signals.MessageReceived
   alias JidoMurmur.Workspaces
   alias Murmur.LLM.MockBehaviour, as: Mock
 
@@ -173,6 +175,42 @@ defmodule MurmurWeb.WorkspaceLiveIntegrationTest do
       refute has_element?(view, "#messages-#{bob_session.id}", "Hi Alice")
 
       Murmur.Jido.stop_agent(bob_session.id)
+    end
+  end
+
+  describe "unified mode actor-aware rendering" do
+    test "programmatic inter-agent messages render sender label without content prefix", %{
+      conn: conn,
+      workspace: workspace,
+      session: session
+    } do
+      {:ok, view, _html} = live(conn, ~p"/workspaces/#{workspace.id}")
+      view |> element("#view-unified-btn") |> render_click()
+
+      send(
+        view.pid,
+        MessageReceived.new!(
+          %{
+            session_id: session.id,
+            message: %{
+              id: Ecto.UUID.generate(),
+              role: "user",
+              content: "Can you review this?",
+              kind: :steering,
+              interaction_id: Ecto.UUID.generate(),
+              sender_name: "Bob",
+              origin_actor: ActorIdentity.serialize(ActorIdentity.agent("Bob")),
+              sender_trace_id: nil,
+              hop_count: 0
+            }
+          },
+          subject: MessageReceived.subject(workspace.id, session.id)
+        )
+      )
+
+      html = render(view)
+      assert html =~ "Can you review this?"
+      assert html =~ "Bob"
     end
   end
 

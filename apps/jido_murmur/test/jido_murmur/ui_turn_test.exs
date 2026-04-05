@@ -1,6 +1,7 @@
 defmodule JidoMurmur.UITurnTest do
   use ExUnit.Case, async: true
 
+  alias JidoMurmur.ActorIdentity
   alias JidoMurmur.UITurn
 
   describe "project_entries/1" do
@@ -22,6 +23,7 @@ defmodule JidoMurmur.UITurnTest do
       assert hd(result).role == "user"
       assert hd(result).content == "Hello!"
       assert hd(result).sender_name == "Alice"
+      assert hd(result).actor == ActorIdentity.human("Alice")
     end
 
     test "projects a single assistant turn" do
@@ -44,6 +46,7 @@ defmodule JidoMurmur.UITurnTest do
       assert msg.role == "assistant"
       assert msg.content == "Hi there!"
       assert msg.sender_name == "Bot"
+      assert msg.actor == ActorIdentity.unknown("Bot")
     end
 
     test "groups assistant entries with same request_id" do
@@ -129,20 +132,22 @@ defmodule JidoMurmur.UITurnTest do
       assert hd(result).content == "Hello!"
     end
 
-    test "infers sender name from message prefix" do
+    test "uses explicit origin actor metadata for inter-agent messages" do
       entries = [
         %{
           id: "msg-9",
           kind: :message,
-          payload: %{role: "user", content: "[Bob]: Hi there!"}
+          payload: %{role: "user", content: "Hi there!"},
+          refs: %{origin_actor: ActorIdentity.agent("Bob")}
         }
       ]
 
       result = UITurn.project_entries(entries)
       assert hd(result).sender_name == "Bob"
+      assert hd(result).actor == ActorIdentity.agent("Bob")
     end
 
-    test "defaults sender name to You" do
+    test "defaults sender identity to the local human actor" do
       entries = [
         %{
           id: "msg-10",
@@ -153,6 +158,7 @@ defmodule JidoMurmur.UITurnTest do
 
       result = UITurn.project_entries(entries)
       assert hd(result).sender_name == "You"
+      assert hd(result).actor == ActorIdentity.human()
     end
   end
 end

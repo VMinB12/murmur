@@ -6,6 +6,7 @@ defmodule JidoMurmur.Ingress.ProgrammaticDelivery do
   canonical ingress input delivered through `JidoMurmur.Ingress`.
   """
 
+  alias JidoMurmur.ActorIdentity
   alias JidoMurmur.Ingress
   alias JidoMurmur.Ingress.Input
   alias JidoMurmur.Signals.MessageReceived
@@ -25,6 +26,7 @@ defmodule JidoMurmur.Ingress.ProgrammaticDelivery do
     :missing_workspace_id,
     :invalid_workspace_id,
     :invalid_sender_name,
+    :invalid_origin_actor,
     :invalid_sender_trace_id,
     :invalid_hop_count,
     :invalid_expected_request_id
@@ -33,13 +35,13 @@ defmodule JidoMurmur.Ingress.ProgrammaticDelivery do
   @spec deliver(session_like(), String.t(), keyword()) ::
           :queued | :agent_not_running | {:error, {:invalid_input, Input.validation_error()}}
   def deliver(session, content, opts \\ []) when is_binary(content) and is_list(opts) do
-    with {:ok, sender_name} <- normalize_sender_name(Keyword.get(opts, :sender_name)),
-         {:ok, message_kind} <- normalize_message_kind(Keyword.get(opts, :kind, Keyword.get(opts, :via))),
+    with {:ok, message_kind} <- normalize_message_kind(Keyword.get(opts, :kind, Keyword.get(opts, :via))),
          {:ok, input} <-
            Input.programmatic_message(session, content,
              via: Keyword.get(opts, :via),
              interaction_id: Keyword.get(opts, :interaction_id),
-             sender_name: sender_name,
+             sender_name: Keyword.get(opts, :sender_name),
+             origin_actor: Keyword.get(opts, :origin_actor),
              sender_trace_id: Keyword.get(opts, :sender_trace_id),
              expected_request_id: Keyword.get(opts, :expected_request_id),
              refs: Keyword.get(opts, :refs, %{})
@@ -73,6 +75,7 @@ defmodule JidoMurmur.Ingress.ProgrammaticDelivery do
             kind: message_kind,
             interaction_id: metadata.interaction_id,
             sender_name: metadata.sender_name,
+            origin_actor: ActorIdentity.serialize(metadata.origin_actor),
             sender_trace_id: metadata.sender_trace_id,
             hop_count: metadata.hop_count
           }
@@ -82,9 +85,6 @@ defmodule JidoMurmur.Ingress.ProgrammaticDelivery do
 
     Phoenix.PubSub.broadcast(JidoMurmur.pubsub(), topic(session), signal)
   end
-
-  defp normalize_sender_name(value) when is_binary(value), do: {:ok, value}
-  defp normalize_sender_name(_value), do: {:error, :invalid_sender_name}
 
   defp normalize_message_kind(value) when is_atom(value) or is_binary(value), do: {:ok, value}
   defp normalize_message_kind(_value), do: {:error, :invalid_source}

@@ -91,16 +91,24 @@ All topics follow `workspace:{wid}:...` for multi-workspace isolation:
 
 - `JidoMurmur.Ingress.Input` owns canonical ingress input construction and validation
 - `JidoMurmur.Ingress.Metadata` is the typed projection of Murmur-owned ingress metadata carried inside `refs`
-- Known metadata fields are `interaction_id`, `workspace_id`, `sender_name`, `sender_trace_id`, and `hop_count`
+- Known metadata fields are `interaction_id`, `workspace_id`, `sender_name`, `origin_actor`, `sender_trace_id`, and `hop_count`
 - Metadata keys are atom-keyed in the cleaned runtime path; fallback string-key readers are not retained in this unpublished package surface
 - `Runner` projects tool-visible runtime context from canonical metadata once, instead of performing ad hoc ref lookups in downstream code
+- Runtime context distinguishes `current_actor` from `origin_actor`; compatibility aliases such as `sender_name` remain transitional outputs, not the long-lived semantic contract
 
 ### Shared Programmatic Delivery
 
 - `JidoMurmur.Ingress.ProgrammaticDelivery` is the single visible programmatic delivery path for tells and task-assignment notifications
 - The helper builds canonical ingress input first, delivers it through `Ingress.deliver_input/2`, then emits `MessageReceived` using the same canonical metadata
-- Visible programmatic payloads now align on one shape: `content`, `kind`, `interaction_id`, `sender_name`, `sender_trace_id`, and `hop_count`
+- Visible programmatic payloads now align on one shape: `content`, `kind`, `interaction_id`, `sender_name`, `origin_actor`, `sender_trace_id`, and `hop_count`
 - Task-assignment notifications and tell messages no longer duplicate message-signal assembly, canonical input assembly, or ad hoc metadata shaping in their callers
+
+### Canonical Display Projection
+
+- `JidoMurmur.DisplayMessage` is the canonical UI-facing message model for chat surfaces
+- `UITurn.project_entries/1` is the shared projection boundary that converts persisted thread entries into display messages with explicit actor semantics
+- The projection boundary normalizes persisted string-keyed payloads once, but it no longer infers actor identity from content prefixes such as `"[Alice]: ..."`
+- Display labels are derived from actor metadata and rendering helpers, not treated as the runtime source of truth
 
 ### Request Transformation Pipeline
 
@@ -189,7 +197,33 @@ jido_murmur_thread_entries
 └── inserted_at (utc_datetime_usec)
 ```
 
-### UITurn (presentation struct)
+### ActorIdentity (shared semantic model)
+
+```elixir
+%ActorIdentity{
+  kind: :agent | :human | :programmatic | :system | :unknown,
+  name: String.t() | nil,
+  id: String.t() | nil
+}
+```
+
+### DisplayMessage (presentation struct)
+
+```elixir
+%DisplayMessage{
+  id: String.t(),
+  role: String.t(),
+  content: String.t(),
+  actor: ActorIdentity.t() | nil,
+  sender_name: String.t() | nil,
+  thinking: String.t() | nil,
+  tool_calls: [%ToolCall{}],
+  usage: map() | nil,
+  status: atom() | nil
+}
+```
+
+### UITurn (projection helper)
 
 ```elixir
 %UITurn{

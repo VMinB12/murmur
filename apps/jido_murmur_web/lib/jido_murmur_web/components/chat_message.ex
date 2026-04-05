@@ -10,6 +10,8 @@ defmodule JidoMurmurWeb.Components.ChatMessage do
 
   use Phoenix.Component
 
+  alias JidoMurmur.DisplayMessage
+
   import JidoMurmurWeb, only: [icon: 1]
 
   @doc """
@@ -38,7 +40,7 @@ defmodule JidoMurmurWeb.Components.ChatMessage do
       ]}
     >
       <div class="chat-header mb-1 text-[10px] uppercase tracking-wider text-base-content/40 px-1">
-        {@message.sender_name || @message.role}
+        {DisplayMessage.label(@message)}
       </div>
 
       <%!-- Thinking trace (collapsible) --%>
@@ -87,16 +89,14 @@ defmodule JidoMurmurWeb.Components.ChatMessage do
 
       <%!-- Message content --%>
       <%= if @message.content && @message.content != "" do %>
-        <% inter_agent? =
-          @message.role == "user" and @message.sender_name != "You" and
-            @message.sender_name != nil %>
+        <% inter_agent? = DisplayMessage.external_user_message?(@message) %>
         <div class={[
           "chat-bubble px-3 py-2 text-sm max-w-[85%] break-words shadow-sm",
           cond do
-            @message.role != "user" and @color ->
+            DisplayMessage.assistant_message?(@message) and @color ->
               [@color.bg, "border border-base-300/30 text-base-content prose prose-sm max-w-none"]
 
-            @message.role != "user" ->
+            DisplayMessage.assistant_message?(@message) ->
               "bg-base-200 text-base-content prose prose-sm max-w-none"
 
             inter_agent? && @color ->

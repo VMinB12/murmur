@@ -7,6 +7,7 @@ defmodule MurmurWeb.WorkspaceLiveHelpersTest do
   """
   use Murmur.AgentCase
 
+  alias JidoMurmur.ActorIdentity
   alias JidoMurmur.Catalog
   alias JidoMurmur.Workspaces
   alias MurmurWeb.Live.WorkspaceState
@@ -76,12 +77,28 @@ defmodule MurmurWeb.WorkspaceLiveHelpersTest do
 
       agent = put_in(agent.state[:__thread__], thread)
 
-  messages = WorkspaceState.project_thread(agent)
+      messages = WorkspaceState.project_thread(agent)
       assert length(messages) == 2
 
       roles = Enum.map(messages, & &1.role)
       assert "user" in roles
       assert "assistant" in roles
+
+      assert Enum.any?(messages, &(&1.actor == ActorIdentity.human()))
+      assert Enum.any?(messages, &(&1.role == "assistant" and is_nil(&1.actor)))
+    end
+
+    test "unified_timeline attaches canonical assistant actor identity", %{session: session} do
+      messages_map = %{
+        session.id => [
+          JidoMurmur.DisplayMessage.assistant("Ready")
+        ]
+      }
+
+      timeline = WorkspaceState.unified_timeline(messages_map, [session])
+
+      assert [%{actor: %ActorIdentity{kind: :agent, name: "Helper", id: actor_id}}] = timeline
+      assert actor_id == session.id
     end
   end
 

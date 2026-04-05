@@ -18,6 +18,7 @@ All notable changes to this project are documented here. Entries are in reverse 
 
 ### Changed
 
+- Completed ticket 015 actor identity and display projection cleanup: runtime context now distinguishes current and origin actors explicitly, `UITurn` emits canonical display messages, shared/demo chat rendering is actor-aware instead of string-heuristic-driven, and presentation wording now stays at the UI edge.
 - Completed ticket 014 runtime metadata boundary cleanup: canonical ingress metadata now projects through a typed runtime boundary, tell hop depth is configurable and non-crashing at the limit, and visible programmatic delivery is shared across tell and task-assignment paths.
 - Completed ticket 009 data contract hardening: live and persisted artifact paths now share the `%JidoArtifacts.Envelope{}` boundary, SQL execution now returns `%JidoSql.QueryResult{}`, legacy envelope unwrap fallbacks were removed, and signal schemas now document typed `artifact.*`, `murmur.message.*`, and `task.*` payloads.
 - Completed ticket 011 frontend boundary refactor: `jido_murmur_web` now ships a domain-agnostic workspace shell, `murmur_demo` owns SQL/arXiv artifact integrations, the workspace presentation is split into focused modules, and the demo child app now builds assets through its own configured aliases

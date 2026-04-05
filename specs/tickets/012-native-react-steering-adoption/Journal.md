@@ -10,3 +10,8 @@
 - Started implementation with ADR-002, ingress coordinator modules, LLM adapter control calls, and Runner handoff to ingress.
 - Removed the legacy runtime delivery module and ETS table, migrated production callers onto `JidoMurmur.Ingress`, and rewrote legacy delivery tests around active-run steer/inject semantics.
 - Removed the final compatibility wrapper around direct runner delivery, aligned package and architecture docs with ingress-first delivery, marked the ticket complete, and revalidated the repo with `mix test` and `mix precommit`.
+
+## 2026-04-05
+
+- Performed a final cleanup pass after completion and removed the remaining ingress compatibility seam built around `from_legacy`.
+- Narrowed the public ingress API to explicit direct human delivery plus canonical programmatic input delivery, then revalidated with focused tests and `mix precommit`.

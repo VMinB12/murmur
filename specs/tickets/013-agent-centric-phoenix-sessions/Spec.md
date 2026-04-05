@@ -8,48 +8,53 @@
 
 **Independent test**: Send multiple direct messages to the same agent over a long time gap and verify all resulting traces remain grouped under one Phoenix session row keyed by that agent.
 
-### US-2: Preserve workflow correlation without using Phoenix session grouping (Priority: P1)
+### US-2: One root trace per executed react loop (Priority: P1)
 
-**As a** developer debugging multi-agent workflows, **I want** cross-agent relationships to remain visible through Murmur correlation metadata, **so that** agent-centric Phoenix Sessions does not erase my ability to trace one workflow across multiple agents.
+**As a** developer debugging agent behavior, **I want** every executed react loop to appear as its own trace, **so that** trace boundaries match real runtime execution rather than inbound message count.
 
-**Independent test**: Run an Alice-to-Bob workflow and verify Alice and Bob still export a shared workflow correlation field even though their Phoenix `session.id` values differ by agent.
+**Independent test**: Send a message to an idle agent, then deliver follow-up input while the agent is still active, and verify the running loop still has only one root trace.
 
-### US-3: Remove heuristic discussion rollover from session grouping (Priority: P1)
+### US-3: Remove discussion and interaction identifiers from the canonical model (Priority: P1)
 
-**As a** Murmur maintainer, **I want** Phoenix session grouping to stop depending on an inactivity timeout or inferred direct-chat discussion cache, **so that** the grouping model matches a stable product concept instead of a runtime heuristic.
+**As a** Murmur maintainer, **I want** Phoenix session grouping and observability metadata to stop depending on inferred discussions, `interaction_id`, and inactivity rollover, **so that** the runtime model stays simple and stable.
 
-**Independent test**: Inspect the runtime behavior for direct messages and verify Phoenix `session.id` no longer changes because of elapsed inactivity time.
+**Independent test**: Inspect direct and programmatic ingress plus exported span attributes and verify session grouping works without `ConversationCache`, `:conversation_session_timeout_ms`, or `murmur.interaction_id`.
 
-### US-4: Keep separate semantics for agent identity and workflow identity (Priority: P2)
+### US-4: Preserve immediate cross-agent handoff causation (Priority: P2)
 
-**As a** developer reading observability data, **I want** the exported fields to make it clear which id represents the concrete agent and which id represents cross-agent workflow correlation, **so that** agent-centric grouping does not blur causal relationships.
+**As a** developer debugging agent-to-agent work, **I want** a new downstream trace to optionally record the parent trace that triggered it, **so that** I can inspect direct handoffs without inventing a workflow or discussion id.
 
-**Independent test**: Inspect one direct turn and one cross-agent turn and verify `session.id` matches the executing agent identity while `murmur.interaction_id` continues to represent workflow or message-level correlation when available.
+**Independent test**: Have Alice tell idle Bob to do work and verify Bob's new trace contains `murmur.triggered_by_trace_id` pointing to Alice's trace.
 
 ## Acceptance Criteria
 
 - [ ] Phoenix `session.id` is exported as the executing agent session id for agent, LLM, and tool spans.
-- [ ] Direct user messages to the same agent continue to group under the same Phoenix session row even after long inactivity periods.
-- [ ] Direct-message session grouping no longer depends on `ConversationCache` or `:conversation_session_timeout_ms`.
-- [ ] Cross-agent workflows no longer rely on Phoenix Sessions to appear as one grouped session row across agents.
-- [ ] `murmur.interaction_id` remains available as the cross-agent workflow or message correlation key when present.
 - [ ] `murmur.agent_id` remains the concrete executing agent identity and is aligned with the Phoenix session grouping key.
-- [ ] Architecture and observability documentation explain the new product meaning of Phoenix Sessions as an agent-centric view rather than a discussion-centric view.
-- [ ] Any now-obsolete direct-chat discussion cache or timeout behavior is removed or clearly deprecated from code and documentation.
+- [ ] Each idle-to-active run creates exactly one new root trace identified by `murmur.request_id`.
+- [ ] Steering or injected follow-up input delivered during an active run does not create a second root trace.
+- [ ] Direct user messages to the same agent continue to appear under one Phoenix session row regardless of inactivity gap.
+- [ ] Phoenix session grouping no longer depends on `ConversationCache` or `:conversation_session_timeout_ms`.
+- [ ] `murmur.interaction_id` is removed from the canonical ingress contract, runtime tool context, delivery signals, and exported span attributes for this path.
+- [ ] No new discussion, workflow, lineage, or replacement session-grouping id is introduced in place of `interaction_id`.
+- [ ] Idle-started downstream work can still record immediate parent causation via `sender_trace_id` and `murmur.triggered_by_trace_id` when available.
+- [ ] Architecture and observability documentation explain Phoenix sessions as agent-centric, traces as react-loop-centric, and parent-trace causation as optional immediate metadata only.
+- [ ] Any now-obsolete direct-chat discussion cache and timeout behavior is removed or clearly deprecated from code and documentation.
 
 ## Scope
 
 ### In Scope
 
 - Redefining Phoenix Sessions to be agent-centric
-- Updating observability export semantics for `session.id`
-- Removing or deprecating `ConversationCache` and inactivity-timeout-based session grouping
-- Preserving cross-agent workflow correlation through Murmur-specific metadata
-- Updating architecture and observability documentation to reflect the new model
+- Keeping one trace per executed react loop
+- Removing `interaction_id` from canonical observability and ingress metadata for this path
+- Removing `ConversationCache` and inactivity-timeout-based session rollover
+- Preserving only immediate parent-trace causation for idle-started downstream work
+- Updating architecture, observability, and package documentation to reflect the new model
 
 ### Out of Scope
 
-- Introducing a first-class persisted discussion or thread id model
-- Changing the root trace boundary model of one trace per executed react loop
+- Introducing a new workflow, discussion, lineage, or replacement interaction id
+- Reconstructing multi-hop workflow graphs as first-class Murmur runtime data
+- Splitting one user message that contains several unrelated tasks into multiple independently tracked work items
 - Reworking Phoenix UI screens outside the observability/session semantics needed for this change
 - Redefining workspace or team correlation semantics beyond clarifying that they are separate from Phoenix session grouping

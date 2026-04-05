@@ -91,7 +91,7 @@ All topics follow `workspace:{wid}:...` for multi-workspace isolation:
 
 - `JidoMurmur.Ingress.Input` owns canonical ingress input construction and validation
 - `JidoMurmur.Ingress.Metadata` is the typed projection of Murmur-owned ingress metadata carried inside `refs`
-- Known metadata fields are `interaction_id`, `workspace_id`, `sender_name`, `origin_actor`, `sender_trace_id`, and `hop_count`
+- Known metadata fields are `workspace_id`, `sender_name`, `origin_actor`, `sender_trace_id`, and `hop_count`
 - Metadata keys are atom-keyed in the cleaned runtime path; fallback string-key readers are not retained in this unpublished package surface
 - `Runner` projects tool-visible runtime context from canonical metadata once, instead of performing ad hoc ref lookups in downstream code
 - Runtime context distinguishes `current_actor` from `origin_actor`; compatibility aliases such as `sender_name` remain transitional outputs, not the long-lived semantic contract
@@ -100,7 +100,7 @@ All topics follow `workspace:{wid}:...` for multi-workspace isolation:
 
 - `JidoMurmur.Ingress.ProgrammaticDelivery` is the single visible programmatic delivery path for tells and task-assignment notifications
 - The helper builds canonical ingress input first, delivers it through `Ingress.deliver_input/2`, then emits `MessageReceived` using the same canonical metadata
-- Visible programmatic payloads now align on one shape: `content`, `kind`, `interaction_id`, `sender_name`, `origin_actor`, `sender_trace_id`, and `hop_count`
+- Visible programmatic payloads now align on one shape: `content`, `kind`, `sender_name`, `origin_actor`, `sender_trace_id`, and `hop_count`
 - Task-assignment notifications and tell messages no longer duplicate message-signal assembly, canonical input assembly, or ad hoc metadata shaping in their callers
 
 ### Canonical Display Projection
@@ -134,8 +134,8 @@ All plugins use `Jido.Plugin`, declaration-ordered:
 ### Observability
 
 - See [observability.md](observability.md) for the current observability model.
-- `Runner` owns root turn boundaries and exports discussion-scoped `session.id` values.
-- `ConversationCache` keeps direct chat grouped into one active discussion until inactivity timeout rollover.
+- `Runner` owns root turn boundaries and exports agent-scoped `session.id` values.
+- Immediate inter-agent causation is carried through `sender_trace_id` on delivery and exported as `murmur.triggered_by_trace_id` when a new downstream run starts.
 - `ReqLLMTracer` feeds detailed LLM telemetry into Murmur-owned span state.
 
 ### ETS Tables (owned by TableOwner GenServer)
@@ -143,7 +143,6 @@ All plugins use `Jido.Plugin`, declaration-ordered:
 | Table | Purpose |
 |-------|---------|
 | `:jido_murmur_active_runners` | Track active run tasks per session |
-| `:jido_murmur_obs_conversations` | Active direct-chat discussion id per agent session |
 
 ## Data Models
 

@@ -6,14 +6,15 @@
 
 | Metric | Value |
 |--------|-------|
-| Active tickets | 1 |
+| Active tickets | 2 |
 | Last updated | 2026-04-05 |
 
 ## Active Tickets
 
 | # | Title | Status | Owner |
 |---|-------|--------|-------|
-| 013 | [Agent-Centric Phoenix Sessions](tickets/013-agent-centric-phoenix-sessions/) | specifying | — |
+| 013 | [Agent-Centric Phoenix Sessions](tickets/013-agent-centric-phoenix-sessions/) | planned | — |
+| 016 | [Conversation Read Model And Streaming Consistency](tickets/016-conversation-read-model-and-streaming-consistency/) | planned | — |
 
 ## Recently Completed
 
@@ -38,6 +39,7 @@
 
 | ADR | Title | Date |
 |-----|-------|------|
+| ADR-006 | [Agent-Centric Phoenix Sessions And Immediate Trace Causation](decisions/ADR-006-agent-centric-phoenix-sessions-and-immediate-trace-causation.md) | 2026-04-05 |
 | ADR-004 | [Canonical Actor Identity And Display Boundary](decisions/ADR-004-canonical-actor-identity-and-display-boundary.md) | 2026-04-05 |
 | ADR-003 | [Runtime Metadata Projection Boundary](decisions/ADR-003-runtime-metadata-projection-boundary.md) | 2026-04-05 |
 | ADR-002 | [Single Ingress Coordinator Actor](decisions/ADR-002-single-ingress-coordinator-actor.md) | 2026-04-04 |

@@ -1,5 +1,5 @@
 defmodule JidoMurmur.TellActionTest do
-  use JidoMurmur.Case, async: true
+  use JidoMurmur.Case, async: false
 
   alias JidoMurmur.TellAction
   alias JidoMurmur.Workspaces
@@ -15,7 +15,7 @@ defmodule JidoMurmur.TellActionTest do
       assert msg =~ "not found"
     end
 
-    test "returns error when max hop depth exceeded" do
+    test "returns informative result when max hop depth is exceeded" do
       {:ok, workspace} = Workspaces.create_workspace(%{name: "hop-test"})
 
       Workspaces.create_agent_session(workspace.id, %{
@@ -26,8 +26,11 @@ defmodule JidoMurmur.TellActionTest do
       params = %{target_agent: "Target", message: "hello"}
       context = %{workspace_id: workspace.id, sender_name: "sender", hop_count: 5}
 
-      assert {:error, msg} = TellAction.run(params, context)
-      assert msg =~ "Maximum inter-agent hop depth"
+      assert {:ok, result} = TellAction.run(params, context)
+      assert result.delivered == false
+      assert result.blocked == :hop_limit_reached
+      assert result.hop_limit == 5
+      assert result.message =~ "hop limit"
     end
 
     test "defaults hop_count to 0 when not present in context" do
@@ -55,6 +58,28 @@ defmodule JidoMurmur.TellActionTest do
 
       assert {:error, msg} = TellAction.run(params, context)
       assert msg =~ "Failed to deliver"
+    end
+
+    test "uses configured hop limit" do
+      original_limit = Application.get_env(:jido_murmur, :tell_hop_limit)
+      Application.put_env(:jido_murmur, :tell_hop_limit, 2)
+
+      on_exit(fn ->
+        if is_nil(original_limit) do
+          Application.delete_env(:jido_murmur, :tell_hop_limit)
+        else
+          Application.put_env(:jido_murmur, :tell_hop_limit, original_limit)
+        end
+      end)
+
+      {:ok, workspace} = Workspaces.create_workspace(%{name: "configured-hop-limit"})
+
+      params = %{target_agent: "Nobody", message: "hello"}
+      context = %{workspace_id: workspace.id, sender_name: "sender", hop_count: 2}
+
+      assert {:ok, result} = TellAction.run(params, context)
+      assert result.blocked == :hop_limit_reached
+      assert result.hop_limit == 2
     end
   end
 end

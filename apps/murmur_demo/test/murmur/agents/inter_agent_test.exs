@@ -72,12 +72,26 @@ defmodule Murmur.Agents.InterAgentTest do
       workspace: workspace,
       bob: bob
     } do
+      expect_llm_ask(fn _mod, _pid, content, ctx ->
+        assert content == "[Alice]: What is 2+2?"
+        assert ctx[:tool_context][:hop_count] == 1
+        assert ctx[:tool_context][:origin_sender_name] == "Alice"
+        assert ctx[:extra_refs][:hop_count] == 1
+        {:ok, make_ref()}
+      end)
+
+      expect_llm_await(fn _mod, _handle, _opts ->
+        {:ok, "Mock agent response"}
+      end)
+
       params = %{target_agent: "Bob", message: "What is 2+2?"}
       context = %{workspace_id: workspace.id, sender_name: "Alice", hop_count: 0}
 
       assert {:ok, _} = TellAction.run(params, context)
 
       bob_id = bob.id
+      assert_receive %Jido.Signal{type: "murmur.message.received", data: %{session_id: ^bob_id, message: msg}}, 5000
+      assert msg.hop_count == 1
       assert_receive %Jido.Signal{type: "murmur.message.completed", data: %{session_id: ^bob_id, response: "Mock agent response"}}, 5000
     end
   end
@@ -95,6 +109,7 @@ defmodule Murmur.Agents.InterAgentTest do
       expect_llm_inject(fn _mod, _pid, content, opts ->
         assert content == "[Alice]: Also, what is 3+3?"
         assert opts[:source][:kind] == :programmatic
+        assert opts[:extra_refs][:hop_count] == 1
         {:ok, %{}}
       end)
 
@@ -116,7 +131,8 @@ defmodule Murmur.Agents.InterAgentTest do
 
       assert {:ok, _} = TellAction.run(params, context)
       bob_id = bob.id
-      assert_receive %Jido.Signal{type: "murmur.message.received", data: %{session_id: ^bob_id}}, 5000
+      assert_receive %Jido.Signal{type: "murmur.message.received", data: %{session_id: ^bob_id, message: msg}}, 5000
+      assert msg.hop_count == 1
 
       send(waiter_pid, {:release_await, pause_ref})
 
@@ -153,6 +169,7 @@ defmodule Murmur.Agents.InterAgentTest do
       bob_id = bob.id
       assert_receive %Jido.Signal{type: "murmur.message.received", data: %{session_id: ^bob_id, message: msg}}, 5000
       assert msg.content =~ "[Alice]"
+      assert msg.hop_count == 1
 
       assert_receive %Jido.Signal{type: "murmur.message.completed", data: %{session_id: ^bob_id}}, 5000
     end

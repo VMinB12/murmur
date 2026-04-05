@@ -6,6 +6,7 @@ defmodule JidoMurmur.Config do
   configuration keys are present before the application starts.
   """
 
+  @default_tell_hop_limit 5
   @required_keys [:repo, :pubsub, :jido_mod, :otp_app]
 
   @spec validate!() :: :ok | no_return()
@@ -34,6 +35,25 @@ defmodule JidoMurmur.Config do
       """
     end
 
+    validate_optional_non_negative_integer!(:tell_hop_limit)
+
     :ok
+  end
+
+  @spec tell_hop_limit() :: non_neg_integer()
+  def tell_hop_limit do
+    case Application.get_env(:jido_murmur, :tell_hop_limit, @default_tell_hop_limit) do
+      value when is_integer(value) and value >= 0 -> value
+      _ ->
+        raise "invalid :jido_murmur :tell_hop_limit configuration; expected a non-negative integer"
+    end
+  end
+
+  defp validate_optional_non_negative_integer!(key) do
+    case Application.get_env(:jido_murmur, key, :unset) do
+      :unset -> :ok
+      value when is_integer(value) and value >= 0 -> :ok
+      _ -> raise "invalid :jido_murmur #{inspect(key)} configuration; expected a non-negative integer"
+    end
   end
 end

@@ -8,7 +8,7 @@ defmodule JidoMurmur.Runner do
   """
 
   alias JidoMurmur.Catalog
-  alias JidoMurmur.Ingress.Input
+  alias JidoMurmur.Ingress.{Input, Metadata}
   alias JidoMurmur.Observability
   alias JidoMurmur.Signals.MessageCompleted
 
@@ -26,70 +26,9 @@ defmodule JidoMurmur.Runner do
   @doc false
   @spec start_run(session_like(), Input.t()) :: {:ok, String.t()} | {:error, term()}
   def start_run(session, %Input{} = input) do
-    jido_mod = JidoMurmur.jido_mod()
-    pid = jido_mod.whereis(session.id)
-
-    if is_nil(pid) do
-      {:error, :agent_not_running}
-    else
-      agent_module = Catalog.agent_module(session.agent_profile_id)
-      topic = agent_topic(session)
-      interaction_id = Input.interaction_id(input) || Observability.next_interaction_id()
-      conversation_session_id = interaction_id || session.id
-      sender_trace_id = ref_value(input.refs, :sender_trace_id)
-      sender_name = ref_value(input.refs, :sender_name)
-      request_id = Uniq.UUID.uuid7()
-
-      tool_ctx = %{
-        workspace_id: session.workspace_id,
-        sender_name: session.display_name,
-        interaction_id: interaction_id,
-        request_id: request_id
-      }
-
-      start_time = System.monotonic_time()
-
-      Observability.start_turn(%{
-        request_id: request_id,
-        agent_id: session.id,
-        agent_name: session.display_name,
-        session_id: conversation_session_id,
-        workspace_id: session.workspace_id,
-        interaction_id: interaction_id,
-        input_value: input.content,
-        message_count: 1,
-        triggered_by_trace_id: sender_trace_id,
-        sender_name: sender_name
-      })
-
-      :telemetry.execute(
-        [:jido_murmur, :runner, :run, :start],
-        %{system_time: System.system_time()},
-        %{session_id: session.id, agent_module: agent_module, request_id: request_id}
-      )
-
-      request_opts =
-        [tool_context: tool_ctx, request_id: request_id]
-        |> maybe_put_extra_refs(input.refs)
-
-      case llm_adapter().ask(agent_module, pid, input.content, request_opts) do
-        {:ok, req} ->
-          :ets.insert(@active_table, {session.id, request_id})
-          start_await_task(agent_module, req, session, topic, start_time, request_id)
-          {:ok, request_id}
-
-        {:error, reason} ->
-          Observability.fail_turn(request_id, reason)
-
-          :telemetry.execute(
-            [:jido_murmur, :runner, :run, :exception],
-            %{duration: System.monotonic_time() - start_time},
-            %{session_id: session.id, request_id: request_id, reason: reason}
-          )
-
-          broadcast(topic, request_failed_signal(session, reason))
-          {:error, reason}
-      end
+    case JidoMurmur.jido_mod().whereis(session.id) do
+      nil -> {:error, :agent_not_running}
+      pid -> do_start_run(session, input, pid)
     end
   end
 
@@ -100,6 +39,80 @@ defmodule JidoMurmur.Runner do
   end
 
   # --- Private ---
+
+  defp do_start_run(session, input, pid) do
+    case Input.metadata(input) do
+      {:ok, metadata} ->
+        run = build_run_context(session, metadata)
+
+        observe_run_start(session, input, metadata, run)
+
+        request_opts =
+          [tool_context: run.tool_context, request_id: run.request_id]
+          |> maybe_put_extra_refs(input.refs)
+
+        case llm_adapter().ask(run.agent_module, pid, input.content, request_opts) do
+          {:ok, req} ->
+            :ets.insert(@active_table, {session.id, run.request_id})
+            start_await_task(run.agent_module, req, session, run.topic, run.start_time, run.request_id)
+            {:ok, run.request_id}
+
+          {:error, reason} ->
+            handle_start_failure(session, run, reason)
+        end
+
+      {:error, reason} ->
+        {:error, {:invalid_input, reason}}
+    end
+  end
+
+  defp build_run_context(session, metadata) do
+    request_id = Uniq.UUID.uuid7()
+
+    %{
+      agent_module: Catalog.agent_module(session.agent_profile_id),
+      topic: agent_topic(session),
+      interaction_id: metadata.interaction_id,
+      request_id: request_id,
+      tool_context: Metadata.tool_context(metadata, session.display_name, request_id),
+      start_time: System.monotonic_time()
+    }
+  end
+
+  defp observe_run_start(session, input, metadata, run) do
+    Observability.start_turn(%{
+      request_id: run.request_id,
+      agent_id: session.id,
+      agent_name: session.display_name,
+      session_id: run.interaction_id,
+      workspace_id: session.workspace_id,
+      interaction_id: run.interaction_id,
+      input_value: input.content,
+      message_count: 1,
+      triggered_by_trace_id: metadata.sender_trace_id,
+      sender_name: metadata.sender_name,
+      hop_count: metadata.hop_count
+    })
+
+    :telemetry.execute(
+      [:jido_murmur, :runner, :run, :start],
+      %{system_time: System.system_time()},
+      %{session_id: session.id, agent_module: run.agent_module, request_id: run.request_id}
+    )
+  end
+
+  defp handle_start_failure(session, run, reason) do
+    Observability.fail_turn(run.request_id, reason)
+
+    :telemetry.execute(
+      [:jido_murmur, :runner, :run, :exception],
+      %{duration: System.monotonic_time() - run.start_time},
+      %{session_id: session.id, request_id: run.request_id, reason: reason}
+    )
+
+    broadcast(run.topic, request_failed_signal(session, reason))
+    {:error, reason}
+  end
 
   defp start_await_task(agent_module, req, session, topic, start_time, request_id) do
     jido_mod = JidoMurmur.jido_mod()
@@ -218,8 +231,4 @@ defmodule JidoMurmur.Runner do
 
   defp maybe_put_extra_refs(request_opts, refs) when map_size(refs) == 0, do: request_opts
   defp maybe_put_extra_refs(request_opts, refs), do: Keyword.put(request_opts, :extra_refs, refs)
-
-  defp ref_value(refs, key) when is_atom(key) do
-    Map.get(refs, key) || Map.get(refs, Atom.to_string(key))
-  end
 end

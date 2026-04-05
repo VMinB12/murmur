@@ -7,6 +7,7 @@ defmodule JidoMurmur.Ingress.Input do
   `new/2` only when constructing canonical input directly.
   """
 
+  alias JidoMurmur.Ingress.Metadata
   alias JidoMurmur.Observability
   alias JidoMurmur.Observability.ConversationCache
 
@@ -31,6 +32,7 @@ defmodule JidoMurmur.Ingress.Input do
           | :invalid_workspace_id
           | :invalid_sender_name
           | :invalid_sender_trace_id
+          | :invalid_hop_count
           | :invalid_expected_request_id
 
   @type session_like :: %{
@@ -45,8 +47,6 @@ defmodule JidoMurmur.Ingress.Input do
     with :ok <- validate_content(normalized_content),
          {:ok, normalized_source} <- normalize_source(Keyword.get(opts, :source)),
          {:ok, normalized_refs} <- normalize_refs(Keyword.get(opts, :refs, %{})),
-         :ok <- validate_required_refs(normalized_refs),
-         :ok <- validate_optional_refs(normalized_refs),
          {:ok, normalized_request_id} <- normalize_request_id(Keyword.get(opts, :expected_request_id)) do
       {:ok,
        %__MODULE__{
@@ -76,18 +76,16 @@ defmodule JidoMurmur.Ingress.Input do
           {:ok, t()} | {:error, validation_error()}
   def programmatic_message(session, content, opts \\ []) when is_list(opts) do
     with {:ok, via} <- normalize_via(Keyword.get(opts, :via)),
-         {:ok, extra_refs} <- normalize_refs(Keyword.get(opts, :refs, %{})) do
+         {:ok, extra_refs} <- normalize_extra_refs(Keyword.get(opts, :refs, %{})) do
       refs =
-        %{
+        Map.merge(extra_refs, %{
           interaction_id: Keyword.get(opts, :interaction_id) || Observability.next_interaction_id(),
-          kind: Keyword.get(opts, :kind, via),
           sender_name: Keyword.get(opts, :sender_name),
           sender_trace_id: Keyword.get(opts, :sender_trace_id),
           workspace_id: session.workspace_id
-        }
+        })
         |> Enum.reject(fn {_key, value} -> is_nil(value) end)
         |> Map.new()
-        |> Map.merge(extra_refs)
 
       new(content,
         source: %{kind: :programmatic, via: via},
@@ -106,18 +104,17 @@ defmodule JidoMurmur.Ingress.Input do
   def validate(%__MODULE__{} = input) do
     with :ok <- validate_content(input.content),
          {:ok, _source} <- normalize_source(input.source),
-         {:ok, refs} <- normalize_refs(input.refs),
-         :ok <- validate_required_refs(refs),
-         :ok <- validate_optional_refs(refs),
+         {:ok, _refs} <- normalize_refs(input.refs),
          {:ok, _request_id} <- normalize_request_id(input.expected_request_id) do
       :ok
     end
   end
 
+  @spec metadata(t()) :: {:ok, Metadata.t()} | {:error, validation_error()}
+  def metadata(%__MODULE__{refs: refs}), do: Metadata.new(refs)
+
   @spec interaction_id(t()) :: String.t() | nil
-  def interaction_id(%__MODULE__{refs: refs}) do
-    Map.get(refs, :interaction_id) || Map.get(refs, "interaction_id")
-  end
+  def interaction_id(%__MODULE__{refs: %{interaction_id: interaction_id}}), do: interaction_id
 
   defp validate_content(""), do: {:error, :empty_content}
   defp validate_content(content) when is_binary(content), do: :ok
@@ -131,54 +128,31 @@ defmodule JidoMurmur.Ingress.Input do
     {:ok, source}
   end
 
-  defp validate_source_map(%{"kind" => kind, "via" => via} = source)
-       when (is_atom(kind) or is_binary(kind)) and (is_atom(via) or is_binary(via)) do
-    {:ok, source}
-  end
-
   defp validate_source_map(_source), do: {:error, :invalid_source}
 
   defp normalize_via(value) when is_atom(value) or is_binary(value), do: {:ok, value}
   defp normalize_via(_value), do: {:error, :invalid_source}
 
-  defp normalize_refs(%{} = refs), do: {:ok, refs}
+  defp normalize_refs(%{} = refs) do
+    case Metadata.new(refs) do
+      {:ok, metadata} -> {:ok, Metadata.to_refs(metadata)}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
   defp normalize_refs(_), do: {:error, :invalid_refs}
 
-  defp validate_required_refs(refs) do
-    case validate_required_ref(refs, :interaction_id, :missing_interaction_id, :invalid_interaction_id) do
-      :ok -> validate_required_ref(refs, :workspace_id, :missing_workspace_id, :invalid_workspace_id)
-      error -> error
+  defp normalize_extra_refs(%{} = refs) do
+    if Enum.all?(Map.keys(refs), &is_atom/1) do
+      {:ok, refs}
+    else
+      {:error, :invalid_refs}
     end
   end
 
-  defp validate_required_ref(refs, key, missing_error, invalid_error) do
-    case ref_value(refs, key) do
-      nil -> {:error, missing_error}
-      value when is_binary(value) -> :ok
-      _ -> {:error, invalid_error}
-    end
-  end
-
-  defp validate_optional_refs(refs) do
-    case validate_optional_ref(refs, :sender_name, :invalid_sender_name) do
-      :ok -> validate_optional_ref(refs, :sender_trace_id, :invalid_sender_trace_id)
-      error -> error
-    end
-  end
-
-  defp validate_optional_ref(refs, key, error) do
-    case ref_value(refs, key) do
-      nil -> :ok
-      value when is_binary(value) -> :ok
-      _ -> {:error, error}
-    end
-  end
+  defp normalize_extra_refs(_), do: {:error, :invalid_refs}
 
   defp normalize_request_id(nil), do: {:ok, nil}
   defp normalize_request_id(request_id) when is_binary(request_id), do: {:ok, request_id}
   defp normalize_request_id(_), do: {:error, :invalid_expected_request_id}
-
-  defp ref_value(refs, key) when is_atom(key) do
-    Map.get(refs, key) || Map.get(refs, Atom.to_string(key))
-  end
 end

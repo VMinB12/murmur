@@ -11,6 +11,7 @@ defmodule JidoMurmur.Ingress.InputTest do
 
       assert input.content == "hello world"
       assert input.source == %{kind: :human, via: :workspace_live}
+      assert input.refs.hop_count == 0
       assert input.refs.workspace_id == session.workspace_id
       assert is_binary(input.refs.interaction_id)
       assert Input.control_kind(input) == :steer
@@ -25,11 +26,12 @@ defmodule JidoMurmur.Ingress.InputTest do
                Input.programmatic_message(session, "follow up",
                  via: :steering,
                  sender_name: "Alice",
-                 sender_trace_id: "trace-123"
+                 sender_trace_id: "trace-123",
+                 refs: %{hop_count: 1}
                )
 
       assert input.source == %{kind: :programmatic, via: :steering}
-      assert input.refs.kind == :steering
+      assert input.refs.hop_count == 1
       assert input.refs.sender_name == "Alice"
       assert input.refs.sender_trace_id == "trace-123"
       assert input.refs.workspace_id == session.workspace_id
@@ -64,11 +66,25 @@ defmodule JidoMurmur.Ingress.InputTest do
                  source: %{kind: :programmatic, via: :test},
                  refs: %{interaction_id: "i-1", workspace_id: "w-1", sender_trace_id: 123}
                )
+
+      assert {:error, :invalid_hop_count} =
+               Input.new("hello",
+                 source: %{kind: :programmatic, via: :test},
+                 refs: %{interaction_id: "i-1", workspace_id: "w-1", hop_count: -1}
+               )
     end
 
     test "rejects source maps without via metadata" do
       assert {:error, :invalid_source} =
                Input.new("hello", source: %{kind: :human}, refs: %{interaction_id: "i-1", workspace_id: "w-1"})
+    end
+
+    test "rejects string-key metadata refs" do
+      assert {:error, :invalid_refs} =
+               Input.new("hello",
+                 source: %{kind: :human, via: :test},
+                 refs: %{"interaction_id" => "i-1", workspace_id: "w-1"}
+               )
     end
   end
 

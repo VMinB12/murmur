@@ -153,20 +153,24 @@ defmodule Murmur.Agents.EdgeCaseTest do
       assert_receive %Jido.Signal{type: "murmur.message.completed", data: %{session_id: ^bob_id}}, 5000
     end
 
-    test "hop count of 5 is rejected (at limit)", %{workspace: workspace} do
+    test "hop count of 5 returns an informative blocked result (at limit)", %{workspace: workspace} do
       params = %{target_agent: "Bob", message: "Hi"}
       context = %{workspace_id: workspace.id, sender_name: "Alice", hop_count: 5}
 
-      assert {:error, msg} = TellAction.run(params, context)
-      assert msg =~ "Maximum" or msg =~ "hop"
+      assert {:ok, result} = TellAction.run(params, context)
+      assert result.delivered == false
+      assert result.blocked == :hop_limit_reached
+      assert result.message =~ "hop limit"
     end
 
-    test "hop count of 10 is rejected (well over limit)", %{workspace: workspace} do
+    test "hop count of 10 returns an informative blocked result (well over limit)", %{workspace: workspace} do
       params = %{target_agent: "Bob", message: "Hi"}
       context = %{workspace_id: workspace.id, sender_name: "Alice", hop_count: 10}
 
-      assert {:error, msg} = TellAction.run(params, context)
-      assert msg =~ "Maximum" or msg =~ "hop"
+      assert {:ok, result} = TellAction.run(params, context)
+      assert result.delivered == false
+      assert result.blocked == :hop_limit_reached
+      assert result.message =~ "hop limit"
     end
   end
 

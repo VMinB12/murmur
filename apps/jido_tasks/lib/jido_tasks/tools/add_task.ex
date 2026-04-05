@@ -19,8 +19,6 @@ defmodule JidoTasks.Tools.AddTask do
     ]
 
   alias JidoMurmur.Ingress
-  alias JidoMurmur.Ingress.Input
-  alias JidoMurmur.Signals.MessageReceived
   alias JidoMurmur.Workspaces
   alias JidoTasks.Signals.TaskCreated
   alias JidoTasks.Tasks
@@ -95,35 +93,10 @@ defmodule JidoTasks.Tools.AddTask do
 
       target_session ->
         message = build_notification(task, sender_name)
-        topic = JidoMurmur.Topics.agent_messages(workspace_id, target_session.id)
-        interaction_id = JidoMurmur.Observability.next_interaction_id()
-
-        inter_msg = %{
-          id: Uniq.UUID.uuid7(),
-          role: "user",
-          content: message,
-          kind: :task_assignment,
-          interaction_id: interaction_id,
-          sender_name: sender_name,
-          sender_trace_id: nil
-        }
-
-        signal =
-          MessageReceived.new!(
-            %{session_id: target_session.id, message: inter_msg},
-            subject: MessageReceived.subject(workspace_id, target_session.id)
-          )
-
-        Phoenix.PubSub.broadcast(JidoTasks.pubsub(), topic, signal)
-
-        with {:ok, input} <-
-               Input.programmatic_message(target_session, message,
-                 via: :task_assignment,
-                 interaction_id: interaction_id,
-                 sender_name: sender_name
-               ) do
-          Ingress.deliver_input(target_session, input)
-        end
+        Ingress.deliver_programmatic(target_session, message,
+          via: :task_assignment,
+          sender_name: sender_name
+        )
     end
   end
 

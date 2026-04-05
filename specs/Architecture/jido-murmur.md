@@ -33,6 +33,7 @@ Core orchestration backend for the multi-agent chat platform. Provides workspace
 | Function | Purpose |
 |----------|---------|
 | `deliver/3` | Route direct human-visible input through the session coordinator |
+| `deliver_programmatic/3` | Route visible programmatic input through the shared canonical ingress path |
 | `deliver_input/2` | Deliver canonical ingress input directly |
 | `ensure_started/1` | Start or reuse the per-session coordinator |
 
@@ -70,16 +71,36 @@ All topics follow `workspace:{wid}:...` for multi-workspace isolation:
 
 1. `start_agent/1` restores state from a checkpoint (if available) or creates a fresh agent via Jido
 2. Conversation history (thread) is persisted in PostgreSQL using the `Jido.Storage` adapter
-3. `Ingress` serializes delivery decisions per session
-4. Idle agents start a fresh `ask/await` run through `Runner.start_run/2`
-5. Busy agents receive native `steer` or `inject` follow-up input against the active ReAct request
-6. Completed responses trigger `MessageCompleted` signals broadcast via PubSub
+3. `Ingress.Input.refs` is the canonical source of Murmur routing and observability metadata
+4. `Ingress.Metadata` projects that canonical metadata once into tool-visible runtime context in `Runner.start_run/2`
+5. `Ingress` serializes delivery decisions per session
+6. Idle agents start a fresh `ask/await` run through `Runner.start_run/2`
+7. Busy agents receive native `steer` or `inject` follow-up input against the active ReAct request
+8. Completed responses trigger `MessageCompleted` signals broadcast via PubSub
 
 ### Inter-Agent Communication (TellAction + MessageInjector)
 
 - Agents use the `tell` action for fire-and-forget inter-agent messages
-- Messages routed by display name with a 5-hop depth limit (prevents infinite loops)
+- Messages route by display name through `Ingress.deliver_programmatic/3`
+- Inter-agent hop depth is configurable via `config :jido_murmur, tell_hop_limit: <non_negative_integer>` and defaults to `5`
+- Hop-limit exhaustion returns an informative tool result (`delivered: false`, `blocked: :hop_limit_reached`) instead of failing the agent run
+- Hop count propagates through canonical ingress metadata, so downstream runs see the current depth in both tool context and `extra_refs`
 - `MessageInjector` (a ReAct RequestTransformer) adds Murmur team context to the system prompt and does not own follow-up delivery
+
+### Canonical Ingress Metadata Boundary
+
+- `JidoMurmur.Ingress.Input` owns canonical ingress input construction and validation
+- `JidoMurmur.Ingress.Metadata` is the typed projection of Murmur-owned ingress metadata carried inside `refs`
+- Known metadata fields are `interaction_id`, `workspace_id`, `sender_name`, `sender_trace_id`, and `hop_count`
+- Metadata keys are atom-keyed in the cleaned runtime path; fallback string-key readers are not retained in this unpublished package surface
+- `Runner` projects tool-visible runtime context from canonical metadata once, instead of performing ad hoc ref lookups in downstream code
+
+### Shared Programmatic Delivery
+
+- `JidoMurmur.Ingress.ProgrammaticDelivery` is the single visible programmatic delivery path for tells and task-assignment notifications
+- The helper builds canonical ingress input first, delivers it through `Ingress.deliver_input/2`, then emits `MessageReceived` using the same canonical metadata
+- Visible programmatic payloads now align on one shape: `content`, `kind`, `interaction_id`, `sender_name`, `sender_trace_id`, and `hop_count`
+- Task-assignment notifications and tell messages no longer duplicate message-signal assembly, canonical input assembly, or ad hoc metadata shaping in their callers
 
 ### Request Transformation Pipeline
 
@@ -185,7 +206,7 @@ jido_murmur_thread_entries
 
 | Signal | Type | Emitted By |
 |--------|------|------------|
-| `MessageReceived` | `murmur.message.received` | `TellAction` |
+| `MessageReceived` | `murmur.message.received` | `Ingress.ProgrammaticDelivery` |
 | `MessageCompleted` | `murmur.message.completed` | `Runner` |
 
 ## Dependencies
@@ -208,5 +229,6 @@ config :jido_murmur,
 config :jido_murmur,
   profiles: [MyApp.Agents.ProfileA, MyApp.Agents.ProfileB],
   authorize: MyApp.Authorization,
-  artifact_renderers: %{"type" => RendererModule}
+  artifact_renderers: %{"type" => RendererModule},
+  tell_hop_limit: 5
 ```

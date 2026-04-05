@@ -6,7 +6,7 @@
 
 | Metric | Value |
 |--------|-------|
-| Active tickets | 2 |
+| Active tickets | 1 |
 | Last updated | 2026-04-05 |
 
 ## Active Tickets
@@ -14,12 +14,12 @@
 | # | Title | Status | Owner |
 |---|-------|--------|-------|
 | 013 | [Agent-Centric Phoenix Sessions](tickets/013-agent-centric-phoenix-sessions/) | specifying | — |
-| 014 | [Runtime Metadata Boundary Cleanup](tickets/014-runtime-metadata-boundary-cleanup/) | planned | — |
 
 ## Recently Completed
 
 | # | Title | Completed |
 |---|-------|-----------|
+| 014 | [Runtime Metadata Boundary Cleanup](tickets/014-runtime-metadata-boundary-cleanup/) | 2026-04-05 |
 | 012 | [Native ReAct Steering Adoption](tickets/012-native-react-steering-adoption/) | 2026-04-04 |
 | 009 | [Data Contract Enforcement](tickets/009-data-contract-enforcement/) | 2026-04-04 |
 | 011 | [Frontend Architecture Review](tickets/011-frontend-architecture-review/) | 2026-04-04 |

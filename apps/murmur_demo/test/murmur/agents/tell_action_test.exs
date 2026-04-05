@@ -6,7 +6,7 @@ defmodule Murmur.Agents.TellActionTest do
   - FR-009: Agents MUST have "tell" capability
   - FR-010: Inter-agent messages prefixed with sender name
   - FR-011: Tell to idle agent triggers processing
-  - FR-015: Loop depth limit (5 hops)
+  - FR-015: Loop depth limit
   - Edge: Tell to non-existent agent fails gracefully
   - Edge: Tell to removed agent fails gracefully
 
@@ -129,14 +129,17 @@ defmodule Murmur.Agents.TellActionTest do
     end
   end
 
-  # FR-015: Loop depth limit (5 hops)
+  # FR-015: Loop depth limit
   describe "run/2 — hop count limit" do
-    test "rejects tell when hop count reaches 5", %{workspace: workspace} do
+    test "returns an informative result when hop count reaches the limit", %{workspace: workspace} do
       params = %{target_agent: "Bob", message: "Loop!"}
       context = %{workspace_id: workspace.id, sender_name: "Alice", hop_count: 5}
 
-      assert {:error, msg} = TellAction.run(params, context)
-      assert msg =~ "Maximum" or msg =~ "hop depth"
+      assert {:ok, result} = TellAction.run(params, context)
+      assert result.delivered == false
+      assert result.blocked == :hop_limit_reached
+      assert result.hop_limit == 5
+      assert result.message =~ "hop limit"
     end
 
     test "allows tell at hop count 4 (below limit)", %{workspace: workspace, bob: bob} do
@@ -145,8 +148,11 @@ defmodule Murmur.Agents.TellActionTest do
 
       assert {:ok, _} = TellAction.run(params, context)
 
-      # Wait for the background Runner Task to finish
       bob_id = bob.id
+      assert_receive %Jido.Signal{type: "murmur.message.received", data: %{session_id: ^bob_id, message: msg}}, 5000
+      assert msg.hop_count == 5
+
+      # Wait for the background Runner Task to finish
       assert_receive %Jido.Signal{type: "murmur.message.completed", data: %{session_id: ^bob_id}}, 5000
     end
   end

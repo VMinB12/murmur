@@ -96,6 +96,9 @@ defmodule Murmur.Agents.Tools.AddTaskTest do
       {:ok, _} = AddTask.run(params, context)
 
       assert_receive %Jido.Signal{type: "murmur.message.received", data: %{message: msg}}
+      assert msg.kind == :task_assignment
+      assert msg.sender_name == "Alice"
+      assert msg.hop_count == 0
       assert msg.content =~ "task"
       assert msg.content =~ "For Bob"
     end

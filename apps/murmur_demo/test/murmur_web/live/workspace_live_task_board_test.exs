@@ -12,6 +12,7 @@ defmodule MurmurWeb.WorkspaceLiveTaskBoardTest do
 
   import Phoenix.LiveViewTest
 
+  alias JidoMurmur.Catalog
   alias JidoMurmur.Workspaces
   alias JidoTasks.Signals.TaskCreated
   alias JidoTasks.Signals.TaskUpdated
@@ -37,7 +38,7 @@ defmodule MurmurWeb.WorkspaceLiveTaskBoardTest do
         "display_name" => "Alice"
       })
 
-    %{workspace: workspace}
+    %{workspace: workspace, alice_name: "Alice"}
   end
 
   describe "toggle task board" do
@@ -93,6 +94,36 @@ defmodule MurmurWeb.WorkspaceLiveTaskBoardTest do
       assert length(tasks) == 1
       assert hd(tasks).title == "Persisted task"
       assert hd(tasks).created_by == "human"
+    end
+
+    test "creating a task notifies the assigned running agent", %{conn: conn, workspace: workspace} do
+      [alice] = Workspaces.list_agent_sessions(workspace.id)
+      topic = JidoMurmur.Topics.agent_messages(workspace.id, alice.id)
+      Phoenix.PubSub.subscribe(Murmur.PubSub, topic)
+
+      agent_module = Catalog.agent_module(alice.agent_profile_id)
+      {:ok, _pid} = Murmur.Jido.start_agent(agent_module, id: alice.id)
+
+      on_exit(fn ->
+        try do
+          Murmur.Jido.stop_agent(alice.id)
+        rescue
+          _ -> :ok
+        end
+      end)
+
+      {:ok, view, _html} = live(conn, ~p"/workspaces/#{workspace.id}")
+      view |> element("button", "Tasks") |> render_click()
+
+      view
+      |> form("#create-task-form", task: %{title: "Notify Alice", assignee: "Alice"})
+      |> render_submit()
+
+      assert_receive %Jido.Signal{type: "murmur.message.received", data: %{message: msg}}, 5000
+      assert msg.kind == :task_assignment
+      assert msg.sender_name == "You (human)"
+      assert msg.hop_count == 0
+      assert msg.content =~ "Notify Alice"
     end
   end
 

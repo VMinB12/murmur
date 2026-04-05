@@ -6,7 +6,7 @@ defmodule JidoMurmur.Ingress do
   deciding whether to call `ask`, `steer`, or `inject`.
   """
 
-  alias JidoMurmur.Ingress.{Coordinator, Input}
+  alias JidoMurmur.Ingress.{Coordinator, Input, ProgrammaticDelivery}
 
   @registry __MODULE__.Registry
   @supervisor __MODULE__.Supervisor
@@ -35,6 +35,12 @@ defmodule JidoMurmur.Ingress do
     end
   end
 
+  @spec deliver_programmatic(session_like(), String.t(), keyword()) ::
+          :queued | :agent_not_running | {:error, {:invalid_input, Input.validation_error()}}
+  def deliver_programmatic(session, content, opts \\ []) when is_binary(content) and is_list(opts) do
+    ProgrammaticDelivery.deliver(session, content, opts)
+  end
+
   @spec deliver_input(session_like(), Input.t()) ::
           :queued | :agent_not_running | {:error, {:invalid_input, Input.validation_error()}}
   def deliver_input(session, %Input{} = input) do
@@ -53,6 +59,7 @@ defmodule JidoMurmur.Ingress do
                               :invalid_workspace_id,
                               :invalid_sender_name,
                               :invalid_sender_trace_id,
+                              :invalid_hop_count,
                               :invalid_expected_request_id
                             ] ->
         {:error, {:invalid_input, reason}}

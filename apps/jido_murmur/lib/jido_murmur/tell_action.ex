@@ -3,7 +3,7 @@ defmodule JidoMurmur.TellAction do
   Jido Action for inter-agent "tell" communication.
 
   Allows an agent to send a message to another agent in the same workspace.
-  Routes by target display_name. Respects 5-hop depth limit.
+  Routes by target display_name. Respects the configured inter-agent hop limit.
   """
 
   use Jido.Action,
@@ -16,13 +16,9 @@ defmodule JidoMurmur.TellAction do
     ]
 
   alias Jido.Tracing.Context, as: TracingContext
+  alias JidoMurmur.Config
   alias JidoMurmur.Ingress
-  alias JidoMurmur.Ingress.Input
-  alias JidoMurmur.Observability
-  alias JidoMurmur.Signals.MessageReceived
   alias JidoMurmur.Workspaces
-
-  @max_hops 5
 
   @impl true
   def run(params, context) do
@@ -35,73 +31,67 @@ defmodule JidoMurmur.TellAction do
          %{} = target <- Workspaces.find_agent_session_by_name(workspace_id, params.target_agent) do
       prefixed_message = "[#{sender_name}]: #{params.message}"
 
-      case deliver_message(target, prefixed_message, hop_count + 1, interaction_id) do
-        :ok ->
+      case deliver_message(target, prefixed_message,
+             interaction_id: interaction_id,
+             sender_name: sender_name,
+             sender_trace_id: sender_trace_id(),
+             hop_count: hop_count + 1
+           ) do
+        :queued ->
           {:ok, %{delivered: true, target: params.target_agent}}
 
-        {:error, reason} ->
+        :agent_not_running ->
+          {:error, "Failed to deliver to '#{params.target_agent}': :agent_not_running"}
+
+        {:error, {:invalid_input, reason}} ->
           {:error, "Failed to deliver to '#{params.target_agent}': #{inspect(reason)}"}
       end
     else
-      {:error, _} = error -> error
+      {:error, {:hop_limit_reached, max_hops}} ->
+        {:ok,
+         %{
+           delivered: false,
+           target: params.target_agent,
+           blocked: :hop_limit_reached,
+           hop_count: hop_count,
+           hop_limit: max_hops,
+           message:
+             "Tell not sent: inter-agent hop limit (#{max_hops}) reached at hop #{hop_count}."
+         }}
+
+      {:error, _} = error ->
+        error
+
       nil -> {:error, "Agent '#{params.target_agent}' not found in this workspace."}
     end
   end
 
-  defp validate_hop_count(hop_count) when hop_count >= @max_hops,
-    do: {:error, "Maximum inter-agent hop depth (#{@max_hops}) reached."}
+  defp validate_hop_count(hop_count) when is_integer(hop_count) and hop_count >= 0 do
+    max_hops = Config.tell_hop_limit()
 
-  defp validate_hop_count(_), do: :ok
-
-  defp deliver_message(target_session, message, _hop_count, interaction_id) do
-    jido_mod = JidoMurmur.jido_mod()
-    pid = jido_mod.whereis(target_session.id)
-
-    if pid do
-      topic = JidoMurmur.Topics.agent_messages(target_session.workspace_id, target_session.id)
-
-      sender_name = String.replace(message, ~r/^\[([^\]]+)\]:.*/, "\\1")
-
-      sender_trace_id =
-        case TracingContext.get() do
-          %{trace_id: tid} when is_binary(tid) -> tid
-          _ -> nil
-        end
-
-      inter_msg = %{
-        id: Uniq.UUID.uuid7(),
-        role: "user",
-        content: message,
-        sender_name: sender_name,
-        sender_trace_id: sender_trace_id,
-        interaction_id: interaction_id || Observability.next_interaction_id(),
-        kind: :steering
-      }
-
-      signal =
-        MessageReceived.new!(
-          %{session_id: target_session.id, message: inter_msg},
-          subject: MessageReceived.subject(target_session.workspace_id, target_session.id)
-        )
-
-      Phoenix.PubSub.broadcast(JidoMurmur.pubsub(), topic, signal)
-
-      with {:ok, input} <-
-             Input.programmatic_message(target_session, message,
-               via: :steering,
-               interaction_id: inter_msg.interaction_id,
-               sender_name: sender_name,
-               sender_trace_id: sender_trace_id
-             ),
-           :queued <- Ingress.deliver_input(target_session, input) do
-        :ok
-      else
-        :agent_not_running -> {:error, :agent_not_running}
-        {:error, {:invalid_input, reason}} -> {:error, reason}
-        {:error, reason} -> {:error, reason}
-      end
+    if hop_count >= max_hops do
+      {:error, {:hop_limit_reached, max_hops}}
     else
-      {:error, :agent_not_running}
+      :ok
+    end
+  end
+
+  defp validate_hop_count(_), do: {:error, :invalid_hop_count}
+
+  defp deliver_message(target_session, message, opts) do
+    Ingress.deliver_programmatic(target_session, message,
+      via: :steering,
+      interaction_id: Keyword.get(opts, :interaction_id),
+      sender_name: Keyword.fetch!(opts, :sender_name),
+      sender_trace_id: Keyword.get(opts, :sender_trace_id),
+      refs: %{hop_count: Keyword.fetch!(opts, :hop_count)}
+    )
+  end
+
+  defp sender_trace_id do
+    case TracingContext.get() do
+      %{trace_id: trace_id} when is_binary(trace_id) -> trace_id
+      _ -> nil
     end
   end
 end

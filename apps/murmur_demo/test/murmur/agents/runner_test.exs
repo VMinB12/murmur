@@ -150,6 +150,7 @@ defmodule Murmur.Agents.RunnerTest do
       expect_llm_inject(fn _mod, _pid, content, opts ->
         assert content == "injected context from another agent"
         assert opts[:source][:kind] == :programmatic
+        assert opts[:extra_refs][:hop_count] == 0
         {:ok, %{}}
       end)
 

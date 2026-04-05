@@ -6,10 +6,8 @@ defmodule MurmurWeb.WorkspaceLive do
   alias JidoArtifacts.Envelope
   alias JidoArtifacts.SignalUpdate
   alias JidoMurmur.Catalog
-  alias JidoMurmur.Ingress.Input
   alias JidoMurmur.Observability.ConversationCache
   alias JidoMurmur.Observability.SessionCache
-  alias JidoMurmur.Signals.MessageReceived
   alias JidoMurmur.Topics
   alias JidoMurmur.Workspaces
   alias JidoTasks.Signals.TaskCreated
@@ -562,35 +560,10 @@ defmodule MurmurWeb.WorkspaceLive do
 
       target_session ->
         message = build_task_notification(task, sender_name)
-        topic = Topics.agent_messages(workspace_id, target_session.id)
-        interaction_id = JidoMurmur.Observability.next_interaction_id()
-
-        inter_msg = %{
-          id: Uniq.UUID.uuid7(),
-          role: "user",
-          content: message,
-          kind: :task_assignment,
-          interaction_id: interaction_id,
-          sender_name: sender_name,
-          sender_trace_id: nil
-        }
-
-        signal =
-          MessageReceived.new!(
-            %{session_id: target_session.id, message: inter_msg},
-            subject: MessageReceived.subject(workspace_id, target_session.id)
-          )
-
-        Phoenix.PubSub.broadcast(Murmur.PubSub, topic, signal)
-
-        with {:ok, input} <-
-               Input.programmatic_message(target_session, message,
-                 via: :task_assignment,
-                 interaction_id: interaction_id,
-                 sender_name: sender_name
-               ) do
-          JidoMurmur.Ingress.deliver_input(target_session, input)
-        end
+        JidoMurmur.Ingress.deliver_programmatic(target_session, message,
+          via: :task_assignment,
+          sender_name: sender_name
+        )
     end
   end
 

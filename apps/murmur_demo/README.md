@@ -6,7 +6,7 @@ This is the demo app inside the [Murmur umbrella](../../README.md). It wires tog
 
 | Package | Role |
 |---------|------|
-| [`jido_murmur`](../jido_murmur/) | Core backend — Runner, Plugins, Storage, Schemas |
+| [`jido_murmur`](../jido_murmur/) | Core backend — Ingress, Runner, Plugins, Storage, Schemas |
 | [`jido_murmur_web`](../jido_murmur_web/) | Pre-built LiveView chat components |
 | [`jido_tasks`](../jido_tasks/) | Task management tools for agents |
 | [`jido_arxiv`](../jido_arxiv/) | arXiv academic research tools |
@@ -16,7 +16,7 @@ This is the demo app inside the [Murmur umbrella](../../README.md). It wires tog
 - **Multi-agent workspaces** — Add multiple agents, each with independent chat history
 - **Agent profiles** — General conversational agent and arXiv research specialist
 - **Real-time streaming** — Token-by-token responses rendered over WebSocket
-- **Agent-to-agent messaging** — Agents collaborate via the "tell" tool with message queuing
+- **Agent-to-agent messaging** — Agents collaborate via the "tell" tool with ingress-coordinated busy-run delivery
 - **Artifacts** — Agents produce rich outputs (paper lists, PDF viewer, custom renderers)
 - **Shared task board** — Agents manage tasks collaboratively across a workspace
 - **Split & unified views** — Side-by-side agent columns or a merged timeline with `@mention` routing

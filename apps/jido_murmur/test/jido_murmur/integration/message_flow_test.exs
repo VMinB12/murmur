@@ -1,7 +1,7 @@
 defmodule JidoMurmur.Integration.MessageFlowTest do
   @moduledoc """
   Integration test for end-to-end message flow:
-  send → Runner → LLM (mock) → streaming → persistence
+  send -> Ingress -> Runner -> LLM (mock) -> streaming -> persistence
 
   Verifies that the full pipeline connects correctly with
   JidoMurmur config accessors.
@@ -9,11 +9,11 @@ defmodule JidoMurmur.Integration.MessageFlowTest do
   use JidoMurmur.Case, async: false
 
   alias JidoMurmur.AgentHelper
+  alias JidoMurmur.Ingress
   alias JidoMurmur.LLM
   alias JidoMurmur.Observability.ConversationCache
   alias JidoMurmur.Observability.SessionCache
   alias JidoMurmur.Observability.Store
-  alias JidoMurmur.Runner
   alias JidoMurmur.StreamingPlugin
   alias JidoMurmur.Workspaces
 
@@ -38,7 +38,6 @@ defmodule JidoMurmur.Integration.MessageFlowTest do
       Application.delete_env(:jido_murmur, :conversation_session_timeout_ms)
     end)
 
-    # Create workspace and session
     {:ok, workspace} = Workspaces.create_workspace(%{name: "Integration Test WS"})
 
     {:ok, session} =
@@ -52,25 +51,19 @@ defmodule JidoMurmur.Integration.MessageFlowTest do
 
   test "end-to-end: start agent, subscribe streaming, send message, receive completion",
        %{session: session} do
-    # Start the agent
     assert {:ok, pid} = AgentHelper.start_agent(session)
     assert is_pid(pid)
 
-    # Subscribe to the streaming topic
     pubsub = JidoMurmur.pubsub()
     Phoenix.PubSub.subscribe(pubsub, StreamingPlugin.stream_topic(session.workspace_id, session.id))
 
-    # Subscribe to the agent topic for completion messages
     agent_topic = JidoMurmur.Topics.agent_messages(session.workspace_id, session.id)
     Phoenix.PubSub.subscribe(pubsub, agent_topic)
 
-    # Set mock response
     LLM.Mock.set_response(%{content: "Integration test response"})
 
-    # Send a message through Runner
-    assert :queued = Runner.send_message(session, "Hello from integration test")
+    assert :queued = Ingress.deliver(session, "Hello from integration test")
 
-    # Wait for the message_completed event (the mock LLM responds immediately)
     assert_receive %Jido.Signal{type: "murmur.message.completed"}, 10_000
   end
 
@@ -87,7 +80,7 @@ defmodule JidoMurmur.Integration.MessageFlowTest do
       pause_ref: pause_ref
     })
 
-    assert :queued = Runner.send_message(session, "Hello from integration test")
+    assert :queued = Ingress.deliver(session, "Hello from integration test")
 
     assert_receive(
       {:mock_llm_phase, :started, %{request_id: request_id, call_id: call_id, waiter_pid: waiter_pid}},
@@ -128,7 +121,7 @@ defmodule JidoMurmur.Integration.MessageFlowTest do
       pause_ref: pause_ref
     })
 
-    assert :queued = Runner.send_message(session, "Hello from integration test", interaction_id: interaction_id)
+    assert :queued = Ingress.deliver(session, "Hello from integration test", interaction_id: interaction_id)
 
     assert_receive(
       {:mock_llm_phase, :started, %{request_id: request_id, waiter_pid: waiter_pid}},
@@ -158,7 +151,7 @@ defmodule JidoMurmur.Integration.MessageFlowTest do
       pause_ref: first_pause_ref
     })
 
-    assert :queued = Runner.send_message(session, "first message", sent_at_ms: base_ms)
+    assert :queued = Ingress.deliver(session, "first message", sent_at_ms: base_ms)
 
     assert_receive(
       {:mock_llm_phase, :started, %{request_id: first_request_id, waiter_pid: first_waiter_pid}},
@@ -179,8 +172,7 @@ defmodule JidoMurmur.Integration.MessageFlowTest do
       pause_ref: second_pause_ref
     })
 
-    assert :queued =
-         Runner.send_message(session, "second message", sent_at_ms: base_ms + 1_000)
+    assert :queued = Ingress.deliver(session, "second message", sent_at_ms: base_ms + 1_000)
 
     assert_receive(
       {:mock_llm_phase, :started, %{request_id: second_request_id, waiter_pid: second_waiter_pid}},
@@ -209,7 +201,7 @@ defmodule JidoMurmur.Integration.MessageFlowTest do
       pause_ref: first_pause_ref
     })
 
-    assert :queued = Runner.send_message(session, "first message", sent_at_ms: base_ms)
+    assert :queued = Ingress.deliver(session, "first message", sent_at_ms: base_ms)
 
     assert_receive(
       {:mock_llm_phase, :started, %{request_id: first_request_id, waiter_pid: first_waiter_pid}},
@@ -230,8 +222,7 @@ defmodule JidoMurmur.Integration.MessageFlowTest do
       pause_ref: second_pause_ref
     })
 
-    assert :queued =
-         Runner.send_message(session, "second message", sent_at_ms: base_ms + 61_000)
+    assert :queued = Ingress.deliver(session, "second message", sent_at_ms: base_ms + 61_000)
 
     assert_receive(
       {:mock_llm_phase, :started, %{request_id: second_request_id, waiter_pid: second_waiter_pid}},
@@ -256,10 +247,6 @@ defmodule JidoMurmur.Integration.MessageFlowTest do
   defp ensure_ets_tables do
     unless :ets.whereis(:jido_murmur_active_runners) != :undefined do
       :ets.new(:jido_murmur_active_runners, [:set, :public, :named_table])
-    end
-
-    unless :ets.whereis(:jido_murmur_pending_messages) != :undefined do
-      :ets.new(:jido_murmur_pending_messages, [:named_table, :public, :duplicate_bag])
     end
 
     SessionCache.create_table()

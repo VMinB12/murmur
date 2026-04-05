@@ -1,6 +1,6 @@
 defmodule JidoMurmur.TableOwner do
   @moduledoc """
-  Owns the ETS tables used by PendingQueue, Runner, and observability.
+  Owns the ETS tables used by Runner and observability.
 
   Named tables are prefixed with `jido_murmur_` to prevent collisions
   when running alongside other applications on the same BEAM node.
@@ -17,7 +17,6 @@ defmodule JidoMurmur.TableOwner do
 
   @impl true
   def init(_opts) do
-    :ets.new(:jido_murmur_pending_messages, [:named_table, :public, :duplicate_bag])
     :ets.new(:jido_murmur_active_runners, [:set, :public, :named_table])
     ConversationCache.create_table()
     SessionCache.create_table()

@@ -2,26 +2,15 @@ defmodule Murmur.Agents.MessageInjectorTest do
   @moduledoc """
   Tests for the MessageInjector request transformer.
 
-  The MessageInjector is the core mechanism that enables mid-turn message
-  injection into a busy agent's conversation. It implements the
-  Jido.AI.Reasoning.ReAct.RequestTransformer behaviour and is called
-  before every LLM API call within an agent loop.
-
-  The principle: when a message arrives for a busy agent (from a user or
-  via the tell tool), it is enqueued in the PendingQueue. The
-  MessageInjector drains the queue before each LLM call and appends
-  those messages to the conversation history, so the LLM sees them
-  on its very next iteration — without waiting for the full agent
-  loop to complete.
+  MessageInjector is now responsible only for adding Murmur's dynamic
+  team-context system prompt to ReAct requests.
   """
-  use ExUnit.Case, async: true
+  use Murmur.DataCase, async: false
 
   alias JidoMurmur.MessageInjector
   alias JidoMurmur.Observability.Store
-  alias JidoMurmur.PendingQueue
+  alias JidoMurmur.Workspaces
 
-  # Minimal stubs for the ReAct runner types.
-  # The transformer receives these as arguments.
   defmodule FakeState do
     @moduledoc false
     defstruct [:run_id, :request_id, :iteration, :context, :llm_call_id]
@@ -34,112 +23,50 @@ defmodule Murmur.Agents.MessageInjectorTest do
 
   setup do
     Store.create_tables()
-    session_id = Ecto.UUID.generate()
-    {:ok, session_id: session_id}
+
+    {:ok, workspace} = Workspaces.create_workspace(%{name: "Injector Test Workspace"})
+
+    {:ok, session} =
+      Workspaces.create_agent_session(workspace.id, %{
+        agent_profile_id: "general_agent",
+        display_name: "Alice"
+      })
+
+    {:ok, _teammate} =
+      Workspaces.create_agent_session(workspace.id, %{
+        agent_profile_id: "general_agent",
+        display_name: "Bob"
+      })
+
+    %{workspace: workspace, session: session}
   end
 
-  describe "transform_request/4 — core injection" do
-    test "returns {:ok, overrides} with unchanged messages when queue is empty", ctx do
+  describe "transform_request/4" do
+    test "returns unchanged messages when workspace context is missing" do
       messages = [
         %{role: :system, content: "You are helpful."},
         %{role: :user, content: "Hello"}
       ]
 
       request = %{messages: messages, llm_opts: [], tools: %{}}
-      runtime_context = %{agent_id: ctx.session_id}
 
       assert {:ok, overrides} =
-               MessageInjector.transform_request(
-                 request,
-                 %FakeState{iteration: 1},
-                 %FakeConfig{},
-                 runtime_context
-               )
+               MessageInjector.transform_request(request, %FakeState{iteration: 1}, %FakeConfig{}, %{})
 
-      # No overrides needed — messages unchanged
       assert overrides == %{}
     end
 
-    test "drains pending messages and appends them to conversation", ctx do
-      PendingQueue.enqueue(ctx.session_id, "urgent update from alice")
-
-      messages = [
-        %{role: :system, content: "You are helpful."},
-        %{role: :user, content: "Original question"},
-        %{role: :assistant, content: "Let me think..."}
-      ]
-
-      request = %{messages: messages, llm_opts: [], tools: %{}}
-      runtime_context = %{agent_id: ctx.session_id}
-
-      assert {:ok, overrides} =
-               MessageInjector.transform_request(
-                 request,
-                 %FakeState{iteration: 2},
-                 %FakeConfig{},
-                 runtime_context
-               )
-
-      injected_messages = overrides.messages
-
-      # Original messages preserved
-      assert Enum.take(injected_messages, 3) == messages
-
-      # Injected message appended at the end
-      [injected] = Enum.drop(injected_messages, 3)
-      assert injected.role == :user
-      assert injected.content =~ "urgent update from alice"
-    end
-
-    test "injects multiple pending messages in order", ctx do
-      PendingQueue.enqueue(ctx.session_id, "first message")
-      PendingQueue.enqueue(ctx.session_id, "second message")
-
-      messages = [%{role: :user, content: "hi"}]
-      request = %{messages: messages, llm_opts: [], tools: %{}}
-      runtime_context = %{agent_id: ctx.session_id}
-
-      assert {:ok, overrides} =
-               MessageInjector.transform_request(
-                 request,
-                 %FakeState{iteration: 1},
-                 %FakeConfig{},
-                 runtime_context
-               )
-
-      injected = Enum.drop(overrides.messages, 1)
-      assert length(injected) == 2
-      assert Enum.at(injected, 0).content =~ "first message"
-      assert Enum.at(injected, 1).content =~ "second message"
-    end
-
-    test "queue is empty after injection (drained atomically)", ctx do
-      PendingQueue.enqueue(ctx.session_id, "will be drained")
-
-      request = %{messages: [%{role: :user, content: "hi"}], llm_opts: [], tools: %{}}
-      runtime_context = %{agent_id: ctx.session_id}
-
-      {:ok, _} =
-        MessageInjector.transform_request(
-          request,
-          %FakeState{iteration: 1},
-          %FakeConfig{},
-          runtime_context
-        )
-
-      refute PendingQueue.pending?(ctx.session_id)
-    end
-
-    test "does not affect tools or llm_opts", ctx do
-      PendingQueue.enqueue(ctx.session_id, "injected")
-
+    test "appends team context to an existing system message", %{workspace: workspace, session: session} do
       request = %{
-        messages: [%{role: :user, content: "hi"}],
-        llm_opts: [temperature: 0.5],
+        messages: [
+          %{role: :system, content: "You are helpful."},
+          %{role: :user, content: "Hello"}
+        ],
+        llm_opts: [],
         tools: %{}
       }
 
-      runtime_context = %{agent_id: ctx.session_id}
+      runtime_context = %{workspace_id: workspace.id, sender_name: session.display_name}
 
       assert {:ok, overrides} =
                MessageInjector.transform_request(
@@ -149,12 +76,56 @@ defmodule Murmur.Agents.MessageInjectorTest do
                  runtime_context
                )
 
-      # Only :messages is overridden
+      [system | rest] = overrides.messages
+      assert system.role == :system
+      assert system.content =~ "You are helpful."
+      assert system.content =~ "<murmur_team_context>"
+      assert system.content =~ "Bob"
+      assert rest == [%{role: :user, content: "Hello"}]
+    end
+
+    test "prepends a system message when the request has none", %{workspace: workspace, session: session} do
+      request = %{messages: [%{role: :user, content: "Hello"}], llm_opts: [], tools: %{}}
+      runtime_context = %{workspace_id: workspace.id, sender_name: session.display_name}
+
+      assert {:ok, overrides} =
+               MessageInjector.transform_request(
+                 request,
+                 %FakeState{iteration: 1},
+                 %FakeConfig{},
+                 runtime_context
+               )
+
+      [system, user] = overrides.messages
+      assert system.role == :system
+      assert system.content =~ "<murmur_team_context>"
+      assert system.content =~ "Bob"
+      assert user == %{role: :user, content: "Hello"}
+    end
+
+    test "does not affect tools or llm_opts", %{workspace: workspace, session: session} do
+      request = %{
+        messages: [%{role: :user, content: "hi"}],
+        llm_opts: [temperature: 0.5],
+        tools: %{tell: true}
+      }
+
+      runtime_context = %{workspace_id: workspace.id, sender_name: session.display_name}
+
+      assert {:ok, overrides} =
+               MessageInjector.transform_request(
+                 request,
+                 %FakeState{iteration: 1},
+                 %FakeConfig{},
+                 runtime_context
+               )
+
+      assert Map.has_key?(overrides, :messages)
       refute Map.has_key?(overrides, :llm_opts)
       refute Map.has_key?(overrides, :tools)
     end
 
-    test "records prepared messages for the current llm_call_id", ctx do
+    test "records prepared messages for the current llm_call_id", %{workspace: workspace, session: session} do
       call_id = "llm-call-#{System.unique_integer([:positive])}"
 
       request = %{
@@ -163,9 +134,9 @@ defmodule Murmur.Agents.MessageInjectorTest do
         tools: %{}
       }
 
-      runtime_context = %{agent_id: ctx.session_id}
+      runtime_context = %{workspace_id: workspace.id, sender_name: session.display_name}
 
-      assert {:ok, _overrides} =
+      assert {:ok, overrides} =
                MessageInjector.transform_request(
                  request,
                  %FakeState{iteration: 1, llm_call_id: call_id},
@@ -174,34 +145,8 @@ defmodule Murmur.Agents.MessageInjectorTest do
                )
 
       assert [{^call_id, messages}] = :ets.lookup(:jido_murmur_obs_prepared_llm_inputs, call_id)
-      assert messages == request.messages
-    end
-  end
-
-  describe "transform_request/4 — agent_id resolution" do
-    test "uses agent_id from runtime_context to identify session queue", ctx do
-      PendingQueue.enqueue(ctx.session_id, "for this agent")
-
-      other_session = Ecto.UUID.generate()
-      PendingQueue.enqueue(other_session, "for other agent")
-
-      request = %{messages: [], llm_opts: [], tools: %{}}
-      runtime_context = %{agent_id: ctx.session_id}
-
-      {:ok, overrides} =
-        MessageInjector.transform_request(
-          request,
-          %FakeState{iteration: 1},
-          %FakeConfig{},
-          runtime_context
-        )
-
-      contents = Enum.map(overrides.messages, & &1.content)
-      assert Enum.any?(contents, &(&1 =~ "for this agent"))
-      refute Enum.any?(contents, &(&1 =~ "for other agent"))
-
-      # Other session's queue untouched
-      assert PendingQueue.pending?(other_session)
+      assert messages == overrides.messages
+      assert hd(messages).content =~ "<murmur_team_context>"
     end
   end
 end

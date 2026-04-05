@@ -60,7 +60,7 @@ defmodule JidoMurmur.Observability.Store do
       response = Map.get(attrs, :response)
 
       span_attrs =
-        %{"murmur.injected_message_count" => Map.get(turn, :injected_message_count, 0)}
+        %{}
         |> maybe_put("output.value", Observability.captured_content(format_output(response)))
 
       Span.set_attributes(turn.span_ctx, span_attrs)
@@ -75,7 +75,7 @@ defmodule JidoMurmur.Observability.Store do
   def fail_turn(request_id, reason, attrs \\ %{}) do
     with {:ok, turn} <- fetch_turn(request_id) do
       span_attrs =
-        %{"murmur.injected_message_count" => Map.get(turn, :injected_message_count, 0)}
+        %{}
         |> Map.merge(Map.new(attrs, fn {key, value} -> {to_string(key), value} end))
         |> Map.put("error", true)
         |> Map.put("error.message", inspect(reason))
@@ -250,31 +250,6 @@ defmodule JidoMurmur.Observability.Store do
   end
 
   def record_signal(_signal, _context), do: :ok
-
-  def record_injected_messages(agent_id, envelopes) when is_list(envelopes) do
-    with [{^agent_id, request_id}] <- :ets.lookup(@agent_turn_table, agent_id),
-         {:ok, turn} <- fetch_turn(request_id) do
-      Enum.each(envelopes, fn envelope ->
-        attrs =
-          %{
-            "murmur.message.kind" => to_string(Map.get(envelope, :kind, :direct)),
-            "murmur.interaction_id" => Map.get(envelope, :interaction_id, "")
-          }
-          |> maybe_put("murmur.sender_name", Map.get(envelope, :sender_name))
-          |> maybe_put("murmur.sender_trace_id", Map.get(envelope, :sender_trace_id))
-          |> maybe_put("murmur.message.content", Observability.captured_content(Map.get(envelope, :content)))
-
-        Span.add_event(turn.span_ctx, "murmur.injected_message", attrs)
-      end)
-
-      update_turn(request_id, fn current ->
-        %{current | injected_message_count: Map.get(current, :injected_message_count, 0) + length(envelopes)}
-      end)
-    end
-
-    :ok
-  end
-
   defp record_delta(%{call_id: call_id, delta: delta, chunk_type: chunk_type}) when is_binary(call_id) do
     update_span(@llm_span_table, call_id, fn record ->
       case chunk_type do
@@ -425,8 +400,7 @@ defmodule JidoMurmur.Observability.Store do
       input_value: Map.fetch!(attrs, :input_value),
       message_count: Map.get(attrs, :message_count, 1),
       triggered_by_trace_id: Map.get(attrs, :triggered_by_trace_id),
-      sender_name: Map.get(attrs, :sender_name),
-      injected_message_count: 0
+      sender_name: Map.get(attrs, :sender_name)
     }
   end
 
@@ -523,10 +497,6 @@ defmodule JidoMurmur.Observability.Store do
     :ets.delete(@req_llm_lookup_table, turn.request_id)
     :ets.delete(@pending_llm_call_table, turn.request_id)
     :ets.delete(@pending_agent_llm_call_table, turn.agent_id)
-  end
-
-  defp update_turn(request_id, fun) do
-    update_span(@turn_table, request_id, fun)
   end
 
   defp update_span(table, key, fun) do

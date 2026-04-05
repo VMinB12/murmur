@@ -36,6 +36,18 @@ defmodule JidoMurmur.LLM.Mock do
   end
 
   @impl true
+  def steer(_agent_module, _pid, content, opts) do
+    notify_control(:steer, content, opts)
+    {:ok, %{kind: :steer, content: content, opts: opts}}
+  end
+
+  @impl true
+  def inject(_agent_module, _pid, content, opts) do
+    notify_control(:inject, content, opts)
+    {:ok, %{kind: :inject, content: content, opts: opts}}
+  end
+
+  @impl true
   def await(_agent_module, %{content: content, opts: opts}, _await_opts) do
     response = current_response()
     emit_observability(content, opts, response)
@@ -55,9 +67,34 @@ defmodule JidoMurmur.LLM.Mock do
     :ok
   end
 
+  def set_control_notify(pid) when is_pid(pid) do
+    Process.put(:mock_llm_control_notify, pid)
+    Application.put_env(:jido_murmur, :mock_llm_control_notify, pid)
+    :ok
+  end
+
+  def clear_control_notify do
+    Process.delete(:mock_llm_control_notify)
+    Application.delete_env(:jido_murmur, :mock_llm_control_notify)
+    :ok
+  end
+
   defp current_response do
     Process.get(:mock_llm_response) ||
       Application.get_env(:jido_murmur, :mock_llm_response, @default_response)
+  end
+
+  defp control_notify_pid(opts) do
+    opts[:notify] ||
+      Process.get(:mock_llm_control_notify) ||
+      Application.get_env(:jido_murmur, :mock_llm_control_notify)
+  end
+
+  defp notify_control(kind, content, opts) do
+    case control_notify_pid(opts) do
+      pid when is_pid(pid) -> send(pid, {:mock_llm_control, kind, %{content: content, opts: opts}})
+      _ -> :ok
+    end
   end
 
   defp normalize_response(%{} = response) do

@@ -6,7 +6,7 @@ defmodule Murmur.Agents.InterAgentTest do
   - User Story 3: Agents communicate with each other
   - FR-009: Tell capability
   - FR-011: Tell to idle agent triggers immediate processing
-  - FR-012: Tell to busy agent queues and injects
+  - FR-012: Tell to busy agent injects into the active run
   - FR-010: Inter-agent messages prefixed with sender name
   - FR-008: Per-agent history persistence (each agent persists independently)
 
@@ -15,8 +15,7 @@ defmodule Murmur.Agents.InterAgentTest do
   use Murmur.AgentCase
 
   alias JidoMurmur.Catalog
-  alias JidoMurmur.PendingQueue
-  alias JidoMurmur.Runner
+  alias JidoMurmur.Ingress
   alias JidoMurmur.TellAction
   alias JidoMurmur.Workspaces
 
@@ -69,40 +68,67 @@ defmodule Murmur.Agents.InterAgentTest do
   end
 
   describe "idle agent receives tell and responds" do
-    # FR-011: Tell to idle agent triggers immediate processing
     test "sending message to idle Bob triggers processing and produces completion", %{
+      workspace: workspace,
       bob: bob
     } do
-      Runner.send_message(bob, "[Alice]: What is 2+2?")
+      params = %{target_agent: "Bob", message: "What is 2+2?"}
+      context = %{workspace_id: workspace.id, sender_name: "Alice", hop_count: 0}
+
+      assert {:ok, _} = TellAction.run(params, context)
 
       bob_id = bob.id
       assert_receive %Jido.Signal{type: "murmur.message.completed", data: %{session_id: ^bob_id, response: "Mock agent response"}}, 5000
     end
   end
 
-  describe "busy agent receives queued message" do
-    # FR-012: Tell to busy agent queues and injects
-    test "message to busy agent is queued and eventually processed", %{bob: bob} do
-      # Send first message to start processing
-      Runner.send_message(bob, "Think about the meaning of life")
+  describe "busy agent receives injected tell" do
+    test "tell to a busy agent is injected into the active run", %{workspace: workspace, bob: bob} do
+      test_pid = self()
+      pause_ref = make_ref()
 
-      # Immediately send another message (Bob's loop is running)
-      Runner.send_message(bob, "[Alice]: Also, what is 3+3?")
+      expect_llm_ask(fn _mod, _pid, content, _ctx ->
+        assert content == "Think about the meaning of life"
+        {:ok, make_ref()}
+      end)
 
+      expect_llm_inject(fn _mod, _pid, content, opts ->
+        assert content == "[Alice]: Also, what is 3+3?"
+        assert opts[:source][:kind] == :programmatic
+        {:ok, %{}}
+      end)
+
+      expect_llm_await(fn _mod, _handle, _opts ->
+        send(test_pid, {:await_started, pause_ref, self()})
+
+        receive do
+          {:release_await, ^pause_ref} -> {:ok, "Mock agent response"}
+        after
+          5_000 -> flunk("timed out waiting to release await")
+        end
+      end)
+
+      assert :queued = Ingress.deliver(bob, "Think about the meaning of life")
+      assert_receive {:await_started, ^pause_ref, waiter_pid}, 5_000
+
+      params = %{target_agent: "Bob", message: "Also, what is 3+3?"}
+      context = %{workspace_id: workspace.id, sender_name: "Alice", hop_count: 0}
+
+      assert {:ok, _} = TellAction.run(params, context)
       bob_id = bob.id
-      # Should receive at least one completion
-      assert_receive %Jido.Signal{type: "murmur.message.completed", data: %{session_id: ^bob_id}}, 5000
+      assert_receive %Jido.Signal{type: "murmur.message.received", data: %{session_id: ^bob_id}}, 5000
 
-      # All messages should be processed
-      Process.sleep(200)
-      refute PendingQueue.pending?(bob.id)
+      send(waiter_pid, {:release_await, pause_ref})
+
+      assert_receive %Jido.Signal{type: "murmur.message.completed", data: %{session_id: ^bob_id}}, 5000
+      refute_receive %Jido.Signal{type: "murmur.request.failed"}, 500
     end
   end
 
   describe "per-agent completions are independent (FR-008)" do
     test "each agent receives its own completion separately", %{alice: alice, bob: bob} do
-      Runner.send_message(alice, "Say hello")
-      Runner.send_message(bob, "Say goodbye")
+      Ingress.deliver(alice, "Say hello")
+      Ingress.deliver(bob, "Say goodbye")
 
       alice_id = alice.id
       bob_id = bob.id
@@ -128,25 +154,22 @@ defmodule Murmur.Agents.InterAgentTest do
       assert_receive %Jido.Signal{type: "murmur.message.received", data: %{session_id: ^bob_id, message: msg}}, 5000
       assert msg.content =~ "[Alice]"
 
-      # Wait for the background Runner Task to finish
       assert_receive %Jido.Signal{type: "murmur.message.completed", data: %{session_id: ^bob_id}}, 5000
     end
   end
 
-  describe "no busy rejections with serialized Runner" do
+  describe "no busy rejections with ingress coordination" do
     test "rapid sends never produce busy errors", %{bob: bob} do
-      # Fire multiple rapid messages
-      Runner.send_message(bob, "first message")
-      Runner.send_message(bob, "second message")
-      Runner.send_message(bob, "third message")
+      Ingress.deliver(bob, "first message")
+      Ingress.deliver(bob, "second message")
+      Ingress.deliver(bob, "third message")
 
       bob_id = bob.id
 
-      # Collect events — should never see a busy rejection
       assert_receive %Jido.Signal{type: "murmur.message.completed", data: %{session_id: ^bob_id}}, 5000
 
       refute_receive %Jido.Signal{type: "murmur.request.failed"}, 500
-      refute PendingQueue.pending?(bob.id)
+      assert :ok = await_runner(bob.id)
     end
   end
 end

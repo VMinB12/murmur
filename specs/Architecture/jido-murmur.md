@@ -28,12 +28,20 @@ Core orchestration backend for the multi-agent chat platform. Provides workspace
 | `find_agent_session_by_name/2` | Lookup session by display name |
 | `delete_agent_session/1` | Delete a session |
 
-### Runner — Message Queue & Agent Communication
+### Ingress — Delivery Coordination
 
 | Function | Purpose |
 |----------|---------|
-| `send_message/2` | Queue a message for agent processing |
-| `active?/1` | Check if agent has an active drain-loop |
+| `deliver/3` | Normalize legacy caller input and route it through the session coordinator |
+| `deliver_input/2` | Deliver canonical ingress input directly |
+| `ensure_started/1` | Start or reuse the per-session coordinator |
+
+### Runner — Single Run Execution
+
+| Function | Purpose |
+|----------|---------|
+| `start_run/2` | Start one ask/await cycle for normalized ingress input |
+| `active?/1` | Check if agent has an active run task |
 
 ### Catalog — Agent Profile Registry
 
@@ -58,19 +66,20 @@ All topics follow `workspace:{wid}:...` for multi-workspace isolation:
 
 ## Internal Architecture
 
-### Agent Lifecycle (AgentHelper + Runner)
+### Agent Lifecycle (AgentHelper + Ingress + Runner)
 
 1. `start_agent/1` restores state from a checkpoint (if available) or creates a fresh agent via Jido
 2. Conversation history (thread) is persisted in PostgreSQL using the `Jido.Storage` adapter
-3. Messages are enqueued in `PendingQueue` (ETS-backed)
-4. A single drain-loop Task per session processes queued messages atomically
-5. Completed responses trigger `MessageCompleted` signals broadcast via PubSub
+3. `Ingress` serializes delivery decisions per session
+4. Idle agents start a fresh `ask/await` run through `Runner.start_run/2`
+5. Busy agents receive native `steer` or `inject` follow-up input against the active ReAct request
+6. Completed responses trigger `MessageCompleted` signals broadcast via PubSub
 
 ### Inter-Agent Communication (TellAction + MessageInjector)
 
 - Agents use the `tell` action for fire-and-forget inter-agent messages
 - Messages routed by display name with a 5-hop depth limit (prevents infinite loops)
-- `MessageInjector` (a ReAct RequestTransformer) drains pending messages into the LLM request
+- `MessageInjector` (a ReAct RequestTransformer) adds Murmur team context to the system prompt and does not own follow-up delivery
 
 ### Request Transformation Pipeline
 
@@ -104,8 +113,7 @@ All plugins use `Jido.Plugin`, declaration-ordered:
 
 | Table | Purpose |
 |-------|---------|
-| `:jido_murmur_pending_messages` | Message queue for active agents |
-| `:jido_murmur_active_runners` | Track active drain-loop sessions |
+| `:jido_murmur_active_runners` | Track active run tasks per session |
 | `:jido_murmur_obs_conversations` | Active direct-chat discussion id per agent session |
 
 ## Data Models
@@ -182,7 +190,7 @@ jido_murmur_thread_entries
 
 ## Dependencies
 
-**Requires:** `jido ~> 2.0`, `jido_ai ~> 2.0`, `jido_action ~> 2.0`, `jido_signal ~> 2.0`, `phoenix_pubsub ~> 2.0`, `ecto_sql ~> 3.13`, `postgrex`, `jason ~> 1.2`, `agent_obs ~> 0.1.4`
+**Requires:** `jido ~> 2.2`, `jido_ai ~> 2.1`, `jido_action ~> 2.2`, `jido_signal ~> 2.1`, `phoenix_pubsub ~> 2.0`, `ecto_sql ~> 3.13`, `postgrex`, `jason ~> 1.2`, `agent_obs ~> 0.1.4`
 
 **Used by:** `jido_murmur_web`, `jido_tasks`, `jido_sql`, `murmur_demo`
 

@@ -18,7 +18,7 @@ defmodule JidoTasks.Tools.AddTask do
       ]
     ]
 
-  alias JidoMurmur.Runner
+  alias JidoMurmur.Ingress
   alias JidoMurmur.Signals.MessageReceived
   alias JidoMurmur.Workspaces
   alias JidoTasks.Signals.TaskCreated
@@ -95,12 +95,16 @@ defmodule JidoTasks.Tools.AddTask do
       target_session ->
         message = build_notification(task, sender_name)
         topic = JidoMurmur.Topics.agent_messages(workspace_id, target_session.id)
+        interaction_id = JidoMurmur.Observability.next_interaction_id()
 
         inter_msg = %{
           id: Uniq.UUID.uuid7(),
           role: "user",
           content: message,
-          sender_name: sender_name
+          kind: :task_assignment,
+          interaction_id: interaction_id,
+          sender_name: sender_name,
+          sender_trace_id: nil
         }
 
         signal =
@@ -110,7 +114,13 @@ defmodule JidoTasks.Tools.AddTask do
           )
 
         Phoenix.PubSub.broadcast(JidoTasks.pubsub(), topic, signal)
-        Runner.send_message(target_session, message)
+        Ingress.deliver(
+          target_session,
+          message,
+          sender_name: sender_name,
+          interaction_id: interaction_id,
+          kind: :task_assignment
+        )
     end
   end
 

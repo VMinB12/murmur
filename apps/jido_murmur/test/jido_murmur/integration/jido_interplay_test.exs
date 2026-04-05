@@ -10,10 +10,10 @@ defmodule JidoMurmur.Integration.JidoInterplayTest do
   use JidoMurmur.Case, async: false
 
   alias JidoMurmur.AgentHelper
+  alias JidoMurmur.Ingress
   alias JidoMurmur.LLM
   alias JidoMurmur.Observability.SessionCache
   alias JidoMurmur.Observability.Store
-  alias JidoMurmur.Runner
   alias JidoMurmur.StreamingPlugin
   alias JidoMurmur.Workspaces
 
@@ -70,7 +70,7 @@ defmodule JidoMurmur.Integration.JidoInterplayTest do
 
       # Trigger a message
       LLM.Mock.set_response(%{content: "Plugin interplay response"})
-      assert :queued = Runner.send_message(session, "Test plugin interplay")
+      assert :queued = Ingress.deliver(session, "Test plugin interplay")
 
       # The agent should complete (mock LLM responds immediately)
       assert_receive %Jido.Signal{type: "murmur.message.completed"}, 10_000
@@ -90,7 +90,7 @@ defmodule JidoMurmur.Integration.JidoInterplayTest do
         pause_ref: pause_ref
       })
 
-      assert :queued = Runner.send_message(session, "Test plugin interplay")
+      assert :queued = Ingress.deliver(session, "Test plugin interplay")
 
       assert_receive {:mock_llm_phase, :deltas, %{call_id: call_id, waiter_pid: waiter_pid}}, 10_000
       assert [{^call_id, llm_record}] = :ets.lookup(@llm_span_table, call_id)
@@ -211,7 +211,7 @@ defmodule JidoMurmur.Integration.JidoInterplayTest do
       Phoenix.PubSub.subscribe(pubsub, agent_topic)
 
       LLM.Mock.set_response(%{content: "ETS storage response"})
-      assert :queued = Runner.send_message(session, "Test with ETS storage")
+      assert :queued = Ingress.deliver(session, "Test with ETS storage")
 
       assert_receive %Jido.Signal{type: "murmur.message.completed"}, 10_000
     end
@@ -232,10 +232,6 @@ defmodule JidoMurmur.Integration.JidoInterplayTest do
   defp ensure_ets_tables do
     unless :ets.whereis(:jido_murmur_active_runners) != :undefined do
       :ets.new(:jido_murmur_active_runners, [:set, :public, :named_table])
-    end
-
-    unless :ets.whereis(:jido_murmur_pending_messages) != :undefined do
-      :ets.new(:jido_murmur_pending_messages, [:named_table, :public, :duplicate_bag])
     end
 
     SessionCache.create_table()

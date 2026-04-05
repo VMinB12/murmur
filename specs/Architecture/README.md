@@ -10,7 +10,7 @@ Murmur is a real-time multi-agent chat platform built as an Elixir/Phoenix umbre
 ┌─────────────────────────────────────────────────────────────────┐
 │                         murmur_demo                             │
 │                  (Reference Phoenix application)                │
-│   LiveView ←→ PubSub ←→ Runner ←→ LLM                         │
+│ LiveView ←→ PubSub ←→ Ingress ←→ Runner ←→ LLM                │
 └──────┬──────────────┬──────────────┬──────────────┬─────────────┘
        │              │              │              │
 ┌──────▼──────┐ ┌─────▼──────┐ ┌────▼─────┐ ┌─────▼──────┐
@@ -36,7 +36,7 @@ Murmur is a real-time multi-agent chat platform built as an Elixir/Phoenix umbre
 | Component | Responsibility |
 |-----------|---------------|
 | `murmur_demo` | Reference Phoenix 1.8 application. Hosts LiveView UI, PubSub, Ecto Repo, and agent profile configuration. |
-| `jido_murmur` | Core backend: Runner (agent execution loop), PendingQueue (message queuing for busy agents), Plugins (streaming, artifacts), Storage.Ecto (conversation persistence), Schemas. |
+| `jido_murmur` | Core backend: Ingress coordinator, Runner (single-run execution), Plugins (streaming, artifacts), Storage.Ecto (conversation persistence), Schemas. |
 | `jido_murmur_web` | Pre-built LiveView components for the chat interface — split/unified views, message rendering, workspace management. |
 | `jido_tasks` | Task management Jido.Action tools — agents collaboratively manage a shared task board. |
 | `jido_arxiv` | arXiv academic research tools — search and paper display as agent actions. |

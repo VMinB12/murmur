@@ -1,21 +1,15 @@
 defmodule JidoMurmur.Runner do
   @moduledoc """
-  Manages the ask/await lifecycle for an agent session.
+  Executes a single ask/await run for an agent session.
 
-  All incoming messages are enqueued in `PendingQueue` first. A single
-  drain-loop Task per session pulls messages off the queue, combines
-  them, and sends exactly ONE `ask()` at a time. This avoids concurrent
-  asks which corrupt the agent's `last_request_id` tracking.
-
-  Messages arriving while the LLM is processing are either:
-  - Injected mid-turn by `MessageInjector` (before the next LLM call)
-  - Picked up by the drain loop after the current request completes
+  Delivery decisions are owned by `JidoMurmur.Ingress`. This module only
+  starts a run, awaits its completion in the background, broadcasts
+  completion or failure, and hibernates the agent afterward.
   """
 
   alias JidoMurmur.Catalog
+  alias JidoMurmur.Ingress.Input
   alias JidoMurmur.Observability
-  alias JidoMurmur.Observability.ConversationCache
-  alias JidoMurmur.PendingQueue
   alias JidoMurmur.Signals.MessageCompleted
 
   require Logger
@@ -29,33 +23,77 @@ defmodule JidoMurmur.Runner do
           required(:display_name) => String.t()
         }
 
-  @doc """
-  Send a message to an agent session.
-
-  The message is enqueued and a drain loop is started if one isn't
-  already running for this session.
-
-  Returns `:queued` or `:agent_not_running`.
-  """
-  @spec send_message(session_like(), String.t(), keyword()) :: :queued | :agent_not_running
-  def send_message(session, content, opts \\ []) do
+  @doc false
+  @spec start_run(session_like(), Input.t()) :: {:ok, String.t()} | {:error, term()}
+  def start_run(session, %Input{} = input) do
     jido_mod = JidoMurmur.jido_mod()
     pid = jido_mod.whereis(session.id)
 
-    if pid do
-      PendingQueue.enqueue(
-        session.id,
-        Observability.build_message_envelope(content, ensure_interaction_id(session, opts))
+    if is_nil(pid) do
+      {:error, :agent_not_running}
+    else
+      agent_module = Catalog.agent_module(session.agent_profile_id)
+      topic = agent_topic(session)
+      interaction_id = Input.interaction_id(input) || Observability.next_interaction_id()
+      conversation_session_id = interaction_id || session.id
+      sender_trace_id = ref_value(input.refs, :sender_trace_id)
+      sender_name = ref_value(input.refs, :sender_name)
+      request_id = Uniq.UUID.uuid7()
+
+      tool_ctx = %{
+        workspace_id: session.workspace_id,
+        sender_name: session.display_name,
+        interaction_id: interaction_id,
+        request_id: request_id
+      }
+
+      start_time = System.monotonic_time()
+
+      Observability.start_turn(%{
+        request_id: request_id,
+        agent_id: session.id,
+        agent_name: session.display_name,
+        session_id: conversation_session_id,
+        workspace_id: session.workspace_id,
+        interaction_id: interaction_id,
+        input_value: input.content,
+        message_count: 1,
+        triggered_by_trace_id: sender_trace_id,
+        sender_name: sender_name
+      })
+
+      :telemetry.execute(
+        [:jido_murmur, :runner, :run, :start],
+        %{system_time: System.system_time()},
+        %{session_id: session.id, agent_module: agent_module, request_id: request_id}
       )
 
-      maybe_start_loop(session)
-      :queued
-    else
-      :agent_not_running
+      request_opts =
+        [tool_context: tool_ctx, request_id: request_id]
+        |> maybe_put_extra_refs(input.refs)
+
+      case llm_adapter().ask(agent_module, pid, input.content, request_opts) do
+        {:ok, req} ->
+          :ets.insert(@active_table, {session.id, request_id})
+          start_await_task(agent_module, req, session, topic, start_time, request_id)
+          {:ok, request_id}
+
+        {:error, reason} ->
+          Observability.fail_turn(request_id, reason)
+
+          :telemetry.execute(
+            [:jido_murmur, :runner, :run, :exception],
+            %{duration: System.monotonic_time() - start_time},
+            %{session_id: session.id, request_id: request_id, reason: reason}
+          )
+
+          broadcast(topic, request_failed_signal(session, reason))
+          {:error, reason}
+      end
     end
   end
 
-  @doc "Check if an agent session has a drain-loop running."
+  @doc "Check if an agent session has an active run task."
   @spec active?(String.t()) :: boolean()
   def active?(session_id) do
     :ets.lookup(@active_table, session_id) != []
@@ -63,112 +101,31 @@ defmodule JidoMurmur.Runner do
 
   # --- Private ---
 
-  defp maybe_start_loop(session) do
+  defp start_await_task(agent_module, req, session, topic, start_time, request_id) do
     jido_mod = JidoMurmur.jido_mod()
-
-    if :ets.insert_new(@active_table, {session.id, true}) do
-      :telemetry.execute(
-        [:jido_murmur, :runner, :loop_start],
-        %{system_time: System.system_time()},
-        %{session_id: session.id}
-      )
-
-      Task.Supervisor.start_child(jido_mod.task_supervisor_name(), fn ->
-        try do
-          run_loop(session)
-        after
-          try do
-            :ets.delete(@active_table, session.id)
-          rescue
-            ArgumentError -> :ok
-          end
-        end
-      end)
-    end
-
-    :ok
-  end
-
-  defp run_loop(session) do
-    case PendingQueue.drain_envelopes(session.id) do
-      [] ->
-        :done
-
-      envelopes ->
-        process_batch(session, envelopes)
-        run_loop(session)
-    end
-  rescue
-    # ETS table may be gone if TableOwner shut down (e.g. during test teardown)
-    ArgumentError -> :ok
-  end
-
-  defp process_batch(session, envelopes) do
-    jido_mod = JidoMurmur.jido_mod()
-    pid = jido_mod.whereis(session.id)
-    if is_nil(pid), do: throw(:agent_gone)
-
-    agent_module = Catalog.agent_module(session.agent_profile_id)
-    topic = agent_topic(session)
-    combined = envelopes_to_content(envelopes)
-    interaction_id = envelopes_to_interaction_id(envelopes)
-    conversation_session_id = interaction_id || session.id
-    sender_trace_id = envelopes_to_sender_trace_id(envelopes)
-    sender_name = envelopes_to_sender_name(envelopes)
-    request_id = Uniq.UUID.uuid7()
-
-    tool_ctx = %{
-      workspace_id: session.workspace_id,
-      sender_name: session.display_name,
-      interaction_id: interaction_id,
-      request_id: request_id
-    }
-
-    start_time = System.monotonic_time()
-
-    Observability.start_turn(%{
-      request_id: request_id,
-      agent_id: session.id,
-      agent_name: session.display_name,
-      session_id: conversation_session_id,
-      workspace_id: session.workspace_id,
-      interaction_id: interaction_id,
-      input_value: combined,
-      message_count: length(envelopes),
-      triggered_by_trace_id: sender_trace_id,
-      sender_name: sender_name
-    })
 
     :telemetry.execute(
-      [:jido_murmur, :runner, :send_message, :start],
+      [:jido_murmur, :runner, :loop_start],
       %{system_time: System.system_time()},
-      %{session_id: session.id, agent_module: agent_module, request_id: request_id}
+      %{session_id: session.id, request_id: request_id}
     )
 
-    request_opts = [tool_context: tool_ctx, request_id: request_id]
-
-    case llm_adapter().ask(agent_module, pid, combined, request_opts) do
-      {:ok, req} ->
+    Task.Supervisor.start_child(jido_mod.task_supervisor_name(), fn ->
+      try do
         handle_await(agent_module, req, session, topic, start_time, request_id)
-
-      {:error, reason} ->
-        Observability.fail_turn(request_id, reason)
-
-        :telemetry.execute(
-          [:jido_murmur, :runner, :send_message, :exception],
-          %{duration: System.monotonic_time() - start_time},
-          %{session_id: session.id, request_id: request_id, reason: reason}
-        )
-
-        broadcast(topic, request_failed_signal(session, reason))
-    end
-  catch
-    :agent_gone -> :ok
+      after
+        try do
+          :ets.delete(@active_table, session.id)
+        rescue
+          ArgumentError -> :ok
+        end
+      end
+    end)
   end
 
   defp handle_await(agent_module, req, session, topic, start_time, request_id) do
-    # A single ReAct run may loop for many iterations (LLM → tools → LLM …)
-    # and individual tool calls can be slow (e.g. arXiv, web scraping).
+    # A single ReAct run may loop for many iterations (LLM -> tools -> LLM ...)
+    # and individual tool calls can be slow (for example arXiv or web scraping).
     # Use :infinity so the agent's own internal timeouts govern cancellation
     # rather than an arbitrary outer wall-clock limit.
     case llm_adapter().await(agent_module, req, timeout: :infinity) do
@@ -176,7 +133,7 @@ defmodule JidoMurmur.Runner do
         Observability.finish_turn(request_id, %{response: response})
 
         :telemetry.execute(
-          [:jido_murmur, :runner, :send_message, :stop],
+          [:jido_murmur, :runner, :run, :stop],
           %{duration: System.monotonic_time() - start_time},
           %{session_id: session.id, request_id: request_id}
         )
@@ -195,7 +152,7 @@ defmodule JidoMurmur.Runner do
         Observability.fail_turn(request_id, reason)
 
         :telemetry.execute(
-          [:jido_murmur, :runner, :send_message, :exception],
+          [:jido_murmur, :runner, :run, :exception],
           %{duration: System.monotonic_time() - start_time},
           %{session_id: session.id, request_id: request_id, reason: reason}
         )
@@ -228,8 +185,8 @@ defmodule JidoMurmur.Runner do
       {:error, reason} -> log_hibernate_error(session_id, reason)
     end
   rescue
-    e ->
-      Logger.error("Exception during hibernate for agent #{session_id}: #{Exception.message(e)}")
+    error ->
+      Logger.error("Exception during hibernate for agent #{session_id}: #{Exception.message(error)}")
       :ok
   catch
     :exit, reason ->
@@ -259,30 +216,10 @@ defmodule JidoMurmur.Runner do
     )
   end
 
-  defp ensure_interaction_id(session, opts) do
-    interaction_id =
-      ConversationCache.resolve(session.id,
-        interaction_id: Keyword.get(opts, :interaction_id),
-        kind: Keyword.get(opts, :kind, :direct),
-        now_ms: Keyword.get(opts, :sent_at_ms, System.monotonic_time(:millisecond))
-      )
+  defp maybe_put_extra_refs(request_opts, refs) when map_size(refs) == 0, do: request_opts
+  defp maybe_put_extra_refs(request_opts, refs), do: Keyword.put(request_opts, :extra_refs, refs)
 
-    Keyword.put(opts, :interaction_id, interaction_id)
-  end
-
-  defp envelopes_to_content(envelopes) do
-    Enum.map_join(envelopes, "\n\n", & &1.content)
-  end
-
-  defp envelopes_to_interaction_id(envelopes) do
-    Enum.find_value(envelopes, &Map.get(&1, :interaction_id)) || Observability.next_interaction_id()
-  end
-
-  defp envelopes_to_sender_trace_id(envelopes) do
-    Enum.find_value(envelopes, &Map.get(&1, :sender_trace_id))
-  end
-
-  defp envelopes_to_sender_name(envelopes) do
-    Enum.find_value(envelopes, &Map.get(&1, :sender_name))
+  defp ref_value(refs, key) when is_atom(key) do
+    Map.get(refs, key) || Map.get(refs, Atom.to_string(key))
   end
 end

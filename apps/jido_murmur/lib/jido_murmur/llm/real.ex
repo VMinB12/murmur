@@ -10,6 +10,20 @@ defmodule JidoMurmur.LLM.Real do
   end
 
   @impl true
+  def steer(agent_module, pid, content, opts) do
+    agent_module.steer(pid, content, opts)
+  rescue
+    e -> {:error, Exception.message(e)}
+  end
+
+  @impl true
+  def inject(agent_module, pid, content, opts) do
+    agent_module.inject(pid, content, opts)
+  rescue
+    e -> {:error, Exception.message(e)}
+  end
+
+  @impl true
   def await(agent_module, req, opts) do
     agent_module.await(req, opts)
   rescue

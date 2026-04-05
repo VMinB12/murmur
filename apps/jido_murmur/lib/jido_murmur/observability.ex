@@ -12,16 +12,6 @@ defmodule JidoMurmur.Observability do
   @enabled_override_key {__MODULE__, :enabled_override}
   @capture_content_override_key {__MODULE__, :capture_content_override}
 
-  @type message_envelope :: %{
-          required(:id) => String.t(),
-          required(:content) => String.t(),
-          required(:role) => String.t(),
-          required(:kind) => atom(),
-          required(:interaction_id) => String.t(),
-          optional(:sender_name) => String.t() | nil,
-          optional(:sender_trace_id) => String.t() | nil
-        }
-
   @spec enabled?() :: boolean()
   def enabled? do
     case runtime_override(@enabled_override_key) do
@@ -46,23 +36,10 @@ defmodule JidoMurmur.Observability do
 
   def next_interaction_id, do: Uniq.UUID.uuid7()
 
-  def build_message_envelope(content, opts \\ []) when is_binary(content) do
-    %{
-      id: Keyword.get(opts, :id, Uniq.UUID.uuid7()),
-      role: Keyword.get(opts, :role, "user"),
-      content: content,
-      kind: Keyword.get(opts, :kind, :direct),
-      interaction_id: Keyword.get(opts, :interaction_id, next_interaction_id()),
-      sender_name: Keyword.get(opts, :sender_name),
-      sender_trace_id: Keyword.get(opts, :sender_trace_id)
-    }
-  end
-
   def start_turn(attrs), do: Store.start_turn(attrs)
   def finish_turn(request_id, attrs), do: Store.finish_turn(request_id, attrs)
   def fail_turn(request_id, reason, attrs \\ %{}), do: Store.fail_turn(request_id, reason, attrs)
   def record_signal(signal, context), do: Store.record_signal(signal, context)
-  def record_injected_messages(agent_id, envelopes), do: Store.record_injected_messages(agent_id, envelopes)
 
   def record_prepared_llm_input(%{llm_call_id: call_id}, messages)
       when is_binary(call_id) and is_list(messages),

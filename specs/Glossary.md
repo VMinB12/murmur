@@ -4,8 +4,8 @@
 |------|-----------|
 | Agent | An AI-powered entity within a workspace that can receive messages, call tools, produce artifacts, and communicate with other agents. Backed by a Jido agent with an LLM. |
 | Workspace | A container for a group of agents and their shared context (conversations, tasks, artifacts). |
-| Runner | The execution loop in `jido_murmur` that processes an agent's message queue, calls the LLM, and dispatches tool calls and responses. |
-| PendingQueue | A message buffer for agents that are busy. Incoming messages are queued and delivered when the agent finishes its current turn. |
+| Ingress Coordinator | The per-session process in `jido_murmur` that decides whether inbound input should start a fresh ask or be routed into the active run with native steering/inject semantics. |
+| Runner | The execution path in `jido_murmur` that starts a single ask/await run, records observability, and broadcasts completion or failure. |
 | Plugin | A Jido plugin that hooks into the agent lifecycle (e.g., StreamingPlugin for token streaming, ArtifactPlugin for artifact emission). |
 | Artifact | A rich output produced by an agent (HTML, chart, paper display) that is rendered in the UI outside the chat message flow. |
 | Tool | A function an agent can call during its turn (e.g., "tell" for agent-to-agent messaging, "add_task" for task management, "arxiv_search" for research). |

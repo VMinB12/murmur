@@ -66,8 +66,19 @@ defmodule MurmurWeb.WorkspaceLiveTest do
   end
 
   defp build_message_received(session_id, workspace_id, message) do
+    full_message =
+      Map.merge(
+        %{
+          kind: :steering,
+          interaction_id: Ecto.UUID.generate(),
+          sender_name: "Alice",
+          sender_trace_id: nil
+        },
+        message
+      )
+
     MessageReceived.new!(
-      %{session_id: session_id, message: message},
+      %{session_id: session_id, message: full_message},
       subject: MessageReceived.subject(workspace_id, session_id)
     )
   end
@@ -562,7 +573,10 @@ defmodule MurmurWeb.WorkspaceLiveTest do
         id: Ecto.UUID.generate(),
         role: "user",
         content: "[Alice]: Can you help?",
-        sender_name: "Alice"
+        kind: :steering,
+        interaction_id: Ecto.UUID.generate(),
+        sender_name: "Alice",
+        sender_trace_id: nil
       }
 
       send(view.pid, build_message_received(session.id, workspace.id, inter_msg))

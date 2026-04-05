@@ -16,8 +16,8 @@ defmodule JidoMurmur.TellAction do
     ]
 
   alias Jido.Tracing.Context, as: TracingContext
+  alias JidoMurmur.Ingress
   alias JidoMurmur.Observability
-  alias JidoMurmur.Runner
   alias JidoMurmur.Signals.MessageReceived
   alias JidoMurmur.Workspaces
 
@@ -85,7 +85,7 @@ defmodule JidoMurmur.TellAction do
 
       Phoenix.PubSub.broadcast(JidoMurmur.pubsub(), topic, signal)
 
-      Runner.send_message(
+      Ingress.deliver(
         target_session,
         message,
         sender_name: sender_name,

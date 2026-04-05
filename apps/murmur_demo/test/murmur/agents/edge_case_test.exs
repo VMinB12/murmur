@@ -3,7 +3,7 @@ defmodule Murmur.Agents.EdgeCaseTest do
   Edge case tests from the specification.
 
   Covers:
-  - Edge: Message to busy agent → injected into pending
+  - Edge: Message to busy agent is steered without blocking
   - Edge: Tell to removed/non-existent agent → graceful failure
   - Edge: Circular tell loop → depth limited to 5
   - Max agents per workspace (8)
@@ -14,12 +14,11 @@ defmodule Murmur.Agents.EdgeCaseTest do
   use Murmur.AgentCase
 
   alias JidoMurmur.Catalog
-  alias JidoMurmur.PendingQueue
-  alias JidoMurmur.Runner
+  alias JidoMurmur.Ingress
   alias JidoMurmur.TellAction
   alias JidoMurmur.Workspaces
 
-  describe "message to busy agent is queued (not blocked)" do
+  describe "message to busy agent is steered (not blocked)" do
     setup do
       {:ok, workspace} = Workspaces.create_workspace(%{"name" => "Busy Test"})
 
@@ -46,25 +45,41 @@ defmodule Murmur.Agents.EdgeCaseTest do
       %{workspace: workspace, session: session}
     end
 
-    test "second message during busy does not error", %{session: session} do
-      stub_llm_success("busy response")
+    test "second message during an active run does not error", %{session: session} do
+      test_pid = self()
+      pause_ref = make_ref()
 
-      # Send first message (starts processing)
-      assert :queued = Runner.send_message(session, "Think carefully about everything")
+      expect_llm_ask(fn _mod, _pid, content, _ctx ->
+        assert content == "Think carefully about everything"
+        {:ok, make_ref()}
+      end)
 
-      # Second message while first is processing
-      assert :queued = Runner.send_message(session, "Also, what is 2+2?")
+      expect_llm_steer(fn _mod, _pid, content, opts ->
+        assert content == "Also, what is 2+2?"
+        assert opts[:source][:kind] == :human
+        {:ok, %{}}
+      end)
+
+      expect_llm_await(fn _mod, _handle, _opts ->
+        send(test_pid, {:await_started, pause_ref, self()})
+
+        receive do
+          {:release_await, ^pause_ref} -> {:ok, "busy response"}
+        after
+          5_000 -> flunk("timed out waiting to release await")
+        end
+      end)
+
+      assert :queued = Ingress.deliver(session, "Think carefully about everything")
+      assert_receive {:await_started, ^pause_ref, waiter_pid}, 5_000
+
+      assert :queued = Ingress.deliver(session, "Also, what is 2+2?")
+
+      send(waiter_pid, {:release_await, pause_ref})
 
       session_id = session.id
-
-      # Should get completion(s), never busy rejections
       assert_receive %Jido.Signal{type: "murmur.message.completed", data: %{session_id: ^session_id}}, 5000
-
       refute_receive %Jido.Signal{type: "murmur.request.failed"}, 500
-
-      # All messages processed
-      Process.sleep(200)
-      refute PendingQueue.pending?(session.id)
     end
   end
 
@@ -124,7 +139,6 @@ defmodule Murmur.Agents.EdgeCaseTest do
 
       assert {:ok, _} = TellAction.run(params, context)
 
-      # Wait for the background Runner Task to finish
       bob_id = bob.id
       assert_receive %Jido.Signal{type: "murmur.message.completed", data: %{session_id: ^bob_id}}, 5000
     end
@@ -135,7 +149,6 @@ defmodule Murmur.Agents.EdgeCaseTest do
 
       assert {:ok, _} = TellAction.run(params, context)
 
-      # Wait for the background Runner Task to finish
       bob_id = bob.id
       assert_receive %Jido.Signal{type: "murmur.message.completed", data: %{session_id: ^bob_id}}, 5000
     end

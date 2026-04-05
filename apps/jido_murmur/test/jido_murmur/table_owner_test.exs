@@ -8,9 +8,8 @@ defmodule JidoMurmur.TableOwnerTest do
       nil ->
         # Clean up any stale tables
         for table <- [
-              :jido_murmur_pending_messages,
               :jido_murmur_active_runners,
-            :jido_murmur_obs_conversations,
+              :jido_murmur_obs_conversations,
               :jido_murmur_obs_turns,
               :jido_murmur_obs_agent_turns,
               :jido_murmur_obs_llm_spans,
@@ -24,7 +23,7 @@ defmodule JidoMurmur.TableOwnerTest do
           end
         end
 
-        {:ok, pid} = start_supervised(JidoMurmur.TableOwner)
+        pid = start_supervised!(JidoMurmur.TableOwner)
         %{pid: pid}
 
       pid ->
@@ -34,17 +33,11 @@ defmodule JidoMurmur.TableOwnerTest do
 
   describe "start_link/1" do
     test "creates ETS tables on init" do
-      assert :ets.whereis(:jido_murmur_pending_messages) != :undefined
       assert :ets.whereis(:jido_murmur_active_runners) != :undefined
       assert :ets.whereis(:jido_murmur_obs_conversations) != :undefined
       assert :ets.whereis(:jido_murmur_obs_turns) != :undefined
       assert :ets.whereis(:jido_murmur_obs_llm_spans) != :undefined
       assert :ets.whereis(:jido_murmur_obs_sessions) != :undefined
-    end
-
-    test "pending_messages table is a duplicate_bag" do
-      info = :ets.info(:jido_murmur_pending_messages)
-      assert info[:type] == :duplicate_bag
     end
 
     test "active_runners table is a set" do
@@ -60,7 +53,6 @@ defmodule JidoMurmur.TableOwnerTest do
     end
 
     test "tables are public" do
-      assert :ets.info(:jido_murmur_pending_messages)[:protection] == :public
       assert :ets.info(:jido_murmur_active_runners)[:protection] == :public
       assert :ets.info(:jido_murmur_obs_conversations)[:protection] == :public
       assert :ets.info(:jido_murmur_obs_turns)[:protection] == :public
@@ -68,7 +60,6 @@ defmodule JidoMurmur.TableOwnerTest do
     end
 
     test "tables are named tables" do
-      assert :ets.info(:jido_murmur_pending_messages)[:named_table] == true
       assert :ets.info(:jido_murmur_active_runners)[:named_table] == true
       assert :ets.info(:jido_murmur_obs_conversations)[:named_table] == true
       assert :ets.info(:jido_murmur_obs_turns)[:named_table] == true

@@ -16,7 +16,7 @@ This analysis assumes Murmur is still in development and can make breaking refac
 Murmur's current request transformation path is doing both of the following:
 
 - injecting dynamic workspace and roster instructions into the system prompt via `JidoMurmur.TeamInstructions`
-- draining busy-agent follow-up messages from `JidoMurmur.PendingQueue` into the next LLM turn via `JidoMurmur.MessageInjector`
+- routing busy-agent follow-up messages into the next LLM turn via a Murmur-owned delivery path and `JidoMurmur.MessageInjector`
 
 That split matters because only the second concern overlaps with native `jido_ai` steering.
 
@@ -30,9 +30,9 @@ Implication: even if Murmur adopts native `steer/3` and `inject/3`, Murmur still
 
 ### 2. Murmur's current delivery model is session-scoped, not run-scoped
 
-Today all inbound messages go through `JidoMurmur.Runner.send_message/3`, which:
+At the start of this investigation, all inbound messages went through a session-scoped delivery path, which:
 
-- writes a message envelope into the ETS-backed `JidoMurmur.PendingQueue`
+- stored the message envelope in a Murmur-managed ETS ingress buffer
 - starts a single drain loop per agent session if one is not already running
 - drains queued envelopes into one `ask/await` cycle when idle
 - relies on `MessageInjector` to surface queued follow-up messages during an active ReAct run
@@ -109,7 +109,7 @@ That actor receives canonical ingress input and then decides:
 - if the agent is busy, route the input through `steer/3` or `inject/3`
 - if the active run changed while the decision was in flight, re-read current state and retry against the new reality
 
-This is different from Murmur's current `PendingQueue` design:
+This is different from Murmur's earlier custom delivery design:
 
 - the current queue is a first-class session-level ingress buffer that feeds both idle and busy delivery
 - the proposed coordinator is just the single actor that owns routing decisions so callers do not make stale ask-versus-steer choices outside the actor boundary
@@ -178,7 +178,7 @@ Implication: Murmur should retire the current custom session-envelope contract i
 What Murmur could likely remove or simplify:
 
 - custom mid-run queue draining in `MessageInjector`
-- some `PendingQueue` usage and the tests that exist only to validate busy-agent injection semantics
+- some older custom-delivery usage and the tests that exist only to validate busy-agent injection semantics
 - some bespoke runtime reasoning around how follow-up messages reach the next LLM turn
 
 What Murmur would still own:
@@ -224,7 +224,7 @@ Implication: if Murmur decides to rely on `steer/3` and `inject/3`, the code and
 
 | Option | Pros | Cons |
 |--------|------|------|
-| Keep Murmur's current PendingQueue + MessageInjector flow | No refactor now; preserves current semantics exactly | Maintains a custom runtime path that now overlaps with upstream; keeps Murmur coupled to a workaround that `jido_ai` 2.1 was designed to replace |
+| Keep Murmur's previous runtime workaround + MessageInjector flow | No refactor now; preserves current semantics exactly | Maintains a custom runtime path that now overlaps with upstream; keeps Murmur coupled to a workaround that `jido_ai` 2.1 was designed to replace |
 | Caller-side optimistic routing with direct `ask` when idle and `steer` or `inject` when busy | Smallest immediate code surface; no new Murmur process | Pushes retry and race handling into every caller; stale state decisions remain possible outside the actor boundary; weaker long-term architecture |
 | Single ingress coordinator actor with native `ask` or `steer` or `inject` dispatch | Best long-term ownership boundary; actor model cleanly owns the delivery protocol; removes semantic session queue while keeping coordination deterministic; aligns the input contract to jido_ai | Introduces a new per-session coordinator component and requires a deliberate runtime refactor |
 

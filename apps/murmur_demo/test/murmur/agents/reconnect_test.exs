@@ -13,7 +13,7 @@ defmodule Murmur.Agents.ReconnectTest do
   use Murmur.AgentCase
 
   alias JidoMurmur.Catalog
-  alias JidoMurmur.Runner
+  alias JidoMurmur.Ingress
   alias JidoMurmur.Workspaces
 
   setup do
@@ -47,14 +47,14 @@ defmodule Murmur.Agents.ReconnectTest do
   # FR-013a: Agent continues server-side regardless of browser state
   describe "agent continues after subscriber disconnects" do
     test "agent completes processing even without PubSub subscriber", %{session: session} do
-      Runner.send_message(session, "Say hello")
+      Ingress.deliver(session, "Say hello")
 
       session_id = session.id
       assert_receive %Jido.Signal{type: "murmur.message.completed", data: %{session_id: ^session_id}}, 5000
     end
 
     test "agent process stays alive after request completes", %{session: session} do
-      Runner.send_message(session, "Say hi")
+      Ingress.deliver(session, "Say hi")
 
       session_id = session.id
       assert_receive %Jido.Signal{type: "murmur.message.completed", data: %{session_id: ^session_id}}, 5000
@@ -68,7 +68,7 @@ defmodule Murmur.Agents.ReconnectTest do
   # FR-013: Restore agent session state on reconnect
   describe "state restoration after reconnect" do
     test "agent process remains accessible after completion", %{session: session} do
-      Runner.send_message(session, "Remember the number 42")
+      Ingress.deliver(session, "Remember the number 42")
 
       session_id = session.id
       assert_receive %Jido.Signal{type: "murmur.message.completed", data: %{session_id: ^session_id}}, 5000
@@ -82,12 +82,12 @@ defmodule Murmur.Agents.ReconnectTest do
     end
 
     test "multiple messages produce multiple completions", %{session: session} do
-      Runner.send_message(session, "First message")
+      Ingress.deliver(session, "First message")
 
       session_id = session.id
       assert_receive %Jido.Signal{type: "murmur.message.completed", data: %{session_id: ^session_id}}, 5000
 
-      Runner.send_message(session, "Second message")
+      Ingress.deliver(session, "Second message")
       assert_receive %Jido.Signal{type: "murmur.message.completed", data: %{session_id: ^session_id}}, 5000
 
       # Agent still alive

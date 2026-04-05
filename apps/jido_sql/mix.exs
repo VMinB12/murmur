@@ -2,6 +2,7 @@ defmodule JidoSql.MixProject do
   use Mix.Project
 
   @version "0.1.0"
+  @description "SQL agent plugin for Jido AI 2.1 and ingress-coordinated JidoMurmur runtimes"
 
   def project do
     [
@@ -14,6 +15,7 @@ defmodule JidoSql.MixProject do
       elixir: "~> 1.15",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
+      description: @description,
       deps: deps()
     ]
   end

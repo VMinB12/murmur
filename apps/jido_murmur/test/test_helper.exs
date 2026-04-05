@@ -77,3 +77,10 @@ if Code.ensure_loaded?(jido_mod) && function_exported?(jido_mod, :start_link, 1)
     _ -> :ok
   end
 end
+
+# Start shared jido_murmur infrastructure for package tests.
+case JidoMurmur.Supervisor.start_link([]) do
+  {:ok, _} -> :ok
+  {:error, {:already_started, _}} -> :ok
+  _ -> :ok
+end

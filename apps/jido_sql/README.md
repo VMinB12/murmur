@@ -78,3 +78,9 @@ JidoSql.Repo ── external target database
        ├── Tools.Query → truncated text for LLM reasoning
        └── Tools.Display → deferred artifact → data panel tab
 ```
+
+When used with `jido_murmur`, SQL-agent requests enter through `JidoMurmur.Ingress`. Busy-run follow-up delivery is handled natively by `jido_ai`, while `JidoSql.RequestTransformer` only enriches the system prompt with cached schema context.
+
+## Dependencies
+
+**Requires:** `jido ~> 2.2`, `jido_ai ~> 2.1`, `jido_action ~> 2.2`, `jido_artifacts` (umbrella), `jido_murmur` (umbrella), `ecto_sql ~> 3.0`, `postgrex`, `jason ~> 1.0`

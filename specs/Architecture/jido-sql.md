@@ -34,6 +34,8 @@ Natural-language-to-SQL agent plugin for the Jido framework. Enables agents to t
 ```
 Agent Request
     ↓
+Ingress-coordinated delivery via jido_murmur
+  ↓
 RequestTransformer (injects cached schema from :persistent_term)
     ↓
 LLM generates SQL
@@ -52,6 +54,7 @@ Return text to LLM               Artifact visible in data panel
 1. Checks for `SQL_AGENT_DATABASE_URL` environment variable
 2. If set, starts `JidoSql.Repo` and loads schema into `:persistent_term`
 3. Schema is injected into every LLM request via `RequestTransformer`
+4. Busy-run follow-up input is handled by `jido_murmur` ingress coordination rather than SQL-specific delivery logic
 
 ## Safety Guardrails
 
@@ -88,7 +91,7 @@ Return text to LLM               Artifact visible in data panel
 
 ## Dependencies
 
-**Requires:** `jido ~> 2.0`, `jido_ai ~> 2.0`, `jido_action ~> 2.0`, `jido_artifacts` (umbrella), `jido_murmur` (umbrella), `ecto_sql ~> 3.0`, `postgrex`, `jason ~> 1.0`
+**Requires:** `jido ~> 2.2`, `jido_ai ~> 2.1`, `jido_action ~> 2.2`, `jido_artifacts` (umbrella), `jido_murmur` (umbrella), `ecto_sql ~> 3.0`, `postgrex`, `jason ~> 1.0`
 
 **Used by:** `murmur_demo` (SqlAgent profile)
 

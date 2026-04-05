@@ -3,10 +3,10 @@ defmodule Murmur.Agents.RunnerTest do
   Tests for the Runner module's core mechanics.
 
   Covers:
-  - Runner.send_message/2 return values
+  - Ingress.deliver/2 return values
   - Agent-not-running handling
-  - Serialization of asks (no concurrent asks to same agent)
-  - Queue drain loop behavior
+  - Rapid follow-up handling during an active run
+  - Active runner lifecycle
   - FR-017: User message to busy agent not blocked
   - LLM ask error propagation
 
@@ -15,7 +15,7 @@ defmodule Murmur.Agents.RunnerTest do
   use Murmur.AgentCase
 
   alias JidoMurmur.Catalog
-  alias JidoMurmur.PendingQueue
+  alias JidoMurmur.Ingress
   alias JidoMurmur.Runner
   alias JidoMurmur.Workspaces
 
@@ -45,10 +45,10 @@ defmodule Murmur.Agents.RunnerTest do
     %{workspace: workspace, session: session}
   end
 
-  describe "send_message/2 return values" do
+  describe "Ingress.deliver/2 return values" do
     test "returns :queued when agent is running", %{session: session} do
       stub_llm_success()
-      assert Runner.send_message(session, "hello") == :queued
+      assert Ingress.deliver(session, "hello") == :queued
 
       # Wait for the background Runner Task to finish
       session_id = session.id
@@ -65,34 +65,32 @@ defmodule Murmur.Agents.RunnerTest do
         })
 
       # Don't start the agent — should be :agent_not_running
-      assert Runner.send_message(dead_session, "hello") == :agent_not_running
+      assert Ingress.deliver(dead_session, "hello") == :agent_not_running
     end
   end
 
   describe "message processing with mock LLM" do
     test "single message produces a mock completion", %{session: session} do
       stub_llm_success("Hello from mock")
-      Runner.send_message(session, "Say hi")
+      Ingress.deliver(session, "Say hi")
 
       session_id = session.id
       assert_receive %Jido.Signal{type: "murmur.message.completed", data: %{session_id: ^session_id, response: "Hello from mock"}}, 5000
     end
 
-    test "PendingQueue is empty after processing completes", %{session: session} do
+    test "active runner state clears after processing completes", %{session: session} do
       stub_llm_success("Done")
-      Runner.send_message(session, "Say hi")
+      Ingress.deliver(session, "Say hi")
 
       session_id = session.id
       assert_receive %Jido.Signal{type: "murmur.message.completed", data: %{session_id: ^session_id}}, 5000
-
-      # Give drain loop time to finish
-      Process.sleep(100)
-      refute PendingQueue.pending?(session.id)
+      assert :ok = await_runner(session.id)
+      refute Runner.active?(session.id)
     end
 
     test "LLM ask error broadcasts request_failed", %{session: session} do
       stub_llm_ask_error(:api_error)
-      Runner.send_message(session, "Say hi")
+      Ingress.deliver(session, "Say hi")
 
       session_id = session.id
       assert_receive %Jido.Signal{type: "murmur.request.failed", data: %{session_id: ^session_id, reason: :api_error}}, 5000
@@ -100,35 +98,30 @@ defmodule Murmur.Agents.RunnerTest do
 
     test "LLM await timeout broadcasts request_failed", %{session: session} do
       stub_llm_await_error(:timeout)
-      Runner.send_message(session, "Say hi")
+      Ingress.deliver(session, "Say hi")
 
       session_id = session.id
       assert_receive %Jido.Signal{type: "murmur.request.failed", data: %{session_id: ^session_id, reason: :timeout}}, 5000
     end
   end
 
-  describe "serialization — no concurrent asks" do
-    test "multiple rapid messages are combined and processed sequentially", %{session: session} do
+  describe "rapid message handling" do
+    test "multiple rapid messages are accepted without busy errors", %{session: session} do
       stub_llm_success("Combined response")
 
-      # Send 3 messages rapidly
-      Runner.send_message(session, "first")
-      Runner.send_message(session, "second")
-      Runner.send_message(session, "third")
+      Ingress.deliver(session, "first")
+      Ingress.deliver(session, "second")
+      Ingress.deliver(session, "third")
 
-      # Should get at least one completion (messages may be combined by drain)
       session_id = session.id
       assert_receive %Jido.Signal{type: "murmur.message.completed", data: %{session_id: ^session_id}}, 5000
-
-      # All messages should be processed — queue empty
-      Process.sleep(200)
-      refute PendingQueue.pending?(session.id)
+      refute_receive %Jido.Signal{type: "murmur.request.failed"}, 500
+      assert :ok = await_runner(session.id)
     end
 
-    test "ask receives combined content from multiple messages", %{session: session} do
+    test "ask receives the original direct message content", %{session: session} do
       expect_llm_ask(fn _mod, _pid, content, _ctx ->
-        # Verify the content contains the combined messages
-        assert content =~ "first"
+        assert content == "first"
         {:ok, make_ref()}
       end)
 
@@ -136,30 +129,52 @@ defmodule Murmur.Agents.RunnerTest do
         {:ok, "Got it"}
       end)
 
-      Runner.send_message(session, "first")
-      # Small sleep to ensure first message is drained first
-      Process.sleep(10)
+      Ingress.deliver(session, "first")
 
       session_id = session.id
       assert_receive %Jido.Signal{type: "murmur.message.completed", data: %{session_id: ^session_id, response: "Got it"}}, 5000
     end
   end
 
-  describe "pre-queued messages are drained by MessageInjector" do
-    test "messages enqueued before ask are processed", %{session: session} do
-      stub_llm_success("Injected response")
+  describe "busy follow-up routing" do
+    test "inter-agent follow-ups are injected into an active run", %{session: session} do
+      test_pid = self()
+      pause_ref = make_ref()
 
-      # Pre-enqueue a message (simulates what happens when agent is busy)
-      PendingQueue.enqueue(session.id, "injected context from another agent")
+      expect_llm_ask(fn _mod, _pid, content, _ctx ->
+        assert content == "what messages have you received?"
+        {:ok, make_ref()}
+      end)
 
-      # Start the agent loop
-      Runner.send_message(session, "what messages have you received?")
+      expect_llm_inject(fn _mod, _pid, content, opts ->
+        assert content == "injected context from another agent"
+        assert opts[:source][:kind] == :programmatic
+        {:ok, %{}}
+      end)
+
+      expect_llm_await(fn _mod, _handle, _opts ->
+        send(test_pid, {:await_started, pause_ref, self()})
+
+        receive do
+          {:release_await, ^pause_ref} -> {:ok, "Injected response"}
+        after
+          5_000 -> flunk("timed out waiting to release await")
+        end
+      end)
+
+      assert :queued = Ingress.deliver(session, "what messages have you received?")
+      assert_receive {:await_started, ^pause_ref, waiter_pid}, 5_000
+
+      assert :queued =
+               Ingress.deliver(session, "injected context from another agent",
+                 kind: :steering,
+                 sender_name: "Alice"
+               )
+
+      send(waiter_pid, {:release_await, pause_ref})
 
       session_id = session.id
       assert_receive %Jido.Signal{type: "murmur.message.completed", data: %{session_id: ^session_id}}, 5000
-
-      # Queue drained
-      refute PendingQueue.pending?(session.id)
     end
   end
 
@@ -167,9 +182,9 @@ defmodule Murmur.Agents.RunnerTest do
     test "3 rapid sends are serialized and produce completions", %{session: session} do
       stub_llm_success("Response")
 
-      r1 = Runner.send_message(session, "[alice]: add the following numbers")
-      r2 = Runner.send_message(session, "[alice]: 2")
-      r3 = Runner.send_message(session, "[alice]: 5")
+      r1 = Ingress.deliver(session, "[alice]: add the following numbers")
+      r2 = Ingress.deliver(session, "[alice]: 2")
+      r3 = Ingress.deliver(session, "[alice]: 5")
 
       assert r1 == :queued
       assert r2 == :queued
@@ -181,22 +196,43 @@ defmodule Murmur.Agents.RunnerTest do
 
       # No failures
       refute_receive %Jido.Signal{type: "murmur.request.failed"}, 500
-
-      # Queue empty
-      Process.sleep(200)
-      refute PendingQueue.pending?(session.id)
+      assert :ok = await_runner(session.id)
     end
 
-    test "pre-queued message is injected into same LLM call", %{session: session} do
-      stub_llm_success("Combined")
+    test "rapid human follow-ups are steered into the active run", %{session: session} do
+      test_pid = self()
+      pause_ref = make_ref()
 
-      PendingQueue.enqueue(session.id, "[alice]: what is 2+2?")
-      Runner.send_message(session, "say hi")
+      expect_llm_ask(fn _mod, _pid, content, _ctx ->
+        assert content == "say hi"
+        {:ok, make_ref()}
+      end)
+
+      expect_llm_steer(fn _mod, _pid, content, opts ->
+        assert content == "[alice]: what is 2+2?"
+        assert opts[:source][:kind] == :human
+        {:ok, %{}}
+      end)
+
+      expect_llm_await(fn _mod, _handle, _opts ->
+        send(test_pid, {:await_started, pause_ref, self()})
+
+        receive do
+          {:release_await, ^pause_ref} -> {:ok, "Combined"}
+        after
+          5_000 -> flunk("timed out waiting to release await")
+        end
+      end)
+
+      assert :queued = Ingress.deliver(session, "say hi")
+      assert_receive {:await_started, ^pause_ref, waiter_pid}, 5_000
+      assert :queued = Ingress.deliver(session, "[alice]: what is 2+2?")
+
+      send(waiter_pid, {:release_await, pause_ref})
 
       session_id = session.id
       assert_receive %Jido.Signal{type: "murmur.message.completed", data: %{session_id: ^session_id}}, 5000
-
-      refute PendingQueue.pending?(session.id)
+      assert :ok = await_runner(session.id)
     end
   end
 end

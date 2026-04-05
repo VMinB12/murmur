@@ -9,7 +9,7 @@ This is a Mix umbrella project containing independently publishable Hex packages
 ```
 murmur/
 ├── apps/
-│   ├── jido_murmur/         # Core backend — Runner, Plugins, Storage, Schemas
+│   ├── jido_murmur/         # Core backend — Ingress, Runner, Plugins, Storage, Schemas
 │   ├── jido_murmur_web/     # Optional LiveView chat components
 │   ├── jido_tasks/          # Task management tools for agents
 │   ├── jido_arxiv/          # arXiv academic research tools
@@ -20,7 +20,7 @@ murmur/
 
 | Package | Description | Hex |
 |---------|-------------|-----|
-| [`jido_murmur`](apps/jido_murmur/) | Multi-agent orchestration — Runner, PendingQueue, Plugins, Storage, Schemas | [![Hex](https://img.shields.io/hexpm/v/jido_murmur.svg)](https://hex.pm/packages/jido_murmur) |
+| [`jido_murmur`](apps/jido_murmur/) | Multi-agent orchestration — Ingress, Runner, Plugins, Storage, Schemas | [![Hex](https://img.shields.io/hexpm/v/jido_murmur.svg)](https://hex.pm/packages/jido_murmur) |
 | [`jido_murmur_web`](apps/jido_murmur_web/) | Pre-built LiveView components for chat UI | [![Hex](https://img.shields.io/hexpm/v/jido_murmur_web.svg)](https://hex.pm/packages/jido_murmur_web) |
 | [`jido_tasks`](apps/jido_tasks/) | Task management Jido.Action tools | [![Hex](https://img.shields.io/hexpm/v/jido_tasks.svg)](https://hex.pm/packages/jido_tasks) |
 | [`jido_arxiv`](apps/jido_arxiv/) | arXiv search and paper display tools | [![Hex](https://img.shields.io/hexpm/v/jido_arxiv.svg)](https://hex.pm/packages/jido_arxiv) |
@@ -30,7 +30,7 @@ murmur/
 ![Murmur multi-agent workspace with three agents collaborating](example.png)
 
 - **Multi-agent workspaces** — Add multiple AI agents, each with independent chat history
-- **Agent-to-agent messaging** — Agents communicate via the "tell" tool, with message queuing when busy
+- **Agent-to-agent messaging** — Agents communicate via the "tell" tool, with ingress-coordinated busy-run delivery
 - **Real-time streaming** — Token-by-token responses over WebSocket
 - **Persistent conversations** — History survives server restarts via hibernate/thaw
 - **Autonomous execution** — Agents continue processing server-side during disconnects
@@ -61,7 +61,7 @@ Visit [localhost:4000](http://localhost:4000), create a workspace, add agents, a
 flowchart TD
     subgraph Umbrella
         subgraph jido_murmur[jido_murmur — Core]
-            Runner --> PendingQueue
+            Ingress --> Runner
             Runner --> LLM
             StreamingPlugin --> PubSub
             ArtifactPlugin --> PubSub
@@ -78,7 +78,7 @@ flowchart TD
         end
         subgraph murmur_demo[murmur_demo — Demo App]
             LiveView --> Components
-            LiveView --> Runner
+            LiveView --> Ingress
         end
     end
     User --> LiveView
@@ -87,7 +87,7 @@ flowchart TD
 
 ## How It Works
 
-When a user sends a message, the Runner queues it and calls the LLM. Tokens stream back in real-time via PubSub. If the agent decides to collaborate, it uses the **tell** tool to queue a message on another agent's Runner — kicking off a parallel conversation.
+When a user sends a message, `JidoMurmur.Ingress` decides whether to start a fresh run or steer an active one. Tokens stream back in real-time via PubSub. If the agent decides to collaborate, it uses the **tell** tool to deliver follow-up input through the target agent's ingress coordinator — kicking off a parallel conversation without a Murmur-owned semantic queue.
 
 ```mermaid
 sequenceDiagram
@@ -98,7 +98,7 @@ sequenceDiagram
     participant PS as PubSub
 
     User->>UI: send message
-    UI->>RA: queue + call LLM
+    UI->>RA: ingress deliver
     RA-->>PS: stream tokens
     PS-->>UI: render live
 

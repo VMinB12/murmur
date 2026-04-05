@@ -57,7 +57,7 @@ config :jido_murmur,
   profiles: [MyApp.Agents.MyAgent]
 ```
 
-This gives you: workspaces, agent sessions, the Runner drain-loop, inter-agent messaging (TellAction), conversation persistence, and PubSub streaming.
+This gives you: workspaces, agent sessions, ingress-coordinated delivery, single-run execution, inter-agent messaging (TellAction), conversation persistence, and PubSub streaming.
 
 ## Adding Capabilities
 

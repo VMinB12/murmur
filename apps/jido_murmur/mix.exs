@@ -17,7 +17,7 @@ defmodule JidoMurmur.MixProject do
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       test_coverage: [summary: [threshold: 80]],
-      description: "Multi-agent orchestration for Jido — Runner, Plugins, Storage, Schemas",
+      description: "Multi-agent orchestration for Jido — ingress coordination, run execution, plugins, storage, and schemas",
       package: package(),
       source_url: @source_url
     ]

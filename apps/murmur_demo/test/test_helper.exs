@@ -13,7 +13,7 @@ Application.put_env(:jido_tasks, :repo, Murmur.Repo)
 Application.put_env(:jido_tasks, :pubsub, Murmur.PubSub)
 
 # Clear stale ETS state from prior test apps (jido_murmur tests create tables directly)
-for table <- [:jido_murmur_active_runners, :jido_murmur_pending_messages] do
+for table <- [:jido_murmur_active_runners] do
   if :ets.whereis(table) != :undefined do
     :ets.delete_all_objects(table)
   end

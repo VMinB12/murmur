@@ -8,7 +8,6 @@ defmodule MurmurWeb.WorkspaceLive do
   alias JidoMurmur.Catalog
   alias JidoMurmur.Observability.ConversationCache
   alias JidoMurmur.Observability.SessionCache
-  alias JidoMurmur.Runner
   alias JidoMurmur.Signals.MessageReceived
   alias JidoMurmur.Topics
   alias JidoMurmur.Workspaces
@@ -544,7 +543,7 @@ defmodule MurmurWeb.WorkspaceLive do
   defp send_to_agent(session, _content, _topic) when is_nil(session), do: :ok
 
   defp send_to_agent(session, content, _topic) do
-    Runner.send_message(session, content)
+    JidoMurmur.Ingress.deliver(session, content)
   end
 
   defp notify_task_assignee(workspace_id, task, sender_name) do
@@ -563,12 +562,16 @@ defmodule MurmurWeb.WorkspaceLive do
       target_session ->
         message = build_task_notification(task, sender_name)
         topic = Topics.agent_messages(workspace_id, target_session.id)
+        interaction_id = JidoMurmur.Observability.next_interaction_id()
 
         inter_msg = %{
           id: Uniq.UUID.uuid7(),
           role: "user",
           content: message,
-          sender_name: sender_name
+          kind: :task_assignment,
+          interaction_id: interaction_id,
+          sender_name: sender_name,
+          sender_trace_id: nil
         }
 
         signal =
@@ -578,7 +581,13 @@ defmodule MurmurWeb.WorkspaceLive do
           )
 
         Phoenix.PubSub.broadcast(Murmur.PubSub, topic, signal)
-        Runner.send_message(target_session, message)
+        JidoMurmur.Ingress.deliver(
+          target_session,
+          message,
+          sender_name: sender_name,
+          interaction_id: interaction_id,
+          kind: :task_assignment
+        )
     end
   end
 

@@ -1,3 +1,7 @@
+# 2026-04-04
+
+- Completed ticket 012, replacing Murmur's older busy-agent follow-up path with a per-session ingress coordinator built on native `jido_ai` `steer/3` and `inject/3` controls.
+
 # Changelog
 
 All notable changes to this project are documented here. Entries are in reverse chronological order.
@@ -10,10 +14,11 @@ All notable changes to this project are documented here. Entries are in reverse 
 - SQL agent plugin (`jido_sql`) for natural-language-to-SQL queries
 - Architecture documentation for all 7 umbrella packages
 - Ecosystem composition guide
-- Ticket 009 (Data Contract Enforcement) on roadmap
+- `%JidoArtifacts.Envelope{}`, `%JidoSql.QueryResult{}`, and typed artifact signal payload structs to harden cross-package data contracts
 
 ### Changed
 
+- Completed ticket 009 data contract hardening: live and persisted artifact paths now share the `%JidoArtifacts.Envelope{}` boundary, SQL execution now returns `%JidoSql.QueryResult{}`, legacy envelope unwrap fallbacks were removed, and signal schemas now document typed `artifact.*`, `murmur.message.*`, and `task.*` payloads.
 - Completed ticket 011 frontend boundary refactor: `jido_murmur_web` now ships a domain-agnostic workspace shell, `murmur_demo` owns SQL/arXiv artifact integrations, the workspace presentation is split into focused modules, and the demo child app now builds assets through its own configured aliases
 - Replaced AgentObs-era tracing with Murmur-owned turn, LLM, and tool observability that renders ordered LLM input/output conversations correctly in Arize Phoenix
 - Grouped direct-chat traces into discussion-scoped Phoenix sessions with inactivity rollover while preserving explicit cross-agent interaction propagation

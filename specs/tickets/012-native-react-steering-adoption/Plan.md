@@ -20,7 +20,7 @@ The redesigned runtime model is:
 4. If the target run changes while delivery is in flight, the coordinator retries against the latest state rather than relying on a Murmur-owned semantic queue.
 5. Request transformers remain only for Murmur-owned context shaping such as team instructions and SQL schema enrichment.
 
-This approach deliberately removes `PendingQueue` as the primary delivery abstraction. The only remaining queueing should be the normal mailbox behavior of the ingress coordinator actor and the native per-run pending-input queue inside `jido_ai`.
+This approach deliberately removes the old custom delivery abstraction. The only remaining coordination should be the normal mailbox behavior of the ingress coordinator actor and the native per-run pending-input behavior inside `jido_ai`.
 
 ## Key Design Decisions
 

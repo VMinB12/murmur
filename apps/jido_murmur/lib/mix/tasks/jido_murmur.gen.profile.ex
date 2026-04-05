@@ -11,6 +11,7 @@ if Code.ensure_loaded?(Igniter) do
       * `use Jido.AI.Agent` boilerplate
       * Default tools (`JidoMurmur.TellAction`)
       * Default plugins (`JidoMurmur.StreamingPlugin`, `JidoArtifacts.ArtifactPlugin`)
+      * Team-context request shaping via `JidoMurmur.MessageInjector`
       * Placeholder system prompt
       * `catalog_meta/0` function
 
@@ -58,6 +59,7 @@ if Code.ensure_loaded?(Igniter) do
             JidoTasks.Tools.ListTasks
           ],
           plugins: [JidoMurmur.StreamingPlugin, JidoArtifacts.ArtifactPlugin],
+          # Team context is injected here. Delivery stays outside the profile via JidoMurmur.Ingress.
           request_transformer: JidoMurmur.MessageInjector,
           system_prompt: \\"\\"\\"
           You are a helpful #{underscore_name |> String.replace("_", " ")}.

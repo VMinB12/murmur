@@ -11,4 +11,6 @@ defmodule JidoMurmur.LLM do
 
   @callback ask(module(), pid(), String.t(), keyword()) :: {:ok, handle()} | {:error, term()}
   @callback await(module(), handle(), keyword()) :: {:ok, term()} | {:error, term()}
+  @callback steer(module(), pid(), String.t(), keyword()) :: {:ok, term()} | {:error, term()}
+  @callback inject(module(), pid(), String.t(), keyword()) :: {:ok, term()} | {:error, term()}
 end

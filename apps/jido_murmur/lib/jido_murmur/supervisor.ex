@@ -2,7 +2,7 @@ defmodule JidoMurmur.Supervisor do
   @moduledoc """
   Supervision tree for jido_murmur package processes.
 
-  Manages `JidoMurmur.TableOwner` which owns ETS tables for PendingQueue and Runner.
+  Manages shared ETS state plus ingress coordination infrastructure.
 
   Add to your application supervision tree:
 
@@ -22,7 +22,9 @@ defmodule JidoMurmur.Supervisor do
     JidoMurmur.Config.validate!()
 
     children = [
-      JidoMurmur.TableOwner
+      JidoMurmur.TableOwner,
+      {Registry, keys: :unique, name: JidoMurmur.Ingress.registry_name()},
+      {DynamicSupervisor, strategy: :one_for_one, name: JidoMurmur.Ingress.supervisor_name()}
     ]
 
     Supervisor.init(children, strategy: :one_for_one)

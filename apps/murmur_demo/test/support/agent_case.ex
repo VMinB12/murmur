@@ -42,11 +42,19 @@ defmodule Murmur.AgentCase do
       {:ok, "default mock response"}
     end)
 
+    Mox.stub(Mock, :steer, fn _mod, _pid, _content, _opts ->
+      {:ok, %{}}
+    end)
+
+    Mox.stub(Mock, :inject, fn _mod, _pid, _content, _opts ->
+      {:ok, %{}}
+    end)
+
     :ok
   end
 
   @doc """
-  Wait for the Runner drain loop to finish for a given session.
+  Wait for the active Runner task to finish for a given session.
   Polls the ETS active-runner table until the session key is gone.
   """
   def await_runner(session_id, timeout \\ 5000) do
@@ -127,5 +135,13 @@ defmodule Murmur.AgentCase do
   """
   def expect_llm_await(n \\ 1, fun) do
     Mox.expect(Mock, :await, n, fun)
+  end
+
+  def expect_llm_steer(n \\ 1, fun) do
+    Mox.expect(Mock, :steer, n, fun)
+  end
+
+  def expect_llm_inject(n \\ 1, fun) do
+    Mox.expect(Mock, :inject, n, fun)
   end
 end

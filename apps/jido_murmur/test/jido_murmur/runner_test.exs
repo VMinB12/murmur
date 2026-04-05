@@ -1,6 +1,7 @@
 defmodule JidoMurmur.RunnerTest do
   use JidoMurmur.Case, async: false
 
+  alias JidoMurmur.Ingress
   alias JidoMurmur.Runner
 
   setup do
@@ -19,22 +20,22 @@ defmodule JidoMurmur.RunnerTest do
     :ok
   end
 
-  describe "send_message/2" do
+  describe "Ingress.deliver/2" do
     test "returns :agent_not_running when agent is not started" do
       session = build_session()
-      assert :agent_not_running = Runner.send_message(session, "hello")
+      assert :agent_not_running = Ingress.deliver(session, "hello")
     end
 
-    test "returns :queued and enqueues message when agent is running" do
+    test "returns :queued when agent is running" do
       session = insert_session!()
       start_test_agent!(session)
 
-      assert :queued = Runner.send_message(session, "hello")
+      assert :queued = Ingress.deliver(session, "hello")
     end
   end
 
   describe "active?/1" do
-    test "returns false when no drain loop is running" do
+    test "returns false when no active run task is running" do
       refute Runner.active?("nonexistent-session-id")
     end
   end
@@ -79,10 +80,6 @@ defmodule JidoMurmur.RunnerTest do
   defp ensure_ets_tables do
     unless :ets.whereis(:jido_murmur_active_runners) != :undefined do
       :ets.new(:jido_murmur_active_runners, [:set, :public, :named_table])
-    end
-
-    unless :ets.whereis(:jido_murmur_pending_messages) != :undefined do
-      :ets.new(:jido_murmur_pending_messages, [:named_table, :public, :duplicate_bag])
     end
 
     unless :ets.whereis(:jido_murmur_obs_conversations) != :undefined do

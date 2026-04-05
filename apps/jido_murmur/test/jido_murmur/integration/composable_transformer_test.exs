@@ -13,7 +13,6 @@ defmodule JidoMurmur.Integration.ComposableTransformerTest do
 
   alias JidoMurmur.ComposableRequestTransformer
   alias JidoMurmur.MessageInjector
-  alias JidoMurmur.PendingQueue
   alias JidoMurmur.Workspaces
 
   # ── Test Transformers ──────────────────────────────────────────
@@ -51,8 +50,6 @@ defmodule JidoMurmur.Integration.ComposableTransformerTest do
   # ── Setup ──────────────────────────────────────────────────────
 
   setup do
-    ensure_ets_tables()
-
     {:ok, workspace} = Workspaces.create_workspace(%{name: "Composable WS"})
 
     {:ok, session} =
@@ -147,11 +144,8 @@ defmodule JidoMurmur.Integration.ComposableTransformerTest do
     end
   end
 
-  describe "MessageInjector with pending messages and custom transformer" do
-    test "pending messages are injected alongside guardrail modifications", ctx do
-      # Enqueue a pending message for the agent
-      PendingQueue.enqueue(ctx.session.id, "Pending message from another agent")
-
+  describe "MessageInjector with custom transformers" do
+    test "team context is added without disturbing the original user message", ctx do
       runtime_context =
         Map.put(ctx.runtime_context, :request_transformers, [
           GuardrailTransformer,
@@ -167,13 +161,10 @@ defmodule JidoMurmur.Integration.ComposableTransformerTest do
                )
 
       messages = overrides.messages
-
-      # Should have: safety system msg, team context, original user msg, and pending msg
       user_messages = Enum.filter(messages, &(&1.role == :user))
-      user_content = Enum.map(user_messages, & &1.content)
 
-      assert "What is the weather?" in user_content
-      assert "Pending message from another agent" in user_content
+      assert Enum.any?(user_messages, &(&1.content == "What is the weather?"))
+      refute Enum.any?(user_messages, &String.contains?(&1.content, "Pending message"))
     end
   end
 
@@ -205,19 +196,5 @@ defmodule JidoMurmur.Integration.ComposableTransformerTest do
       assert Keyword.get(overrides.llm_opts, :max_tokens) == 4096
       assert Keyword.get(overrides.llm_opts, :stop) == ["END"]
     end
-  end
-
-  # ── Helpers ────────────────────────────────────────────────────
-
-  defp ensure_ets_tables do
-    unless :ets.whereis(:jido_murmur_active_runners) != :undefined do
-      :ets.new(:jido_murmur_active_runners, [:set, :public, :named_table])
-    end
-
-    unless :ets.whereis(:jido_murmur_pending_messages) != :undefined do
-      :ets.new(:jido_murmur_pending_messages, [:named_table, :public, :duplicate_bag])
-    end
-  rescue
-    ArgumentError -> :ok
   end
 end

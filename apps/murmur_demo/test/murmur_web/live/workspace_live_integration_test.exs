@@ -39,7 +39,7 @@ defmodule MurmurWeb.WorkspaceLiveIntegrationTest do
         "display_name" => "Alice"
       })
 
-    # Start agent process (needed for Runner.send_message to find it)
+    # Start agent process so ingress can route messages into a live agent session.
     agent_module = Catalog.agent_module(session.agent_profile_id)
     {:ok, _pid} = Murmur.Jido.start_agent(agent_module, id: session.id)
 
@@ -72,7 +72,7 @@ defmodule MurmurWeb.WorkspaceLiveIntegrationTest do
       assert has_element?(view, "#messages-#{session.id}", "Say hello")
     end
 
-    test "mock LLM completion appears in chat column via Runner", %{
+    test "mock LLM completion appears in chat column via ingress", %{
       conn: conn,
       workspace: workspace,
       session: session

@@ -8,3 +8,5 @@
 - Confirmed that request transformers should remain only for Murmur-owned context shaping, not busy-run message delivery.
 - Defined `Tasks.md` around the coordinator actor, jido_ai-aligned ingress input, runtime refactor, and legacy queue removal.
 - Started implementation with ADR-002, ingress coordinator modules, LLM adapter control calls, and Runner handoff to ingress.
+- Removed the legacy runtime delivery module and ETS table, migrated production callers onto `JidoMurmur.Ingress`, and rewrote legacy delivery tests around active-run steer/inject semantics.
+- Removed the final compatibility wrapper around direct runner delivery, aligned package and architecture docs with ingress-first delivery, marked the ticket complete, and revalidated the repo with `mix test` and `mix precommit`.

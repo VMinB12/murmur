@@ -8,7 +8,7 @@ Users create workspaces and add multiple AI agents, each with independent chat h
 
 ### FR-2: Agent-to-agent messaging
 
-Agents communicate with each other via the "tell" tool, with message queuing (PendingQueue) when the target agent is busy processing.
+Agents communicate with each other via the "tell" tool. Delivery is coordinated per target session so idle agents start a fresh run and busy agents receive native active-run follow-up input.
 
 ### FR-3: Real-time streaming
 

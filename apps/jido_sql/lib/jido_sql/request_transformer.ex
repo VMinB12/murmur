@@ -3,8 +3,8 @@ defmodule JidoSql.RequestTransformer do
   ReAct request transformer that composes the standard MessageInjector with
   database schema injection.
 
-  First delegates to `JidoMurmur.MessageInjector` for team context and pending
-  messages, then appends the cached database schema to the system message.
+  First delegates to `JidoMurmur.MessageInjector` for team context, then
+  appends the cached database schema to the system message.
   """
 
   @behaviour Jido.AI.Reasoning.ReAct.RequestTransformer
@@ -13,7 +13,7 @@ defmodule JidoSql.RequestTransformer do
 
   @impl true
   def transform_request(request, state, config, runtime_context) do
-    # First run the standard MessageInjector
+    # First run the standard team-context transformer.
     {:ok, base_overrides} =
       JidoMurmur.MessageInjector.transform_request(request, state, config, runtime_context)
 

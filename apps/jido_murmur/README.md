@@ -1,6 +1,6 @@
 # JidoMurmur
 
-Multi-agent orchestration for [Jido](https://github.com/agentjido/jido). Provides Runner, Plugins, Storage, Schemas, and convenience helpers for building multi-agent chat applications.
+Multi-agent orchestration for [Jido](https://github.com/agentjido/jido). Provides ingress coordination, run execution, plugins, storage, schemas, and convenience helpers for building multi-agent chat applications.
 
 ## Installation
 
@@ -114,7 +114,25 @@ defmodule MyApp.Jido do
 end
 ```
 
-The Runner, AgentHelper, and all other JidoMurmur components work transparently with any storage backend.
+Ingress, Runner, AgentHelper, and the other JidoMurmur components work transparently with any storage backend.
+
+## Delivery Model
+
+Inbound agent input should always enter through `JidoMurmur.Ingress`.
+
+```elixir
+# Direct human-visible input
+:queued = JidoMurmur.Ingress.deliver(session, "Summarize the latest updates")
+
+# Programmatic follow-up with explicit metadata
+:queued =
+  JidoMurmur.Ingress.deliver(session, "Background update available",
+    source: %{kind: :programmatic, via: :scheduler},
+    refs: %{interaction_id: interaction_id}
+  )
+```
+
+The coordinator decides whether the input should start a fresh `ask/await` run or be routed into the active ReAct run with native `steer` or `inject` semantics. `JidoMurmur.MessageInjector` only enriches request context; it is no longer a delivery mechanism.
 
 ### Composing Package and Custom Actions
 
@@ -142,7 +160,8 @@ end
 
 | Module | Purpose |
 |--------|---------|
-| `JidoMurmur.Runner` | Ask/await drain-loop orchestration |
+| `JidoMurmur.Ingress` | Per-session ingress coordination and input normalization |
+| `JidoMurmur.Runner` | Single ask/await run execution |
 | `JidoMurmur.AgentHelper` | Convenience functions (start, load, subscribe) |
 | `JidoMurmur.Catalog` | Config-driven agent profile registry |
 | `JidoMurmur.Workspaces` | Workspace and session CRUD |

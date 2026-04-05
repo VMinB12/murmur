@@ -93,11 +93,8 @@ defmodule JidoMurmur.Ingress.CoordinatorTest do
 
     assert_receive {:mock_llm_phase, :started, %{waiter_pid: waiter_pid}}, 10_000
 
-    assert :queued =
-             Ingress.deliver(session, "background update",
-               source: %{kind: :programmatic, via: :test},
-               refs: %{interaction_id: Ecto.UUID.generate()}
-             )
+    assert {:ok, input} = Input.programmatic_message(session, "background update", via: :test)
+    assert :queued = Ingress.deliver_input(session, input)
 
     assert_receive {:mock_llm_control, :inject, %{content: "background update", opts: opts}},
                    10_000
@@ -109,7 +106,11 @@ defmodule JidoMurmur.Ingress.CoordinatorTest do
   end
 
   test "deliver_input rejects invalid canonical input", %{session: session} do
-    invalid_input = %Input{content: "hello", source: %{kind: :human, via: :test}, refs: %{workspace_id: session.workspace_id}}
+    invalid_input = %Input{
+      content: "hello",
+      source: %{kind: :human, via: :test},
+      refs: %{workspace_id: session.workspace_id}
+    }
 
     assert {:error, {:invalid_input, :missing_interaction_id}} =
              Ingress.deliver_input(session, invalid_input)

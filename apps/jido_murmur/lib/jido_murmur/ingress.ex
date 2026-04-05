@@ -26,7 +26,7 @@ defmodule JidoMurmur.Ingress do
 
   @spec deliver(session_like(), String.t(), keyword()) :: :queued | :agent_not_running
   def deliver(session, content, opts \\ []) when is_binary(content) and is_list(opts) do
-    with {:ok, input} <- Input.from_legacy(session, content, opts),
+    with {:ok, input} <- Input.direct_message(session, content, opts),
          {:ok, pid} <- ensure_started(session) do
       GenServer.call(pid, {:deliver, session, input})
     else

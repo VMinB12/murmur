@@ -17,6 +17,7 @@ defmodule JidoMurmur.TellAction do
 
   alias Jido.Tracing.Context, as: TracingContext
   alias JidoMurmur.Ingress
+  alias JidoMurmur.Ingress.Input
   alias JidoMurmur.Observability
   alias JidoMurmur.Signals.MessageReceived
   alias JidoMurmur.Workspaces
@@ -85,16 +86,20 @@ defmodule JidoMurmur.TellAction do
 
       Phoenix.PubSub.broadcast(JidoMurmur.pubsub(), topic, signal)
 
-      Ingress.deliver(
-        target_session,
-        message,
-        sender_name: sender_name,
-        sender_trace_id: sender_trace_id,
-        interaction_id: inter_msg.interaction_id,
-        kind: :steering
-      )
-
-      :ok
+      with {:ok, input} <-
+             Input.programmatic_message(target_session, message,
+               via: :steering,
+               interaction_id: inter_msg.interaction_id,
+               sender_name: sender_name,
+               sender_trace_id: sender_trace_id
+             ),
+           :queued <- Ingress.deliver_input(target_session, input) do
+        :ok
+      else
+        :agent_not_running -> {:error, :agent_not_running}
+        {:error, {:invalid_input, reason}} -> {:error, reason}
+        {:error, reason} -> {:error, reason}
+      end
     else
       {:error, :agent_not_running}
     end

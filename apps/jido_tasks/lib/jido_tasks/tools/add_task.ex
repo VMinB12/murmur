@@ -19,6 +19,7 @@ defmodule JidoTasks.Tools.AddTask do
     ]
 
   alias JidoMurmur.Ingress
+  alias JidoMurmur.Ingress.Input
   alias JidoMurmur.Signals.MessageReceived
   alias JidoMurmur.Workspaces
   alias JidoTasks.Signals.TaskCreated
@@ -114,13 +115,15 @@ defmodule JidoTasks.Tools.AddTask do
           )
 
         Phoenix.PubSub.broadcast(JidoTasks.pubsub(), topic, signal)
-        Ingress.deliver(
-          target_session,
-          message,
-          sender_name: sender_name,
-          interaction_id: interaction_id,
-          kind: :task_assignment
-        )
+
+        with {:ok, input} <-
+               Input.programmatic_message(target_session, message,
+                 via: :task_assignment,
+                 interaction_id: interaction_id,
+                 sender_name: sender_name
+               ) do
+          Ingress.deliver_input(target_session, input)
+        end
     end
   end
 

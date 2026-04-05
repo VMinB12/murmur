@@ -6,6 +6,7 @@ defmodule MurmurWeb.WorkspaceLive do
   alias JidoArtifacts.Envelope
   alias JidoArtifacts.SignalUpdate
   alias JidoMurmur.Catalog
+  alias JidoMurmur.Ingress.Input
   alias JidoMurmur.Observability.ConversationCache
   alias JidoMurmur.Observability.SessionCache
   alias JidoMurmur.Signals.MessageReceived
@@ -581,13 +582,15 @@ defmodule MurmurWeb.WorkspaceLive do
           )
 
         Phoenix.PubSub.broadcast(Murmur.PubSub, topic, signal)
-        JidoMurmur.Ingress.deliver(
-          target_session,
-          message,
-          sender_name: sender_name,
-          interaction_id: interaction_id,
-          kind: :task_assignment
-        )
+
+        with {:ok, input} <-
+               Input.programmatic_message(target_session, message,
+                 via: :task_assignment,
+                 interaction_id: interaction_id,
+                 sender_name: sender_name
+               ) do
+          JidoMurmur.Ingress.deliver_input(target_session, input)
+        end
     end
   end
 

@@ -32,7 +32,7 @@ Core orchestration backend for the multi-agent chat platform. Provides workspace
 
 | Function | Purpose |
 |----------|---------|
-| `deliver/3` | Normalize legacy caller input and route it through the session coordinator |
+| `deliver/3` | Route direct human-visible input through the session coordinator |
 | `deliver_input/2` | Deliver canonical ingress input directly |
 | `ensure_started/1` | Start or reuse the per-session coordinator |
 

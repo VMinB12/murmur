@@ -3,11 +3,11 @@ defmodule JidoMurmur.Ingress.InputTest do
 
   alias JidoMurmur.Ingress.Input
 
-  describe "from_legacy/3" do
+  describe "direct_message/3" do
     test "builds a human ingress input for direct workspace messages" do
       session = build_session()
 
-      assert {:ok, input} = Input.from_legacy(session, "  hello world  ")
+      assert {:ok, input} = Input.direct_message(session, "  hello world  ")
 
       assert input.content == "hello world"
       assert input.source == %{kind: :human, via: :workspace_live}
@@ -15,20 +15,25 @@ defmodule JidoMurmur.Ingress.InputTest do
       assert is_binary(input.refs.interaction_id)
       assert Input.control_kind(input) == :steer
     end
+  end
 
+  describe "programmatic_message/3" do
     test "builds a programmatic ingress input for inter-agent follow-ups" do
       session = build_session()
 
       assert {:ok, input} =
-               Input.from_legacy(session, "follow up",
-                 kind: :steering,
+               Input.programmatic_message(session, "follow up",
+                 via: :steering,
                  sender_name: "Alice",
                  sender_trace_id: "trace-123"
                )
 
-      assert input.source == %{kind: :programmatic, via: :steering, sender_name: "Alice"}
+      assert input.source == %{kind: :programmatic, via: :steering}
+      assert input.refs.kind == :steering
       assert input.refs.sender_name == "Alice"
       assert input.refs.sender_trace_id == "trace-123"
+      assert input.refs.workspace_id == session.workspace_id
+      assert is_binary(input.refs.interaction_id)
       assert Input.control_kind(input) == :inject
     end
   end
@@ -59,6 +64,11 @@ defmodule JidoMurmur.Ingress.InputTest do
                  source: %{kind: :programmatic, via: :test},
                  refs: %{interaction_id: "i-1", workspace_id: "w-1", sender_trace_id: 123}
                )
+    end
+
+    test "rejects source maps without via metadata" do
+      assert {:error, :invalid_source} =
+               Input.new("hello", source: %{kind: :human}, refs: %{interaction_id: "i-1", workspace_id: "w-1"})
     end
   end
 

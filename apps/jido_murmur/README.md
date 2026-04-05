@@ -125,11 +125,13 @@ Inbound agent input should always enter through `JidoMurmur.Ingress`.
 :queued = JidoMurmur.Ingress.deliver(session, "Summarize the latest updates")
 
 # Programmatic follow-up with explicit metadata
-:queued =
-  JidoMurmur.Ingress.deliver(session, "Background update available",
-    source: %{kind: :programmatic, via: :scheduler},
-    refs: %{interaction_id: interaction_id}
+{:ok, input} =
+  JidoMurmur.Ingress.Input.programmatic_message(session, "Background update available",
+    via: :scheduler,
+    interaction_id: interaction_id
   )
+
+:queued = JidoMurmur.Ingress.deliver_input(session, input)
 ```
 
 The coordinator decides whether the input should start a fresh `ask/await` run or be routed into the active ReAct run with native `steer` or `inject` semantics. `JidoMurmur.MessageInjector` only enriches request context; it is no longer a delivery mechanism.

@@ -16,6 +16,7 @@ defmodule Murmur.Agents.RunnerTest do
 
   alias JidoMurmur.Catalog
   alias JidoMurmur.Ingress
+  alias JidoMurmur.Ingress.Input
   alias JidoMurmur.Runner
   alias JidoMurmur.Workspaces
 
@@ -165,11 +166,13 @@ defmodule Murmur.Agents.RunnerTest do
       assert :queued = Ingress.deliver(session, "what messages have you received?")
       assert_receive {:await_started, ^pause_ref, waiter_pid}, 5_000
 
-      assert :queued =
-               Ingress.deliver(session, "injected context from another agent",
-                 kind: :steering,
+      assert {:ok, input} =
+               Input.programmatic_message(session, "injected context from another agent",
+                 via: :steering,
                  sender_name: "Alice"
                )
+
+      assert :queued = Ingress.deliver_input(session, input)
 
       send(waiter_pid, {:release_await, pause_ref})
 

@@ -3,8 +3,11 @@ defmodule JidoMurmur.Ingress.Input do
   Canonical ingress input aligned with `jido_ai` control payloads.
 
   Murmur-specific routing and observability metadata lives inside `refs`.
+  Use the explicit builder functions for Murmur-owned producer paths and
+  `new/2` only when constructing canonical input directly.
   """
 
+  alias JidoMurmur.Observability
   alias JidoMurmur.Observability.ConversationCache
 
   @enforce_keys [:content]
@@ -55,34 +58,40 @@ defmodule JidoMurmur.Ingress.Input do
     end
   end
 
-  @spec from_legacy(session_like(), String.t(), keyword()) :: {:ok, t()} | {:error, validation_error()}
-  def from_legacy(session, content, opts \\ []) when is_list(opts) do
-    kind = Keyword.get(opts, :kind, :direct)
-
+  @spec direct_message(session_like(), String.t(), keyword()) :: {:ok, t()} | {:error, validation_error()}
+  def direct_message(session, content, opts \\ []) when is_list(opts) do
     interaction_id =
       ConversationCache.resolve(session.id,
         interaction_id: Keyword.get(opts, :interaction_id),
-        kind: kind,
         now_ms: Keyword.get(opts, :sent_at_ms, System.monotonic_time(:millisecond))
       )
 
-    legacy_refs =
-      %{
-        interaction_id: interaction_id,
-        kind: kind,
-        sender_name: Keyword.get(opts, :sender_name),
-        sender_trace_id: Keyword.get(opts, :sender_trace_id),
-        workspace_id: session.workspace_id
-      }
-      |> Enum.reject(fn {_key, value} -> is_nil(value) end)
-      |> Map.new()
+    new(content,
+      source: %{kind: :human, via: Keyword.get(opts, :via, :workspace_live)},
+      refs: %{interaction_id: interaction_id, workspace_id: session.workspace_id}
+    )
+  end
 
-    with {:ok, extra_refs} <- normalize_refs(Keyword.get(opts, :refs, %{})) do
-      merged_refs = Map.merge(legacy_refs, extra_refs)
+  @spec programmatic_message(session_like(), String.t(), keyword()) ::
+          {:ok, t()} | {:error, validation_error()}
+  def programmatic_message(session, content, opts \\ []) when is_list(opts) do
+    with {:ok, via} <- normalize_via(Keyword.get(opts, :via)),
+         {:ok, extra_refs} <- normalize_refs(Keyword.get(opts, :refs, %{})) do
+      refs =
+        %{
+          interaction_id: Keyword.get(opts, :interaction_id) || Observability.next_interaction_id(),
+          kind: Keyword.get(opts, :kind, via),
+          sender_name: Keyword.get(opts, :sender_name),
+          sender_trace_id: Keyword.get(opts, :sender_trace_id),
+          workspace_id: session.workspace_id
+        }
+        |> Enum.reject(fn {_key, value} -> is_nil(value) end)
+        |> Map.new()
+        |> Map.merge(extra_refs)
 
       new(content,
-        source: Keyword.get(opts, :source, infer_source(kind, Keyword.get(opts, :sender_name))),
-        refs: merged_refs,
+        source: %{kind: :programmatic, via: via},
+        refs: refs,
         expected_request_id: Keyword.get(opts, :expected_request_id)
       )
     end
@@ -91,7 +100,6 @@ defmodule JidoMurmur.Ingress.Input do
   @spec control_kind(t()) :: :steer | :inject
   def control_kind(%__MODULE__{source: %{kind: :human}}), do: :steer
   def control_kind(%__MODULE__{source: %{kind: "human"}}), do: :steer
-  def control_kind(%__MODULE__{source: :human}), do: :steer
   def control_kind(_input), do: :inject
 
   @spec validate(t()) :: :ok | {:error, validation_error()}
@@ -111,41 +119,35 @@ defmodule JidoMurmur.Ingress.Input do
     Map.get(refs, :interaction_id) || Map.get(refs, "interaction_id")
   end
 
-  defp infer_source(:direct, _sender_name), do: %{kind: :human, via: :workspace_live}
-
-  defp infer_source(kind, sender_name) do
-    %{
-      kind: :programmatic,
-      via: kind,
-      sender_name: sender_name
-    }
-    |> Enum.reject(fn {_key, value} -> is_nil(value) end)
-    |> Map.new()
-  end
-
   defp validate_content(""), do: {:error, :empty_content}
   defp validate_content(content) when is_binary(content), do: :ok
 
   defp normalize_source(nil), do: {:error, :missing_source}
   defp normalize_source(%{} = source), do: validate_source_map(source)
-  defp normalize_source(:human), do: {:ok, :human}
-  defp normalize_source(:programmatic), do: {:ok, :programmatic}
   defp normalize_source(_), do: {:error, :invalid_source}
 
-  defp validate_source_map(source) do
-    case ref_value(source, :kind) do
-      kind when is_atom(kind) or is_binary(kind) -> {:ok, source}
-      _ -> {:error, :invalid_source}
-    end
+  defp validate_source_map(%{kind: kind, via: via} = source)
+       when (is_atom(kind) or is_binary(kind)) and (is_atom(via) or is_binary(via)) do
+    {:ok, source}
   end
+
+  defp validate_source_map(%{"kind" => kind, "via" => via} = source)
+       when (is_atom(kind) or is_binary(kind)) and (is_atom(via) or is_binary(via)) do
+    {:ok, source}
+  end
+
+  defp validate_source_map(_source), do: {:error, :invalid_source}
+
+  defp normalize_via(value) when is_atom(value) or is_binary(value), do: {:ok, value}
+  defp normalize_via(_value), do: {:error, :invalid_source}
 
   defp normalize_refs(%{} = refs), do: {:ok, refs}
   defp normalize_refs(_), do: {:error, :invalid_refs}
 
   defp validate_required_refs(refs) do
-    with :ok <- validate_required_ref(refs, :interaction_id, :missing_interaction_id, :invalid_interaction_id),
-         :ok <- validate_required_ref(refs, :workspace_id, :missing_workspace_id, :invalid_workspace_id) do
-      :ok
+    case validate_required_ref(refs, :interaction_id, :missing_interaction_id, :invalid_interaction_id) do
+      :ok -> validate_required_ref(refs, :workspace_id, :missing_workspace_id, :invalid_workspace_id)
+      error -> error
     end
   end
 
@@ -158,9 +160,9 @@ defmodule JidoMurmur.Ingress.Input do
   end
 
   defp validate_optional_refs(refs) do
-    with :ok <- validate_optional_ref(refs, :sender_name, :invalid_sender_name),
-         :ok <- validate_optional_ref(refs, :sender_trace_id, :invalid_sender_trace_id) do
-      :ok
+    case validate_optional_ref(refs, :sender_name, :invalid_sender_name) do
+      :ok -> validate_optional_ref(refs, :sender_trace_id, :invalid_sender_trace_id)
+      error -> error
     end
   end
 

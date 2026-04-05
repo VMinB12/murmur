@@ -9,7 +9,6 @@ defmodule JidoMurmur.Signals.MessageReceivedTest do
       role: "user",
       content: "[Alice]: hello",
       kind: :steering,
-      interaction_id: Uniq.UUID.uuid7(),
       sender_name: "Alice",
       sender_trace_id: nil
     }
@@ -25,6 +24,6 @@ defmodule JidoMurmur.Signals.MessageReceivedTest do
     }
 
     assert {:error, message} = MessageReceived.validate_message(payload)
-    assert message =~ "interaction_id"
+    assert message =~ "sender_name"
   end
 end

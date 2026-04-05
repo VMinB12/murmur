@@ -6,17 +6,16 @@ defmodule JidoMurmur.Signals.MessageReceived do
   Subject: `/workspaces/{wid}/agents/{sid}`
   """
 
-    alias JidoMurmur.ActorIdentity
+  alias JidoMurmur.ActorIdentity
 
   @type message_payload :: %{
           required(:id) => String.t(),
           required(:role) => String.t(),
           required(:content) => String.t(),
           required(:kind) => atom() | String.t(),
-          required(:interaction_id) => String.t(),
           required(:sender_name) => String.t(),
           required(:sender_trace_id) => String.t() | nil,
-      optional(:origin_actor) => map(),
+          optional(:origin_actor) => map(),
           optional(:hop_count) => non_neg_integer()
         }
 
@@ -38,7 +37,6 @@ defmodule JidoMurmur.Signals.MessageReceived do
          :ok <- validate_required_binary(message, :role),
          :ok <- validate_required_binary(message, :content),
          :ok <- validate_kind(Map.get(message, :kind)),
-         :ok <- validate_required_binary(message, :interaction_id),
          :ok <- validate_required_binary(message, :sender_name),
          :ok <- validate_optional_actor(Map.get(message, :origin_actor)),
          :ok <- validate_optional_binary(Map.get(message, :sender_trace_id)),
@@ -84,6 +82,6 @@ defmodule JidoMurmur.Signals.MessageReceived do
 
   defp invalid_message_error do
     {:error,
-     "must be a message map with id, role, content, kind, interaction_id, sender_name, and sender_trace_id fields"}
+     "must be a message map with id, role, content, kind, sender_name, and sender_trace_id fields"}
   end
 end

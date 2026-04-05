@@ -9,8 +9,6 @@ defmodule JidoMurmur.Ingress.Input do
 
   alias JidoMurmur.ActorIdentity
   alias JidoMurmur.Ingress.Metadata
-  alias JidoMurmur.Observability
-  alias JidoMurmur.Observability.ConversationCache
 
   @enforce_keys [:content]
   defstruct [:content, :source, refs: %{}, expected_request_id: nil]
@@ -27,8 +25,6 @@ defmodule JidoMurmur.Ingress.Input do
           | :missing_source
           | :invalid_source
           | :invalid_refs
-          | :missing_interaction_id
-          | :invalid_interaction_id
           | :missing_workspace_id
           | :invalid_workspace_id
           | :invalid_sender_name
@@ -62,16 +58,9 @@ defmodule JidoMurmur.Ingress.Input do
 
   @spec direct_message(session_like(), String.t(), keyword()) :: {:ok, t()} | {:error, validation_error()}
   def direct_message(session, content, opts \\ []) when is_list(opts) do
-    interaction_id =
-      ConversationCache.resolve(session.id,
-        interaction_id: Keyword.get(opts, :interaction_id),
-        now_ms: Keyword.get(opts, :sent_at_ms, System.monotonic_time(:millisecond))
-      )
-
     new(content,
       source: %{kind: :human, via: Keyword.get(opts, :via, :workspace_live)},
       refs: %{
-        interaction_id: interaction_id,
         workspace_id: session.workspace_id,
         origin_actor: ActorIdentity.serialize(ActorIdentity.human())
       }
@@ -86,7 +75,6 @@ defmodule JidoMurmur.Ingress.Input do
          {:ok, origin_actor} <- normalize_origin_actor(Keyword.get(opts, :origin_actor), Keyword.get(opts, :sender_name)) do
       refs =
         Map.merge(extra_refs, %{
-          interaction_id: Keyword.get(opts, :interaction_id) || Observability.next_interaction_id(),
           sender_name: Keyword.get(opts, :sender_name) || ActorIdentity.display_name(origin_actor),
           origin_actor: ActorIdentity.serialize(origin_actor),
           sender_trace_id: Keyword.get(opts, :sender_trace_id),
@@ -120,9 +108,6 @@ defmodule JidoMurmur.Ingress.Input do
 
   @spec metadata(t()) :: {:ok, Metadata.t()} | {:error, validation_error()}
   def metadata(%__MODULE__{refs: refs}), do: Metadata.new(refs)
-
-  @spec interaction_id(t()) :: String.t() | nil
-  def interaction_id(%__MODULE__{refs: %{interaction_id: interaction_id}}), do: interaction_id
 
   defp validate_content(""), do: {:error, :empty_content}
   defp validate_content(content) when is_binary(content), do: :ok

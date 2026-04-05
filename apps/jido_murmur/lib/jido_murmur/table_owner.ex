@@ -11,14 +11,12 @@ defmodule JidoMurmur.TableOwner do
     GenServer.start_link(__MODULE__, opts, name: __MODULE__)
   end
 
-  alias JidoMurmur.Observability.ConversationCache
   alias JidoMurmur.Observability.SessionCache
   alias JidoMurmur.Observability.Store
 
   @impl true
   def init(_opts) do
     :ets.new(:jido_murmur_active_runners, [:set, :public, :named_table])
-    ConversationCache.create_table()
     SessionCache.create_table()
     Store.create_tables()
     {:ok, %{}}

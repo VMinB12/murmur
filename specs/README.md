@@ -6,20 +6,20 @@
 
 | Metric | Value |
 |--------|-------|
-| Active tickets | 2 |
+| Active tickets | 1 |
 | Last updated | 2026-04-05 |
 
 ## Active Tickets
 
 | # | Title | Status | Owner |
 |---|-------|--------|-------|
-| 013 | [Agent-Centric Phoenix Sessions](tickets/013-agent-centric-phoenix-sessions/) | planned | — |
 | 016 | [Conversation Read Model And Streaming Consistency](tickets/016-conversation-read-model-and-streaming-consistency/) | planned | — |
 
 ## Recently Completed
 
 | # | Title | Completed |
 |---|-------|-----------|
+| 013 | [Agent-Centric Phoenix Sessions](tickets/013-agent-centric-phoenix-sessions/) | 2026-04-05 |
 | 015 | [Actor Identity And Display Projection Cleanup](tickets/015-actor-identity-and-display-projection-cleanup/) | 2026-04-05 |
 | 014 | [Runtime Metadata Boundary Cleanup](tickets/014-runtime-metadata-boundary-cleanup/) | 2026-04-05 |
 | 012 | [Native ReAct Steering Adoption](tickets/012-native-react-steering-adoption/) | 2026-04-04 |

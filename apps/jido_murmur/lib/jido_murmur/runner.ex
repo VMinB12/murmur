@@ -74,7 +74,6 @@ defmodule JidoMurmur.Runner do
     %{
       agent_module: Catalog.agent_module(session.agent_profile_id),
       topic: agent_topic(session),
-      interaction_id: metadata.interaction_id,
       request_id: request_id,
       tool_context: Metadata.tool_context(metadata, current_actor, request_id),
       start_time: System.monotonic_time()
@@ -86,9 +85,8 @@ defmodule JidoMurmur.Runner do
       request_id: run.request_id,
       agent_id: session.id,
       agent_name: session.display_name,
-      session_id: run.interaction_id,
+      session_id: session.id,
       workspace_id: session.workspace_id,
-      interaction_id: run.interaction_id,
       input_value: input.content,
       message_count: 1,
       triggered_by_trace_id: metadata.sender_trace_id,

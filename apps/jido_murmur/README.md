@@ -128,13 +128,16 @@ Inbound agent input should always enter through `JidoMurmur.Ingress`.
 {:ok, input} =
   JidoMurmur.Ingress.Input.programmatic_message(session, "Background update available",
     via: :scheduler,
-    interaction_id: interaction_id
+    sender_name: "Scheduler",
+    sender_trace_id: request_id
   )
 
 :queued = JidoMurmur.Ingress.deliver_input(session, input)
 ```
 
 The coordinator decides whether the input should start a fresh `ask/await` run or be routed into the active ReAct run with native `steer` or `inject` semantics. `JidoMurmur.MessageInjector` only enriches request context; it is no longer a delivery mechanism.
+
+Phoenix session grouping is agent-centric: `session.id` maps to the executing agent session, each executed react loop gets its own `murmur.request_id`, and cross-agent causation is carried only by immediate parent trace metadata such as `sender_trace_id`.
 
 ### Composing Package and Custom Actions
 

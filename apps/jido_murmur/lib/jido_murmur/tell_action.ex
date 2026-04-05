@@ -25,7 +25,6 @@ defmodule JidoMurmur.TellAction do
   def run(params, context) do
     workspace_id = context[:workspace_id]
     hop_count = context[:hop_count] || 0
-    interaction_id = context[:interaction_id]
 
     with :ok <- validate_hop_count(hop_count),
          {:ok, sender_name} <- current_actor_name(context),
@@ -33,7 +32,6 @@ defmodule JidoMurmur.TellAction do
       prefixed_message = "[#{sender_name}]: #{params.message}"
 
       case deliver_message(target, prefixed_message,
-             interaction_id: interaction_id,
              sender_name: sender_name,
              origin_actor: ActorIdentity.agent(sender_name),
              sender_trace_id: sender_trace_id(),
@@ -86,7 +84,6 @@ defmodule JidoMurmur.TellAction do
   defp deliver_message(target_session, message, opts) do
     Ingress.deliver_programmatic(target_session, message,
       via: :steering,
-      interaction_id: Keyword.get(opts, :interaction_id),
       sender_name: Keyword.fetch!(opts, :sender_name),
       origin_actor: Keyword.get(opts, :origin_actor),
       sender_trace_id: Keyword.get(opts, :sender_trace_id),

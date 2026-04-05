@@ -34,8 +34,6 @@ defmodule JidoMurmur.Observability do
     if capture_content?(), do: value, else: nil
   end
 
-  def next_interaction_id, do: Uniq.UUID.uuid7()
-
   def start_turn(attrs), do: Store.start_turn(attrs)
   def finish_turn(request_id, attrs), do: Store.finish_turn(request_id, attrs)
   def fail_turn(request_id, reason, attrs \\ %{}), do: Store.fail_turn(request_id, reason, attrs)

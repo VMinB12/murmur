@@ -396,7 +396,6 @@ defmodule JidoMurmur.Observability.Store do
       agent_name: Map.fetch!(attrs, :agent_name),
       session_id: Map.fetch!(attrs, :session_id),
       workspace_id: Map.fetch!(attrs, :workspace_id),
-      interaction_id: Map.fetch!(attrs, :interaction_id),
       input_value: Map.fetch!(attrs, :input_value),
       message_count: Map.get(attrs, :message_count, 1),
       triggered_by_trace_id: Map.get(attrs, :triggered_by_trace_id),
@@ -412,7 +411,6 @@ defmodule JidoMurmur.Observability.Store do
       "murmur.agent_name" => turn.agent_name,
       "murmur.workspace_id" => turn.workspace_id,
       "murmur.request_id" => turn.request_id,
-      "murmur.interaction_id" => turn.interaction_id,
       "murmur.message_count" => turn.message_count
     }
     |> maybe_put("input.value", Observability.captured_content(turn.input_value))
@@ -437,7 +435,6 @@ defmodule JidoMurmur.Observability.Store do
       "murmur.agent_name" => turn && turn.agent_name,
       "murmur.workspace_id" => turn && turn.workspace_id,
       "murmur.request_id" => metadata[:request_id],
-      "murmur.interaction_id" => turn && turn.interaction_id,
       "murmur.llm_call_id" => metadata[:llm_call_id]
     }
     |> Enum.reject(fn {_key, value} -> is_nil(value) end)
@@ -455,7 +452,6 @@ defmodule JidoMurmur.Observability.Store do
       "murmur.agent_name" => turn && turn.agent_name,
       "murmur.workspace_id" => turn && turn.workspace_id,
       "murmur.request_id" => metadata[:request_id],
-      "murmur.interaction_id" => turn && turn.interaction_id,
       "murmur.tool_call_id" => metadata[:tool_call_id]
     }
     |> Enum.reject(fn {_key, value} -> is_nil(value) end)

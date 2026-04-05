@@ -197,7 +197,6 @@ defmodule MurmurWeb.WorkspaceLiveIntegrationTest do
               role: "user",
               content: "Can you review this?",
               kind: :steering,
-              interaction_id: Ecto.UUID.generate(),
               sender_name: "Bob",
               origin_actor: ActorIdentity.serialize(ActorIdentity.agent("Bob")),
               sender_trace_id: nil,

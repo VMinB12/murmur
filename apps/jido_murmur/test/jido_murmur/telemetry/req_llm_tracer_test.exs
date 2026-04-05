@@ -170,7 +170,6 @@ defmodule JidoMurmur.Telemetry.ReqLLMTracerTest do
         agent_name: "Trace Agent",
         session_id: agent_id,
         workspace_id: workspace_id,
-        interaction_id: "interaction-#{System.unique_integer([:positive])}",
         input_value: "queued request"
       })
 
@@ -214,7 +213,6 @@ defmodule JidoMurmur.Telemetry.ReqLLMTracerTest do
         agent_name: "Trace Agent",
         session_id: agent_id,
         workspace_id: workspace_id,
-        interaction_id: "interaction-#{System.unique_integer([:positive])}",
         input_value: "pre-start request"
       })
 
@@ -256,7 +254,6 @@ defmodule JidoMurmur.Telemetry.ReqLLMTracerTest do
         agent_name: "Trace Agent",
         session_id: agent_id,
         workspace_id: workspace_id,
-        interaction_id: "interaction-#{System.unique_integer([:positive])}",
         input_value: "late request"
       })
 
@@ -296,7 +293,6 @@ defmodule JidoMurmur.Telemetry.ReqLLMTracerTest do
         agent_name: "Trace Agent",
         session_id: agent_id,
         workspace_id: workspace_id,
-        interaction_id: "interaction-#{System.unique_integer([:positive])}",
         input_value: "prepared request"
       })
 

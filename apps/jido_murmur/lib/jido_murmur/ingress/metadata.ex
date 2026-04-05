@@ -6,18 +6,17 @@ defmodule JidoMurmur.Ingress.Metadata do
   atom-keyed refs for downstream runtime use.
   """
 
-    alias JidoMurmur.ActorIdentity
+  alias JidoMurmur.ActorIdentity
 
-  @enforce_keys [:interaction_id, :workspace_id]
-    defstruct [:interaction_id, :workspace_id, :sender_name, :origin_actor, :sender_trace_id, hop_count: 0, extra: %{}]
+  @enforce_keys [:workspace_id]
+  defstruct [:workspace_id, :sender_name, :origin_actor, :sender_trace_id, hop_count: 0, extra: %{}]
 
-    @known_keys [:interaction_id, :workspace_id, :sender_name, :origin_actor, :sender_trace_id, :hop_count]
+  @known_keys [:workspace_id, :sender_name, :origin_actor, :sender_trace_id, :hop_count]
 
   @type t :: %__MODULE__{
-          interaction_id: String.t(),
           workspace_id: String.t(),
           sender_name: String.t() | nil,
-      origin_actor: ActorIdentity.t() | nil,
+          origin_actor: ActorIdentity.t() | nil,
           sender_trace_id: String.t() | nil,
           hop_count: non_neg_integer(),
           extra: map()
@@ -25,8 +24,6 @@ defmodule JidoMurmur.Ingress.Metadata do
 
   @type validation_error ::
           :invalid_refs
-          | :missing_interaction_id
-          | :invalid_interaction_id
           | :missing_workspace_id
           | :invalid_workspace_id
           | :invalid_sender_name
@@ -39,7 +36,6 @@ defmodule JidoMurmur.Ingress.Metadata do
     sender_name = Map.get(refs, :sender_name)
 
     with :ok <- validate_atom_keys(refs),
-         :ok <- validate_required_binary(Map.get(refs, :interaction_id), :missing_interaction_id, :invalid_interaction_id),
          :ok <- validate_required_binary(Map.get(refs, :workspace_id), :missing_workspace_id, :invalid_workspace_id),
          :ok <- validate_optional_binary(sender_name, :invalid_sender_name),
          {:ok, origin_actor} <- normalize_origin_actor(Map.get(refs, :origin_actor), sender_name),
@@ -47,7 +43,6 @@ defmodule JidoMurmur.Ingress.Metadata do
          {:ok, hop_count} <- normalize_hop_count(Map.get(refs, :hop_count, 0)) do
       {:ok,
        %__MODULE__{
-         interaction_id: Map.fetch!(refs, :interaction_id),
          workspace_id: Map.fetch!(refs, :workspace_id),
          sender_name: sender_name || ActorIdentity.display_name(origin_actor),
          origin_actor: origin_actor,
@@ -64,7 +59,6 @@ defmodule JidoMurmur.Ingress.Metadata do
   def to_refs(%__MODULE__{} = metadata) do
     canonical_refs =
       %{
-        interaction_id: metadata.interaction_id,
         workspace_id: metadata.workspace_id,
         sender_name: metadata.sender_name,
         origin_actor: ActorIdentity.serialize(metadata.origin_actor),
@@ -84,7 +78,6 @@ defmodule JidoMurmur.Ingress.Metadata do
       workspace_id: metadata.workspace_id,
       current_actor: current_actor,
       sender_name: ActorIdentity.display_name(current_actor),
-      interaction_id: metadata.interaction_id,
       request_id: request_id,
       hop_count: metadata.hop_count
     }

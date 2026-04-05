@@ -15,7 +15,6 @@ defmodule JidoMurmur.Ingress.InputTest do
       assert input.refs.hop_count == 0
       assert input.refs.origin_actor == %{kind: :human}
       assert input.refs.workspace_id == session.workspace_id
-      assert is_binary(input.refs.interaction_id)
       assert Input.control_kind(input) == :steer
     end
   end
@@ -38,7 +37,6 @@ defmodule JidoMurmur.Ingress.InputTest do
       assert input.refs.origin_actor == %{kind: :agent, name: "Alice"}
       assert input.refs.sender_trace_id == "trace-123"
       assert input.refs.workspace_id == session.workspace_id
-      assert is_binary(input.refs.interaction_id)
       assert Input.control_kind(input) == :inject
     end
   end
@@ -46,53 +44,50 @@ defmodule JidoMurmur.Ingress.InputTest do
   describe "new/2 validation" do
     test "rejects missing source" do
       assert {:error, :missing_source} =
-               Input.new("hello", refs: %{interaction_id: "i-1", workspace_id: "w-1"})
+               Input.new("hello", refs: %{workspace_id: "w-1"})
     end
 
-    test "rejects missing interaction metadata" do
-      assert {:error, :missing_interaction_id} =
-               Input.new("hello", source: %{kind: :human, via: :test}, refs: %{workspace_id: "w-1"})
-
+    test "rejects missing workspace metadata" do
       assert {:error, :missing_workspace_id} =
-               Input.new("hello", source: %{kind: :human, via: :test}, refs: %{interaction_id: "i-1"})
+               Input.new("hello", source: %{kind: :human, via: :test}, refs: %{})
     end
 
     test "rejects invalid optional ref types" do
       assert {:error, :invalid_sender_name} =
                Input.new("hello",
                  source: %{kind: :programmatic, via: :test},
-                 refs: %{interaction_id: "i-1", workspace_id: "w-1", sender_name: 123}
+                 refs: %{workspace_id: "w-1", sender_name: 123}
                )
 
       assert {:error, :invalid_origin_actor} =
                Input.new("hello",
                  source: %{kind: :programmatic, via: :test},
-                 refs: %{interaction_id: "i-1", workspace_id: "w-1", origin_actor: %{kind: 123}}
+                 refs: %{workspace_id: "w-1", origin_actor: %{kind: 123}}
                )
 
       assert {:error, :invalid_sender_trace_id} =
                Input.new("hello",
                  source: %{kind: :programmatic, via: :test},
-                 refs: %{interaction_id: "i-1", workspace_id: "w-1", sender_trace_id: 123}
+                 refs: %{workspace_id: "w-1", sender_trace_id: 123}
                )
 
       assert {:error, :invalid_hop_count} =
                Input.new("hello",
                  source: %{kind: :programmatic, via: :test},
-                 refs: %{interaction_id: "i-1", workspace_id: "w-1", hop_count: -1}
+                 refs: %{workspace_id: "w-1", hop_count: -1}
                )
     end
 
     test "rejects source maps without via metadata" do
       assert {:error, :invalid_source} =
-               Input.new("hello", source: %{kind: :human}, refs: %{interaction_id: "i-1", workspace_id: "w-1"})
+               Input.new("hello", source: %{kind: :human}, refs: %{workspace_id: "w-1"})
     end
 
     test "rejects string-key metadata refs" do
       assert {:error, :invalid_refs} =
                Input.new("hello",
                  source: %{kind: :human, via: :test},
-                 refs: %{"interaction_id" => "i-1", workspace_id: "w-1"}
+                 refs: %{"workspace_id" => "w-1"}
                )
     end
   end

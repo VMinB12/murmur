@@ -71,7 +71,6 @@ defmodule MurmurWeb.WorkspaceLiveTest do
       Map.merge(
         %{
           kind: :steering,
-          interaction_id: Ecto.UUID.generate(),
           sender_name: "Alice",
           sender_trace_id: nil
         },
@@ -575,7 +574,6 @@ defmodule MurmurWeb.WorkspaceLiveTest do
         role: "user",
         content: "Can you help?",
         kind: :steering,
-        interaction_id: Ecto.UUID.generate(),
         origin_actor: ActorIdentity.agent("Alice"),
         sender_name: "Alice",
         sender_trace_id: nil

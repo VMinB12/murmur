@@ -109,10 +109,10 @@ defmodule JidoMurmur.Ingress.CoordinatorTest do
     invalid_input = %Input{
       content: "hello",
       source: %{kind: :human, via: :test},
-      refs: %{workspace_id: session.workspace_id}
+      refs: %{}
     }
 
-    assert {:error, {:invalid_input, :missing_interaction_id}} =
+    assert {:error, {:invalid_input, :missing_workspace_id}} =
              Ingress.deliver_input(session, invalid_input)
   end
 end

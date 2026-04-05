@@ -2,6 +2,7 @@ defmodule JidoMurmur.AgentHelperTest do
   use JidoMurmur.Case, async: false
 
   alias JidoMurmur.AgentHelper
+  alias JidoMurmur.Observability.Store
   alias JidoMurmur.Workspaces
 
   setup do
@@ -75,9 +76,7 @@ defmodule JidoMurmur.AgentHelperTest do
       :ets.new(:jido_murmur_active_runners, [:set, :public, :named_table])
     end
 
-    unless :ets.whereis(:jido_murmur_obs_conversations) != :undefined do
-      :ets.new(:jido_murmur_obs_conversations, [:named_table, :public, :set])
-    end
+    Store.create_tables()
   rescue
     ArgumentError -> :ok
   end

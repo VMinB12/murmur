@@ -53,8 +53,6 @@ defmodule JidoMurmur.Ingress do
                               :missing_source,
                               :invalid_source,
                               :invalid_refs,
-                              :missing_interaction_id,
-                              :invalid_interaction_id,
                               :missing_workspace_id,
                               :invalid_workspace_id,
                               :invalid_sender_name,

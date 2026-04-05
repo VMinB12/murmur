@@ -6,7 +6,6 @@ defmodule MurmurWeb.WorkspaceLive do
   alias JidoArtifacts.Envelope
   alias JidoArtifacts.SignalUpdate
   alias JidoMurmur.Catalog
-  alias JidoMurmur.Observability.ConversationCache
   alias JidoMurmur.Observability.SessionCache
   alias JidoMurmur.Topics
   alias JidoMurmur.Workspaces
@@ -668,7 +667,6 @@ defmodule MurmurWeb.WorkspaceLive do
 
     adapter.delete_checkpoint(checkpoint_key, opts)
     adapter.delete_thread(session.id, opts)
-    ConversationCache.delete(session.id)
   rescue
     e ->
       Logger.warning("Failed to cleanup storage for session #{session.id}: #{Exception.message(e)}")

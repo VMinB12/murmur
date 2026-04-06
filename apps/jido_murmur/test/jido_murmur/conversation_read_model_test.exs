@@ -93,6 +93,32 @@ defmodule JidoMurmur.ConversationReadModelTest do
       assert step_two.step_index == 2
       assert step_two.content == "Final answer"
     end
+
+    test "reuses visible ingress identity refs for persisted user messages" do
+      message_id = SignalID.generate_sequential(1_700_000_000_000, 7)
+
+      entries = [
+        %{
+          id: "storage-entry-1",
+          seq: 2,
+          at: 999,
+          kind: :message,
+          payload: %{role: "user", content: "Hello again"},
+          refs: %{
+            message_id: message_id,
+            message_first_seen_at: SignalID.extract_timestamp(message_id),
+            message_first_seen_seq: SignalID.sequence_number(message_id)
+          }
+        }
+      ]
+
+      model = ConversationReadModel.from_entries("session-1", entries)
+
+      assert [user_message] = model.messages
+      assert user_message.id == message_id
+      assert user_message.first_seen_at == SignalID.extract_timestamp(message_id)
+      assert user_message.first_seen_seq == SignalID.sequence_number(message_id)
+    end
   end
 
   describe "apply_signal/2" do

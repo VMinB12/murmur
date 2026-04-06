@@ -17,6 +17,19 @@ defmodule JidoMurmur.Ingress.InputTest do
       assert input.refs.workspace_id == session.workspace_id
       assert Input.control_kind(input) == :steer
     end
+
+    test "preserves atom-keyed extra refs for visible ingress reconciliation" do
+      session = build_session()
+
+      assert {:ok, input} =
+               Input.direct_message(session, "hello",
+                 refs: %{client_ref: "client-1", message_id: "message-1"}
+               )
+
+      assert input.refs.client_ref == "client-1"
+      assert input.refs.message_id == "message-1"
+      assert input.refs.workspace_id == session.workspace_id
+    end
   end
 
   describe "programmatic_message/3" do

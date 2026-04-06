@@ -21,7 +21,7 @@ defmodule JidoMurmur.Signals.MessageReceivedTest do
     assert {:ok, ^payload} = MessageReceived.validate_message(payload)
   end
 
-  test "validate_message rejects payloads missing ingress correlation fields" do
+  test "validate_message rejects payloads missing required message fields" do
     payload = %{
       id: Uniq.UUID.uuid7(),
       role: "user",
@@ -29,6 +29,6 @@ defmodule JidoMurmur.Signals.MessageReceivedTest do
     }
 
     assert {:error, message} = MessageReceived.validate_message(payload)
-    assert message =~ "sender_name"
+    assert message =~ "kind"
   end
 end

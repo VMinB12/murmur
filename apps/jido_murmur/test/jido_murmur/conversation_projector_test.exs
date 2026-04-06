@@ -2,6 +2,7 @@ defmodule JidoMurmur.ConversationProjectorTest do
   use JidoMurmur.Case, async: true
 
   alias Jido.Signal.ID, as: SignalID
+  alias JidoMurmur.ConversationProjector
   alias JidoMurmur.ConversationReadModel
 
   describe "ConversationReadModel.apply_signal/2" do
@@ -157,6 +158,38 @@ defmodule JidoMurmur.ConversationProjectorTest do
 
       assert Enum.map(model.messages, & &1.id) == ["req-4-step-1", "req-4-step-2"]
       assert step_two.id == "req-4-step-2"
+    end
+
+    test "conversation projector caches the full read-model snapshot" do
+      session_id = Ecto.UUID.generate()
+      workspace_id = Ecto.UUID.generate()
+
+      on_exit(fn -> ConversationProjector.clear(session_id) end)
+
+      signal =
+        Jido.Signal.new!(
+          "ai.llm.delta",
+          %{request_id: "req-5", delta: "Hello", chunk_type: :content},
+          source: "/test",
+          id: SignalID.generate_sequential(1_700_000_000_000, 1)
+        )
+
+      assert {:ok, message} =
+               ConversationProjector.apply_signal(
+                 workspace_id,
+                 session_id,
+                 %{state: %{__thread__: %{entries: []}}},
+                 signal
+               )
+
+      assert message.id == "req-5-step-1"
+
+      assert [
+               {^session_id, %ConversationReadModel{} = snapshot}
+             ] = :ets.lookup(:jido_murmur_conversation_snapshots, session_id)
+
+      assert snapshot.messages == [message]
+      assert snapshot.step_indexes == %{"req-5" => 1}
     end
   end
 end

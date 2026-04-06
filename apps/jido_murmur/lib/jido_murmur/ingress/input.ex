@@ -58,13 +58,16 @@ defmodule JidoMurmur.Ingress.Input do
 
   @spec direct_message(session_like(), String.t(), keyword()) :: {:ok, t()} | {:error, validation_error()}
   def direct_message(session, content, opts \\ []) when is_list(opts) do
-    new(content,
-      source: %{kind: :human, via: Keyword.get(opts, :via, :workspace_live)},
-      refs: %{
-        workspace_id: session.workspace_id,
-        origin_actor: ActorIdentity.serialize(ActorIdentity.human())
-      }
-    )
+    with {:ok, extra_refs} <- normalize_extra_refs(Keyword.get(opts, :refs, %{})) do
+      new(content,
+        source: %{kind: :human, via: Keyword.get(opts, :via, :workspace_live)},
+        refs:
+          Map.merge(extra_refs, %{
+            workspace_id: session.workspace_id,
+            origin_actor: ActorIdentity.serialize(ActorIdentity.human())
+          })
+      )
+    end
   end
 
   @spec programmatic_message(session_like(), String.t(), keyword()) ::

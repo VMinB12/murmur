@@ -21,14 +21,14 @@ defmodule JidoMurmur.ConversationProjector do
   def snapshot(session) do
     case get_snapshot(session.id) do
       nil -> load_snapshot(session)
-      messages -> messages
+      model -> model.messages
     end
   end
 
   @spec load_snapshot(session_like()) :: [DisplayMessage.t()]
   def load_snapshot(session) do
     model = load_model(session)
-    put_snapshot(session.id, model.messages)
+    put_snapshot(session.id, model)
     model.messages
   end
 
@@ -44,7 +44,7 @@ defmodule JidoMurmur.ConversationProjector do
 
     case ConversationReadModel.apply_signal(model, signal) do
       {:ok, next_model, message} ->
-        put_snapshot(session_id, next_model.messages)
+        put_snapshot(session_id, next_model)
         broadcast_update(workspace_id, session_id, message)
         {:ok, message}
 
@@ -55,13 +55,13 @@ defmodule JidoMurmur.ConversationProjector do
 
   @spec reconcile_session(session_like()) :: [DisplayMessage.t()]
   def reconcile_session(session) do
-    previous_model = ConversationReadModel.new(session.id, get_snapshot(session.id) || [])
-    next_model = load_model(session)
-    put_snapshot(session.id, next_model.messages)
+    previous_model = get_snapshot(session.id) || ConversationReadModel.new(session.id)
+    {next_model, latest_message} = ConversationReadModel.reconcile_entries(previous_model, extract_entries(session))
+    put_snapshot(session.id, next_model)
 
-    case ConversationReadModel.reconcile_entries(previous_model, extract_entries(session)) do
-      {_model, nil} -> :ok
-      {_model, message} -> broadcast_update(session.workspace_id, session.id, message)
+    case latest_message do
+      nil -> :ok
+      message -> broadcast_update(session.workspace_id, session.id, message)
     end
 
     next_model.messages
@@ -71,9 +71,15 @@ defmodule JidoMurmur.ConversationProjector do
   def latest_assistant_message(session_id) when is_binary(session_id) do
     session_id
     |> get_snapshot()
-    |> List.wrap()
-    |> Enum.reverse()
-    |> Enum.find(&DisplayMessage.assistant_message?/1)
+    |> case do
+      %ConversationReadModel{messages: messages} ->
+        messages
+        |> Enum.reverse()
+        |> Enum.find(&DisplayMessage.assistant_message?/1)
+
+      _ ->
+        nil
+    end
   end
 
   defp ensure_model(session_id, agent) do
@@ -81,10 +87,10 @@ defmodule JidoMurmur.ConversationProjector do
       nil ->
         session_id
         |> ConversationReadModel.from_entries(extract_entries_from_agent(agent))
-        |> tap(fn model -> put_snapshot(session_id, model.messages) end)
+        |> tap(fn model -> put_snapshot(session_id, model) end)
 
-      messages ->
-        ConversationReadModel.new(session_id, messages)
+      model ->
+        model
     end
   end
 
@@ -95,7 +101,7 @@ defmodule JidoMurmur.ConversationProjector do
   defp extract_entries(session) do
     jido_mod = JidoMurmur.jido_mod()
 
-    case jido_mod.whereis(session.id) do
+    case safe_whereis(jido_mod, session.id) do
       pid when is_pid(pid) ->
         case Jido.AgentServer.state(pid) do
           {:ok, %{agent: agent}} -> extract_entries_from_agent(agent)
@@ -105,6 +111,12 @@ defmodule JidoMurmur.ConversationProjector do
       _ ->
         extract_entries_from_storage(session)
     end
+  end
+
+  defp safe_whereis(jido_mod, session_id) do
+    jido_mod.whereis(session_id)
+  rescue
+    ArgumentError -> nil
   end
 
   defp extract_entries_from_storage(session) do
@@ -131,12 +143,13 @@ defmodule JidoMurmur.ConversationProjector do
 
   defp get_snapshot(session_id) do
     case :ets.lookup(@table, session_id) do
-      [{^session_id, messages}] -> messages
+      [{^session_id, %ConversationReadModel{} = model}] -> model
+      [{^session_id, messages}] when is_list(messages) -> ConversationReadModel.new(session_id, messages)
       _ -> nil
     end
   end
 
-  defp put_snapshot(session_id, messages) do
-    :ets.insert(@table, {session_id, messages})
+  defp put_snapshot(session_id, %ConversationReadModel{} = model) do
+    :ets.insert(@table, {session_id, model})
   end
 end

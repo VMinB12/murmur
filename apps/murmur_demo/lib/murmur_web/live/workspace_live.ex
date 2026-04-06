@@ -4,8 +4,8 @@ defmodule MurmurWeb.WorkspaceLive do
 
   alias JidoArtifacts.Envelope
   alias JidoArtifacts.SignalUpdate
+  alias JidoMurmur.AgentHelper
   alias JidoMurmur.Catalog
-  alias JidoMurmur.Observability.SessionCache
   alias JidoMurmur.Topics
   alias JidoMurmur.Workspaces
   alias JidoTasks.Signals.TaskCreated
@@ -13,8 +13,6 @@ defmodule MurmurWeb.WorkspaceLive do
   alias JidoTasks.Tasks
   alias MurmurWeb.Artifacts.Actions, as: ArtifactActions
   alias MurmurWeb.Live.WorkspaceState
-
-  require Logger
 
   @impl true
   def mount(%{"id" => workspace_id}, _session, socket) do
@@ -40,6 +38,7 @@ defmodule MurmurWeb.WorkspaceLive do
       |> assign(:profiles, profiles)
       |> assign(:agent_statuses, Map.new(agent_sessions, &{&1.id, :idle}))
       |> assign(:messages, messages_map)
+      |> assign(:pending_messages, Map.new(agent_sessions, &{&1.id, []}))
       |> assign(:artifacts, artifacts_map)
       |> assign(:active_artifact, nil)
       |> assign(:view_mode, :split)
@@ -54,10 +53,8 @@ defmodule MurmurWeb.WorkspaceLive do
         Phoenix.PubSub.subscribe(Murmur.PubSub, Topics.workspace_tasks(workspace_id))
 
         Enum.reduce(agent_sessions, socket, fn session, acc ->
-          Phoenix.PubSub.subscribe(Murmur.PubSub, Topics.agent_messages(workspace_id, session.id))
-          Phoenix.PubSub.subscribe(Murmur.PubSub, Topics.agent_conversation(workspace_id, session.id))
-          Phoenix.PubSub.subscribe(Murmur.PubSub, Topics.agent_artifacts(workspace_id, session.id))
-          ensure_agent_started(session)
+          AgentHelper.subscribe(session)
+          AgentHelper.start_agent(session)
 
           status = get_agent_status(session.id)
           update(acc, :agent_statuses, &Map.put(&1, session.id, status))
@@ -79,23 +76,7 @@ defmodule MurmurWeb.WorkspaceLive do
       {:noreply, socket}
     else
       session = Workspaces.get_agent_session!(session_id)
-      workspace_id = socket.assigns.workspace.id
-      topic = Topics.agent_messages(workspace_id, session_id)
-
-      # Add user message to local display immediately
-      user_msg = JidoMurmur.DisplayMessage.user(content)
-
-      socket =
-        socket
-        |> update(:messages, fn msgs ->
-          Map.update(msgs, session_id, [user_msg], &append_message(&1, user_msg))
-        end)
-        |> update(:agent_statuses, &Map.put(&1, session_id, :busy))
-
-      # Send to agent via ask/await in an async task
-      send_to_agent(session, content, topic)
-
-      {:noreply, socket}
+      queue_direct_message(socket, session, content)
     end
   end
 
@@ -108,15 +89,14 @@ defmodule MurmurWeb.WorkspaceLive do
            "display_name" => display_name
          }) do
       {:ok, session} ->
-        Phoenix.PubSub.subscribe(Murmur.PubSub, Topics.agent_messages(workspace.id, session.id))
-        Phoenix.PubSub.subscribe(Murmur.PubSub, Topics.agent_conversation(workspace.id, session.id))
-        Phoenix.PubSub.subscribe(Murmur.PubSub, Topics.agent_artifacts(workspace.id, session.id))
-        ensure_agent_started(session)
+        AgentHelper.subscribe(session)
+        AgentHelper.start_agent(session)
 
         socket =
           socket
           |> update(:agent_sessions, &(&1 ++ [session]))
           |> update(:messages, &Map.put(&1, session.id, []))
+          |> update(:pending_messages, &Map.put(&1, session.id, []))
           |> update(:agent_statuses, &Map.put(&1, session.id, :idle))
           |> update(:artifacts, &Map.put(&1, session.id, %{}))
           |> assign(
@@ -134,30 +114,26 @@ defmodule MurmurWeb.WorkspaceLive do
   @impl true
   def handle_event("clear_team", _params, socket) do
     Enum.each(socket.assigns.agent_sessions, fn session ->
-      stop_agent(session.id)
-      cleanup_storage(session)
+      AgentHelper.stop_agent(session.id)
+      AgentHelper.cleanup_session_storage(session)
     end)
 
     Tasks.delete_tasks_for_workspace(socket.assigns.workspace.id)
 
     # Restart agents fresh (no history)
     Enum.each(socket.assigns.agent_sessions, fn session ->
-      agent_module = Catalog.agent_module(session.agent_profile_id)
-      SessionCache.put(session.id, session.workspace_id, session.display_name)
-
-      Murmur.Jido.start_agent(agent_module,
-        id: session.id,
-        initial_state: %{workspace_id: session.workspace_id}
-      )
+      AgentHelper.start_fresh_agent(session)
     end)
 
     empty_messages = Map.new(socket.assigns.agent_sessions, &{&1.id, []})
+    empty_pending_messages = Map.new(socket.assigns.agent_sessions, &{&1.id, []})
     empty_statuses = Map.new(socket.assigns.agent_sessions, &{&1.id, :idle})
     empty_artifacts = Map.new(socket.assigns.agent_sessions, &{&1.id, %{}})
 
     {:noreply,
      socket
      |> assign(:messages, empty_messages)
+      |> assign(:pending_messages, empty_pending_messages)
      |> assign(:agent_statuses, empty_statuses)
      |> assign(:artifacts, empty_artifacts)
      |> assign(:active_artifact, nil)
@@ -273,12 +249,9 @@ defmodule MurmurWeb.WorkspaceLive do
 
   def handle_event("remove_agent", %{"session-id" => session_id}, socket) do
     session = Workspaces.get_agent_session!(session_id)
-    workspace_id = socket.assigns.workspace.id
-    Phoenix.PubSub.unsubscribe(Murmur.PubSub, Topics.agent_messages(workspace_id, session_id))
-    Phoenix.PubSub.unsubscribe(Murmur.PubSub, Topics.agent_conversation(workspace_id, session_id))
-    Phoenix.PubSub.unsubscribe(Murmur.PubSub, Topics.agent_artifacts(workspace_id, session_id))
-    stop_agent(session_id)
-    cleanup_storage(session)
+    AgentHelper.unsubscribe(session)
+    AgentHelper.stop_agent(session_id)
+    AgentHelper.cleanup_session_storage(session)
     Workspaces.delete_agent_session(session)
 
     socket =
@@ -287,6 +260,7 @@ defmodule MurmurWeb.WorkspaceLive do
         Enum.reject(sessions, &(&1.id == session_id))
       end)
       |> update(:messages, &Map.delete(&1, session_id))
+      |> update(:pending_messages, &Map.delete(&1, session_id))
       |> update(:agent_statuses, &Map.delete(&1, session_id))
       |> update(:artifacts, &Map.delete(&1, session_id))
       |> then(fn s ->
@@ -329,7 +303,11 @@ defmodule MurmurWeb.WorkspaceLive do
     message = JidoMurmur.DisplayMessage.from_received(data.message)
 
     socket =
-      update(socket, :messages, fn msgs ->
+      socket
+      |> update(:pending_messages, fn pending_messages ->
+        remove_pending_message(pending_messages, session_id, client_ref(data.message))
+      end)
+      |> update(:messages, fn msgs ->
         Map.update(msgs, session_id, [message], &upsert_message(&1, message))
       end)
 
@@ -407,10 +385,10 @@ defmodule MurmurWeb.WorkspaceLive do
 
   # --- Agent Communication ---
 
-  defp send_to_agent(session, _content, _topic) when is_nil(session), do: :ok
+  defp send_to_agent(session, _content, _client_ref) when is_nil(session), do: :agent_not_running
 
-  defp send_to_agent(session, content, _topic) do
-    JidoMurmur.Ingress.deliver(session, content)
+  defp send_to_agent(session, content, client_ref) do
+    JidoMurmur.Ingress.deliver(session, content, refs: %{client_ref: client_ref})
   end
 
   defp notify_task_assignee(workspace_id, task) do
@@ -462,60 +440,24 @@ defmodule MurmurWeb.WorkspaceLive do
     JidoMurmur.DisplayMessage.sort_messages(messages ++ [message])
   end
 
-  defp cleanup_storage(session) do
-    {adapter, opts} = Murmur.Jido.__jido_storage__()
-    agent_module = Catalog.agent_module(session.agent_profile_id)
-    checkpoint_key = {agent_module, session.id}
-
-    adapter.delete_checkpoint(checkpoint_key, opts)
-    adapter.delete_thread(session.id, opts)
-    JidoMurmur.ConversationProjector.clear(session.id)
-  rescue
-    e ->
-      Logger.warning("Failed to cleanup storage for session #{session.id}: #{Exception.message(e)}")
-
-      :ok
+  defp append_pending_message(pending_messages, session_id, content, client_ref) do
+    pending_message = pending_user_message(content, client_ref)
+    Map.update(pending_messages, session_id, [pending_message], &append_message(&1, pending_message))
   end
 
-  # --- Agent Lifecycle ---
+  defp remove_pending_message(pending_messages, _session_id, nil), do: pending_messages
 
-  defp ensure_agent_started(session) do
-    # Populate observability cache so the tracer can enrich spans
-    SessionCache.put(session.id, session.workspace_id, session.display_name)
-
-    case Murmur.Jido.whereis(session.id) do
-      nil ->
-        agent_module = Catalog.agent_module(session.agent_profile_id)
-
-        # Try to restore agent from storage so it retains conversation history.
-        # Falls back to a fresh agent if no checkpoint exists.
-        {agent, extra_opts} =
-          case Murmur.Jido.thaw(agent_module, session.id) do
-            {:ok, thawed_agent} ->
-              thawed_agent = put_in(thawed_agent.state[:workspace_id], session.workspace_id)
-              {thawed_agent, [agent_module: agent_module]}
-
-            {:error, :not_found} ->
-              {agent_module, [initial_state: %{workspace_id: session.workspace_id}]}
-          end
-
-        case Murmur.Jido.start_agent(agent, [id: session.id] ++ extra_opts) do
-          {:ok, _pid} -> :ok
-          {:error, {:already_started, _pid}} -> :ok
-          {:error, {:already_registered, _pid}} -> :ok
-          _ -> :ok
-        end
-
-      _pid ->
-        :ok
-    end
+  defp remove_pending_message(pending_messages, session_id, client_ref) do
+    Map.update(pending_messages, session_id, [], fn messages ->
+      Enum.reject(messages, &(Map.get(&1, :client_ref) == client_ref))
+    end)
   end
 
-  defp stop_agent(session_id) do
-    case Murmur.Jido.whereis(session_id) do
-      nil -> :ok
-      _pid -> Murmur.Jido.stop_agent(session_id)
-    end
+  defp pending_user_message(content, client_ref) do
+    content
+    |> JidoMurmur.DisplayMessage.user(id: "pending-" <> client_ref)
+    |> Map.from_struct()
+    |> Map.put(:client_ref, client_ref)
   end
 
   # --- Helpers ---
@@ -536,20 +478,27 @@ defmodule MurmurWeb.WorkspaceLive do
   end
 
   defp send_to_target(socket, target_session, content) do
-    workspace_id = socket.assigns.workspace.id
-    topic = Topics.agent_messages(workspace_id, target_session.id)
+    queue_direct_message(socket, target_session, content)
+  end
 
-    user_msg = JidoMurmur.DisplayMessage.user(content)
+  defp queue_direct_message(socket, session, content) do
+    client_ref = Ecto.UUID.generate()
 
-    socket =
-      socket
-      |> update(:messages, fn msgs ->
-        Map.update(msgs, target_session.id, [user_msg], &append_message(&1, user_msg))
-      end)
-      |> update(:agent_statuses, &Map.put(&1, target_session.id, :busy))
+    case send_to_agent(session, content, client_ref) do
+      :queued ->
+        socket =
+          socket
+          |> update(:pending_messages, &append_pending_message(&1, session.id, content, client_ref))
+          |> update(:agent_statuses, &Map.put(&1, session.id, :busy))
 
-    send_to_agent(target_session, content, topic)
-    {:noreply, socket}
+        {:noreply, socket}
+
+      :agent_not_running ->
+        {:noreply, put_flash(socket, :error, "The selected agent is not running.")}
+
+      {:error, {:invalid_input, _reason}} ->
+        {:noreply, put_flash(socket, :error, "Unable to send that message.")}
+    end
   end
 
   defp resolve_target_agent(content, assigns) do
@@ -580,4 +529,10 @@ defmodule MurmurWeb.WorkspaceLive do
       _ -> :idle
     end
   end
+
+  defp client_ref(message) when is_map(message) do
+    Map.get(message, :client_ref) || Map.get(message, "client_ref")
+  end
+
+  defp client_ref(_message), do: nil
 end

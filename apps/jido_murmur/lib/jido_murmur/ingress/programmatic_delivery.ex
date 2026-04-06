@@ -6,15 +6,14 @@ defmodule JidoMurmur.Ingress.ProgrammaticDelivery do
   canonical ingress input delivered through `JidoMurmur.Ingress`.
   """
 
-  alias Jido.Signal.ID, as: SignalID
-  alias JidoMurmur.ActorIdentity
   alias JidoMurmur.Ingress
-  alias JidoMurmur.Ingress.Input
-  alias JidoMurmur.Signals.MessageReceived
+  alias JidoMurmur.Ingress.{Input, VisibleMessage}
 
   @type session_like :: %{
           required(:id) => String.t(),
-          required(:workspace_id) => String.t()
+      required(:workspace_id) => String.t(),
+      required(:agent_profile_id) => String.t(),
+      required(:display_name) => String.t()
         }
 
   @invalid_input_reasons [
@@ -33,7 +32,8 @@ defmodule JidoMurmur.Ingress.ProgrammaticDelivery do
 
   @spec deliver(session_like(), String.t(), keyword()) ::
           :queued | :agent_not_running | {:error, {:invalid_input, Input.validation_error()}}
-  def deliver(session, content, opts \\ []) when is_binary(content) and is_list(opts) do
+  def deliver(%{id: _, workspace_id: _, agent_profile_id: _, display_name: _} = session, content, opts \\ [])
+      when is_binary(content) and is_list(opts) do
     with {:ok, message_kind} <- normalize_message_kind(Keyword.get(opts, :kind, Keyword.get(opts, :via))),
          {:ok, input} <-
            Input.programmatic_message(session, content,
@@ -42,10 +42,10 @@ defmodule JidoMurmur.Ingress.ProgrammaticDelivery do
              origin_actor: Keyword.get(opts, :origin_actor),
              sender_trace_id: Keyword.get(opts, :sender_trace_id),
              expected_request_id: Keyword.get(opts, :expected_request_id),
-             refs: Keyword.get(opts, :refs, %{})
+             refs: VisibleMessage.attach_identity_refs(Keyword.get(opts, :refs, %{}))
            ),
          :queued <- Ingress.deliver_input(session, input) do
-      broadcast_received(session, input, message_kind)
+      VisibleMessage.broadcast_received(session, input, message_kind)
       :queued
     else
       {:error, reason} when reason in @invalid_input_reasons ->
@@ -59,37 +59,6 @@ defmodule JidoMurmur.Ingress.ProgrammaticDelivery do
     end
   end
 
-  defp broadcast_received(session, input, message_kind) do
-    {:ok, metadata} = Input.metadata(input)
-    message_id = Uniq.UUID.uuid7()
-
-    signal =
-      MessageReceived.new!(
-        %{
-          session_id: session.id,
-          message: %{
-            id: message_id,
-            role: "user",
-            content: input.content,
-            kind: message_kind,
-            sender_name: metadata.sender_name,
-            first_seen_at: SignalID.extract_timestamp(message_id),
-            first_seen_seq: SignalID.sequence_number(message_id),
-            origin_actor: ActorIdentity.serialize(metadata.origin_actor),
-            sender_trace_id: metadata.sender_trace_id,
-            hop_count: metadata.hop_count
-          }
-        },
-        subject: MessageReceived.subject(session.workspace_id, session.id)
-      )
-
-    Phoenix.PubSub.broadcast(JidoMurmur.pubsub(), topic(session), signal)
-  end
-
   defp normalize_message_kind(value) when is_atom(value) or is_binary(value), do: {:ok, value}
   defp normalize_message_kind(_value), do: {:error, :invalid_source}
-
-  defp topic(session) do
-    JidoMurmur.Topics.agent_messages(session.workspace_id, session.id)
-  end
 end

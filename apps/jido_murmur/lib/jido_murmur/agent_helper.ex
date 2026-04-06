@@ -24,8 +24,7 @@ defmodule JidoMurmur.AgentHelper do
     jido_mod = JidoMurmur.jido_mod()
     agent_module = Catalog.agent_module(session.agent_profile_id)
 
-    # Populate observability cache so the tracer can enrich spans
-    SessionCache.put(session.id, session.workspace_id, session.display_name)
+    cache_session(session)
 
     case jido_mod.whereis(session.id) do
       nil ->
@@ -46,6 +45,24 @@ defmodule JidoMurmur.AgentHelper do
         )
 
         jido_mod.start_agent(agent, [id: session.id] ++ extra_opts)
+
+      pid ->
+        {:ok, pid}
+    end
+  end
+
+  @doc """
+  Start an agent process for a session without restoring persisted state.
+  """
+  def start_fresh_agent(session) do
+    jido_mod = JidoMurmur.jido_mod()
+    agent_module = Catalog.agent_module(session.agent_profile_id)
+
+    cache_session(session)
+
+    case jido_mod.whereis(session.id) do
+      nil ->
+        jido_mod.start_agent(agent_module, id: session.id, initial_state: %{workspace_id: session.workspace_id})
 
       pid ->
         {:ok, pid}
@@ -90,6 +107,16 @@ defmodule JidoMurmur.AgentHelper do
     :ok
   end
 
+  @doc "Unsubscribe from all PubSub topics for a session."
+  def unsubscribe(session) do
+    pubsub = JidoMurmur.pubsub()
+    Phoenix.PubSub.unsubscribe(pubsub, JidoMurmur.Topics.agent_messages(session.workspace_id, session.id))
+    Phoenix.PubSub.unsubscribe(pubsub, JidoMurmur.Topics.agent_stream(session.workspace_id, session.id))
+    Phoenix.PubSub.unsubscribe(pubsub, JidoMurmur.Topics.agent_conversation(session.workspace_id, session.id))
+    Phoenix.PubSub.unsubscribe(pubsub, JidoMurmur.Topics.agent_artifacts(session.workspace_id, session.id))
+    :ok
+  end
+
   @doc "Subscribe to workspace-level PubSub topics."
   def subscribe_workspace(workspace_id) do
     pubsub = JidoMurmur.pubsub()
@@ -100,16 +127,8 @@ defmodule JidoMurmur.AgentHelper do
   @doc "Clean up storage for a workspace (delete threads, checkpoints for all sessions)."
   def cleanup_workspace_storage(workspace_id) do
     sessions = JidoMurmur.Workspaces.list_agent_sessions(workspace_id)
-    {adapter, opts} = JidoMurmur.jido_mod().__jido_storage__()
 
-    Enum.each(sessions, fn session ->
-      agent_module = Catalog.agent_module(session.agent_profile_id)
-      checkpoint_key = {agent_module, session.id}
-
-      adapter.delete_checkpoint(checkpoint_key, opts)
-      adapter.delete_thread(session.id, opts)
-      ConversationProjector.clear(session.id)
-    end)
+    Enum.each(sessions, &cleanup_session_storage/1)
 
     :ok
   rescue
@@ -118,7 +137,35 @@ defmodule JidoMurmur.AgentHelper do
       :ok
   end
 
+  @doc "Clean up storage for a single session (checkpoint, thread, projector snapshot)."
+  def cleanup_session_storage(session) do
+    {adapter, opts} = JidoMurmur.jido_mod().__jido_storage__()
+    agent_module = Catalog.agent_module(session.agent_profile_id)
+    checkpoint_key = {agent_module, session.id}
+
+    adapter.delete_checkpoint(checkpoint_key, opts)
+    adapter.delete_thread(session.id, opts)
+    ConversationProjector.clear(session.id)
+    :ok
+  rescue
+    e ->
+      Logger.warning("Failed to cleanup storage for session #{session.id}: #{Exception.message(e)}")
+      :ok
+  end
+
+  @doc "Stop a running agent session if it exists."
+  def stop_agent(session_id) when is_binary(session_id) do
+    case JidoMurmur.jido_mod().whereis(session_id) do
+      nil -> :ok
+      _pid -> JidoMurmur.jido_mod().stop_agent(session_id)
+    end
+  end
+
   # --- Private Helpers ---
+
+  defp cache_session(session) do
+    SessionCache.put(session.id, session.workspace_id, session.display_name)
+  end
 
   defp load_artifacts_from_storage(session) do
     jido_mod = JidoMurmur.jido_mod()

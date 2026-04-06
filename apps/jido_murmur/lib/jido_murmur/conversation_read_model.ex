@@ -11,21 +11,29 @@ defmodule JidoMurmur.ConversationReadModel do
   alias JidoMurmur.DisplayMessage
 
   @enforce_keys [:session_id]
-  defstruct [:session_id, messages: []]
+  defstruct [:session_id, messages: [], step_indexes: %{}]
 
   @type t :: %__MODULE__{
           session_id: String.t(),
-          messages: [DisplayMessage.t()]
+          messages: [DisplayMessage.t()],
+          step_indexes: %{optional(String.t()) => pos_integer()}
         }
 
-  @spec new(String.t(), [DisplayMessage.t()]) :: t()
-  def new(session_id, messages \\ []) when is_binary(session_id) and is_list(messages) do
-    %__MODULE__{session_id: session_id, messages: DisplayMessage.sort_messages(messages)}
+  @spec new(String.t(), [DisplayMessage.t()], keyword()) :: t()
+  def new(session_id, messages \\ [], opts \\ [])
+      when is_binary(session_id) and is_list(messages) and is_list(opts) do
+    sorted_messages = DisplayMessage.sort_messages(messages)
+
+    %__MODULE__{
+      session_id: session_id,
+      messages: sorted_messages,
+      step_indexes: Keyword.get(opts, :step_indexes, build_step_indexes(sorted_messages))
+    }
   end
 
   @spec from_entries(String.t(), list()) :: t()
   def from_entries(session_id, entries) when is_binary(session_id) and is_list(entries) do
-    new(session_id, EntryProjector.project_entries(entries))
+    EntryProjector.project_entries(session_id, entries)
   end
 
   @spec apply_signal(t(), Jido.Signal.t()) :: {:ok, t(), DisplayMessage.t()} | :ignore
@@ -44,6 +52,43 @@ defmodule JidoMurmur.ConversationReadModel do
   def reconcile_entries(%__MODULE__{session_id: session_id}, entries) when is_list(entries) do
     next_model = from_entries(session_id, entries)
     {next_model, latest_assistant_message(next_model.messages)}
+  end
+
+  @spec next_step_index(t(), String.t() | nil) :: pos_integer()
+  def next_step_index(%__MODULE__{step_indexes: step_indexes}, request_id) when is_binary(request_id) do
+    Map.get(step_indexes, request_id, 0) + 1
+  end
+
+  def next_step_index(%__MODULE__{}, _request_id), do: 1
+
+  @spec latest_request_step(t(), String.t() | nil) :: {DisplayMessage.t(), non_neg_integer()} | nil
+  def latest_request_step(%__MODULE__{messages: messages}, request_id) when is_binary(request_id) do
+    latest_request_step_in_messages(messages, request_id)
+  end
+
+  def latest_request_step(%__MODULE__{}, _request_id), do: nil
+
+  @spec put_message(t(), DisplayMessage.t()) :: t()
+  def put_message(%__MODULE__{} = model, %DisplayMessage{} = message) do
+    update_messages(model, model.messages ++ [message])
+  end
+
+  @spec replace_message(t(), non_neg_integer(), DisplayMessage.t()) :: t()
+  def replace_message(%__MODULE__{} = model, index, %DisplayMessage{} = message)
+      when is_integer(index) and index >= 0 do
+    update_messages(model, List.replace_at(model.messages, index, message))
+  end
+
+  @spec attach_persisted_tool_result(t(), String.t() | nil, String.t() | nil, String.t()) :: t()
+  def attach_persisted_tool_result(%__MODULE__{} = model, request_id, tool_call_id, result_content)
+      when is_binary(result_content) do
+    case latest_request_step(model, request_id) do
+      {message, index} ->
+        replace_message(model, index, Turn.put_persisted_tool_result(message, tool_call_id, result_content))
+
+      nil ->
+        model
+    end
   end
 
   defp apply_llm_delta(model, signal) do
@@ -105,52 +150,51 @@ defmodule JidoMurmur.ConversationReadModel do
     end
   end
 
-  defp upsert_step(%__MODULE__{messages: messages} = model, request_id, signal, event_type, updater) do
-    {message, index} = resolve_step(messages, request_id, signal, event_type)
+  defp upsert_step(%__MODULE__{} = model, request_id, signal, event_type, updater) do
+    {message, index} = resolve_step(model, request_id, signal, event_type)
 
     updated_message = updater.(message)
 
-    next_messages =
+    next_model =
       if is_integer(index) do
-        List.replace_at(messages, index, updated_message)
+        replace_message(model, index, updated_message)
       else
-        messages ++ [updated_message]
+        put_message(model, updated_message)
       end
 
-    sorted_messages = DisplayMessage.sort_messages(next_messages)
-    {:ok, %{model | messages: sorted_messages}, updated_message}
+    {:ok, next_model, updated_message}
   end
 
-  defp resolve_step(messages, request_id, signal, :llm) do
-    case latest_request_step(messages, request_id) do
+  defp resolve_step(%__MODULE__{} = model, request_id, signal, :llm) do
+    case latest_request_step(model, request_id) do
       {message, index} ->
         if continue_current_llm_step?(message) do
           {message, index}
         else
-          build_new_step(messages, request_id, signal)
+          build_new_step(model, request_id, signal)
         end
 
       nil ->
-        build_new_step(messages, request_id, signal)
+        build_new_step(model, request_id, signal)
     end
   end
 
-  defp resolve_step(messages, request_id, signal, :tool) do
-    case latest_request_step(messages, request_id) do
+  defp resolve_step(%__MODULE__{} = model, request_id, signal, :tool) do
+    case latest_request_step(model, request_id) do
       {message, index} -> {message, index}
-      nil -> build_new_step(messages, request_id, signal)
+      nil -> build_new_step(model, request_id, signal)
     end
   end
 
-  defp resolve_step(messages, request_id, signal, :usage) do
-    case latest_request_step(messages, request_id) do
+  defp resolve_step(%__MODULE__{} = model, request_id, signal, :usage) do
+    case latest_request_step(model, request_id) do
       {message, index} -> {message, index}
-      nil -> build_new_step(messages, request_id, signal)
+      nil -> build_new_step(model, request_id, signal)
     end
   end
 
-  defp build_new_step(messages, request_id, signal) do
-    step_index = next_step_index(messages, request_id)
+  defp build_new_step(%__MODULE__{} = model, request_id, signal) do
+    step_index = next_step_index(model, request_id)
 
     {Turn.new(request_id, step_index,
        first_seen_at: signal_first_seen_at(signal),
@@ -158,7 +202,7 @@ defmodule JidoMurmur.ConversationReadModel do
      ), nil}
   end
 
-  defp latest_request_step(messages, request_id) do
+  defp latest_request_step_in_messages(messages, request_id) do
     messages
     |> Enum.with_index()
     |> Enum.reverse()
@@ -171,14 +215,6 @@ defmodule JidoMurmur.ConversationReadModel do
 
   defp continue_current_llm_step?(message) do
     Map.get(message, :status) == :running and (Map.get(message, :tool_calls) || []) == []
-  end
-
-  defp next_step_index(messages, request_id) do
-    messages
-    |> Enum.filter(&(DisplayMessage.assistant_message?(&1) and Map.get(&1, :request_id) == request_id))
-    |> Enum.map(&message_step_index/1)
-    |> Enum.max(fn -> 0 end)
-    |> Kernel.+(1)
   end
 
   defp message_step_index(message) do
@@ -252,5 +288,24 @@ defmodule JidoMurmur.ConversationReadModel do
   defp generated_signal_sequence do
     fallback_id = SignalID.generate!()
     SignalID.sequence_number(fallback_id)
+  end
+
+  defp update_messages(%__MODULE__{} = model, messages) do
+    sorted_messages = DisplayMessage.sort_messages(messages)
+    %{model | messages: sorted_messages, step_indexes: build_step_indexes(sorted_messages)}
+  end
+
+  defp build_step_indexes(messages) do
+    Enum.reduce(messages, %{}, &accumulate_step_index/2)
+  end
+
+  defp accumulate_step_index(message, step_indexes) do
+    case {DisplayMessage.assistant_message?(message), Map.get(message, :request_id), message_step_index(message)} do
+      {true, request_id, step_index} when is_binary(request_id) and step_index > 0 ->
+        Map.update(step_indexes, request_id, step_index, &max(&1, step_index))
+
+      _ ->
+        step_indexes
+    end
   end
 end

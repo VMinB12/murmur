@@ -126,14 +126,17 @@ defmodule Murmur.Agents.InterAgentTest do
         end
       end)
 
+      bob_id = bob.id
+
       assert :queued = Ingress.deliver(bob, "Think about the meaning of life")
+      assert_receive %Jido.Signal{type: "murmur.message.received", data: %{session_id: ^bob_id, message: initial_msg}}, 5000
+      assert initial_msg.content == "Think about the meaning of life"
       assert_receive {:await_started, ^pause_ref, waiter_pid}, 5_000
 
       params = %{target_agent: "Bob", message: "Also, what is 3+3?"}
       context = %{workspace_id: workspace.id, sender_name: "Alice", hop_count: 0}
 
       assert {:ok, _} = TellAction.run(params, context)
-      bob_id = bob.id
       assert_receive %Jido.Signal{type: "murmur.message.received", data: %{session_id: ^bob_id, message: msg}}, 5000
       assert msg.hop_count == 1
 

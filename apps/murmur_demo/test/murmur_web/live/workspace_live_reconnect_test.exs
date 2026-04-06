@@ -109,14 +109,14 @@ defmodule MurmurWeb.WorkspaceLiveReconnectTest do
       :ets.insert(
         :jido_murmur_conversation_snapshots,
         {session.id,
-         [
+         JidoMurmur.ConversationReadModel.new(session.id, [
            JidoMurmur.DisplayMessage.assistant("Still working",
              id: "req-live-step-1",
              request_id: "req-live",
              step_index: 1,
              status: :running
            )
-         ]}
+         ])}
       )
 
       {:ok, view, _html} = live(conn, ~p"/workspaces/#{workspace.id}")

@@ -2,12 +2,13 @@ defmodule JidoMurmur.ConversationReadModel.EntryProjectorTest do
   use ExUnit.Case, async: true
 
   alias JidoMurmur.ActorIdentity
+  alias JidoMurmur.ConversationReadModel
   alias JidoMurmur.ConversationReadModel.EntryProjector
   alias JidoMurmur.DisplayMessage.ToolCall
 
-  describe "project_entries/1" do
-    test "returns an empty list for empty entries" do
-      assert EntryProjector.project_entries([]) == []
+  describe "project_entries/2" do
+    test "returns an empty model for empty entries" do
+      assert %ConversationReadModel{messages: []} = EntryProjector.project_entries("session-1", [])
     end
 
     test "preserves explicit origin actor metadata for user messages" do
@@ -22,7 +23,7 @@ defmodule JidoMurmur.ConversationReadModel.EntryProjectorTest do
         }
       ]
 
-      assert [message] = EntryProjector.project_entries(entries)
+      assert %ConversationReadModel{messages: [message]} = EntryProjector.project_entries("session-1", entries)
       assert message.role == "user"
       assert message.sender_name == "Bob"
       assert message.actor == ActorIdentity.agent("Bob")
@@ -62,7 +63,8 @@ defmodule JidoMurmur.ConversationReadModel.EntryProjectorTest do
         }
       ]
 
-      assert [step_one, step_two] = EntryProjector.project_entries(entries)
+      assert %ConversationReadModel{messages: [step_one, step_two]} =
+           EntryProjector.project_entries("session-1", entries)
 
       assert step_one.id == "req-1-step-1"
       assert step_one.step_index == 1
@@ -96,7 +98,9 @@ defmodule JidoMurmur.ConversationReadModel.EntryProjectorTest do
         }
       ]
 
-      assert [user, assistant] = EntryProjector.project_entries(entries)
+      assert %ConversationReadModel{messages: [user, assistant]} =
+               EntryProjector.project_entries("session-1", entries)
+
       assert user.role == "user"
       assert user.content == "Legacy"
       assert user.sender_name == "You"

@@ -4,6 +4,8 @@
 
 Core orchestration backend for the multi-agent chat platform. Provides workspace management, agent lifecycle control, inter-agent communication, stateful session storage, observability integration, and a plugin architecture for extending agent behavior.
 
+See [data-model.md](data-model.md) for the canonical entity and read-model view of Murmur, and [data-contracts.md](data-contracts.md) for the boundary contracts this package owns.
+
 ## Public API
 
 ### AgentHelper — Agent Lifecycle
@@ -11,9 +13,13 @@ Core orchestration backend for the multi-agent chat platform. Provides workspace
 | Function | Signature | Purpose |
 |----------|-----------|---------|
 | `start_agent/1` | `(session) → {:ok, pid}` | Start or restore an agent from checkpoint |
+| `start_fresh_agent/1` | `(session) → {:ok, pid}` | Start a fresh agent without restoring persisted state |
+| `stop_agent/1` | `(session_id) → :ok` | Stop a running agent session if it exists |
 | `load_messages/1` | `(session) → [map()]` | Load conversation history (live process or storage) |
 | `load_artifacts/1` | `(session) → [map()]` | Load generated artifacts from agent state |
 | `subscribe/1` | `(session) → :ok` | Subscribe to all PubSub topics for a session |
+| `unsubscribe/1` | `(session) → :ok` | Unsubscribe from all PubSub topics for a session |
+| `cleanup_session_storage/1` | `(session) → :ok` | Delete one session checkpoint, thread, and projector snapshot |
 
 ### Workspaces — Workspace & Session Management
 
@@ -99,7 +105,8 @@ All topics follow `workspace:{wid}:...` for multi-workspace isolation:
 ### Shared Programmatic Delivery
 
 - `JidoMurmur.Ingress.ProgrammaticDelivery` is the single visible programmatic delivery path for tells and task-assignment notifications
-- The helper builds canonical ingress input first, delivers it through `Ingress.deliver_input/2`, then emits `MessageReceived` using the same canonical metadata
+- Direct human-visible delivery and visible programmatic delivery now share the same Murmur-owned visible ingress message assembly through `JidoMurmur.Ingress.VisibleMessage`
+- The helper builds canonical ingress input first, delivers it through `Ingress.deliver_input/2`, then emits `MessageReceived` using the same canonical metadata and stable visible message identity
 - Visible programmatic payloads now align on one shape: `content`, `kind`, `sender_name`, `origin_actor`, `sender_trace_id`, and `hop_count`
 - Task-assignment notifications and tell messages no longer duplicate message-signal assembly, canonical input assembly, or ad hoc metadata shaping in their callers
 
@@ -115,6 +122,7 @@ All topics follow `workspace:{wid}:...` for multi-workspace isolation:
 
 - `JidoMurmur.ConversationProjector` owns the core conversation snapshot and incremental update boundary for top-level assistant steps
 - `JidoMurmur.ConversationReadModel` reduces raw `ai.*` lifecycle facts into canonical assistant-step state keyed by Murmur-owned step ids within a stable outer `request_id`
+- The projector caches the full `ConversationReadModel` state, not just rendered messages, so live updates and replay share the same canonical state model
 - `JidoMurmur.Signals.ConversationUpdated` is the Murmur-owned UI update contract for connected clients
 - Raw `ai.*` signals may still exist for observability or internal runtime use, but they are no longer the rendering contract for chat surfaces
 - Finalized thread-backed history reconciles through the same canonical projection model instead of remaining a separate richer UI path
@@ -241,7 +249,7 @@ jido_murmur_thread_entries
 | Signal | Type | Emitted By |
 |--------|------|------------|
 | `ConversationUpdated` | `murmur.conversation.updated` | `ConversationProjector` |
-| `MessageReceived` | `murmur.message.received` | `Ingress.ProgrammaticDelivery` |
+| `MessageReceived` | `murmur.message.received` | `Ingress.VisibleMessage` |
 | `MessageCompleted` | `murmur.message.completed` | `Runner` |
 
 ## Dependencies

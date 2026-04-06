@@ -18,6 +18,14 @@ defmodule MurmurWeb.Live.WorkspaceState do
     AgentHelper.load_artifacts(session)
   end
 
+  @spec display_messages(map(), map(), String.t()) :: list()
+  def display_messages(messages_map, pending_messages, session_id) do
+    messages_map
+    |> Map.get(session_id, [])
+    |> Kernel.++(Map.get(pending_messages, session_id, []))
+    |> DisplayMessage.sort_messages()
+  end
+
   @spec extract_artifacts(map()) :: map()
   def extract_artifacts(%{state: %{artifacts: artifacts}}) when is_map(artifacts), do: artifacts
   def extract_artifacts(_agent), do: %{}
@@ -28,10 +36,17 @@ defmodule MurmurWeb.Live.WorkspaceState do
 
   @spec unified_timeline(map(), list()) :: list()
   def unified_timeline(messages_map, agent_sessions) do
+    unified_timeline(messages_map, %{}, agent_sessions)
+  end
+
+  @spec unified_timeline(map(), map(), list()) :: list()
+  def unified_timeline(messages_map, pending_messages, agent_sessions) do
     session_index = Map.new(agent_sessions, &{&1.id, &1})
 
-    messages_map
-    |> Enum.flat_map(fn {session_id, messages} ->
+    agent_sessions
+    |> Enum.flat_map(fn session ->
+      session_id = session.id
+      messages = display_messages(messages_map, pending_messages, session_id)
       session = Map.get(session_index, session_id)
       agent_name = if session, do: session.display_name, else: "unknown"
       profile_id = if session, do: session.agent_profile_id

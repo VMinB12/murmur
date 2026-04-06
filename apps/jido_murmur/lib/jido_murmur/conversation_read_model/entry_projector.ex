@@ -1,57 +1,43 @@
 defmodule JidoMurmur.ConversationReadModel.EntryProjector do
   @moduledoc false
 
+  alias Jido.Signal.ID, as: SignalID
   alias JidoMurmur.ActorIdentity
+  alias JidoMurmur.ConversationReadModel
   alias JidoMurmur.ConversationReadModel.Turn
   alias JidoMurmur.DisplayMessage
   alias JidoMurmur.DisplayMessage.ToolCall
 
-  @spec project_entries([struct() | map()]) :: [DisplayMessage.t()]
-  def project_entries(entries) when is_list(entries) do
+  @spec project_entries(String.t(), [struct() | map()]) :: ConversationReadModel.t()
+  def project_entries(session_id, entries) when is_binary(session_id) and is_list(entries) do
     entries
     |> Enum.map(&normalize_entry/1)
     |> Enum.filter(&relevant_entry?/1)
-    |> Enum.reduce({[], %{}}, &reduce_entry/2)
-    |> elem(0)
-    |> DisplayMessage.sort_messages()
+    |> Enum.reduce(ConversationReadModel.new(session_id), &reduce_entry/2)
   end
 
-  defp reduce_entry(entry, {messages, step_indexes}) do
+  defp reduce_entry(entry, model) do
     cond do
       user_entry?(entry) ->
-        {messages ++ [build_user_message(entry)], step_indexes}
+        ConversationReadModel.put_message(model, build_user_message(entry))
 
       assistant_entry?(entry) ->
         request_id = get_request_id(entry)
-        step_index = next_step_index(step_indexes, request_id)
+        step_index = ConversationReadModel.next_step_index(model, request_id)
         message = build_assistant_step(entry, request_id, step_index)
 
-        {messages ++ [message], put_step_index(step_indexes, request_id, step_index)}
+        ConversationReadModel.put_message(model, message)
 
       tool_entry?(entry) ->
-        {merge_tool_result(messages, entry), step_indexes}
+        ConversationReadModel.attach_persisted_tool_result(
+          model,
+          get_request_id(entry),
+          Map.get(entry.payload, :tool_call_id),
+          Map.get(entry.payload, :content, "")
+        )
 
       true ->
-        {messages, step_indexes}
-    end
-  end
-
-  defp merge_tool_result(messages, entry) do
-    request_id = get_request_id(entry)
-
-    case latest_assistant_step(messages, request_id) do
-      {message, index} ->
-        updated =
-          Turn.put_persisted_tool_result(
-            message,
-            Map.get(entry.payload, :tool_call_id),
-            Map.get(entry.payload, :content, "")
-          )
-
-        List.replace_at(messages, index, updated)
-
-      nil ->
-        messages
+        model
     end
   end
 
@@ -61,6 +47,7 @@ defmodule JidoMurmur.ConversationReadModel.EntryProjector do
     content = Map.get(payload, :content, "")
     request_id = get_request_id(entry)
     payload_sender_name = Map.get(payload, :sender_name)
+    message_id = user_message_id(entry)
 
     actor =
       normalize_actor(
@@ -71,12 +58,12 @@ defmodule JidoMurmur.ConversationReadModel.EntryProjector do
     sender_name = payload_sender_name || actor_display_name(actor)
 
     DisplayMessage.user(content,
-      id: Map.get(entry, :id, Uniq.UUID.uuid7()),
+      id: message_id,
       request_id: request_id,
       actor: actor,
       sender_name: sender_name,
-      first_seen_at: Map.get(entry, :at),
-      first_seen_seq: Map.get(entry, :seq)
+      first_seen_at: user_first_seen_at(entry, message_id),
+      first_seen_seq: user_first_seen_seq(entry, message_id)
     )
   end
 
@@ -116,29 +103,6 @@ defmodule JidoMurmur.ConversationReadModel.EntryProjector do
     (Map.get(entry, :id) || Uniq.UUID.uuid7()) <> "-step"
   end
 
-  defp next_step_index(step_indexes, request_id) when is_binary(request_id) do
-    Map.get(step_indexes, request_id, 0) + 1
-  end
-
-  defp next_step_index(_step_indexes, _request_id), do: 1
-
-  defp put_step_index(step_indexes, request_id, step_index) when is_binary(request_id) do
-    Map.put(step_indexes, request_id, step_index)
-  end
-
-  defp put_step_index(step_indexes, _request_id, _step_index), do: step_indexes
-
-  defp latest_assistant_step(messages, request_id) do
-    messages
-    |> Enum.with_index()
-    |> Enum.reverse()
-    |> Enum.find_value(fn {message, index} ->
-      if DisplayMessage.assistant_message?(message) and Map.get(message, :request_id) == request_id do
-        {message, index}
-      end
-    end)
-  end
-
   defp parse_tool_call(tool_call) do
     %ToolCall{
       id: tc_field(tool_call, :id),
@@ -174,6 +138,26 @@ defmodule JidoMurmur.ConversationReadModel.EntryProjector do
 
   defp get_request_id(%{payload: payload, refs: refs}) do
     Map.get(payload, :request_id) || Map.get(refs, :request_id)
+  end
+
+  defp user_message_id(entry) do
+    Map.get(entry.refs, :message_id) || Map.get(entry, :id) || Uniq.UUID.uuid7()
+  end
+
+  defp user_first_seen_at(entry, message_id) do
+    Map.get(entry.refs, :message_first_seen_at) ||
+      if(is_binary(message_id) and SignalID.valid?(message_id),
+        do: SignalID.extract_timestamp(message_id),
+        else: Map.get(entry, :at)
+      )
+  end
+
+  defp user_first_seen_seq(entry, message_id) do
+    Map.get(entry.refs, :message_first_seen_seq) ||
+      if(is_binary(message_id) and SignalID.valid?(message_id),
+        do: SignalID.sequence_number(message_id),
+        else: Map.get(entry, :seq)
+      )
   end
 
   defp normalize_actor(nil, default), do: default

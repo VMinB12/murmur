@@ -1,6 +1,7 @@
 defmodule JidoMurmur.Ingress.CoordinatorTest do
   use JidoMurmur.Case, async: false
 
+  alias Jido.Signal.ID, as: SignalID
   alias JidoMurmur.AgentHelper
   alias JidoMurmur.Ingress
   alias JidoMurmur.Ingress.Input
@@ -46,6 +47,11 @@ defmodule JidoMurmur.Ingress.CoordinatorTest do
     LLM.Mock.set_response(%{content: "idle response", notify: self()})
 
     assert :queued = Ingress.deliver(session, "hello from ingress")
+
+    assert_receive %Jido.Signal{type: "murmur.message.received", data: %{message: message}}, 10_000
+    assert message.content == "hello from ingress"
+    assert message.kind == :steering
+    assert SignalID.valid?(message.id)
 
     assert_receive {:mock_llm_phase, :started, %{request_id: request_id}}, 10_000
     assert is_binary(request_id)

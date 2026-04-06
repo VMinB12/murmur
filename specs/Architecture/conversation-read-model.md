@@ -4,6 +4,8 @@
 
 This document defines Murmur's canonical conversation projection model for chat rendering.
 
+See [data-model.md](data-model.md) for where the conversation read model sits relative to Murmur's other entities, and [data-contracts.md](data-contracts.md) for the connected-client and replay contracts that carry this model.
+
 It answers one question: how does Murmur keep live in-progress assistant steps, refreshed history, and reconnect state consistent without asking the UI to reconstruct meaning from raw `ai.*` lifecycle signals?
 
 ## Problem
@@ -39,6 +41,8 @@ That snapshot is derived from:
 - live thread state when the agent is running
 - thawed persisted thread state when the agent is not live
 - any in-memory projector state that represents the current in-progress assistant step sequence
+
+The projector cache now stores the full canonical `ConversationReadModel`, not only the rendered message list, so snapshot load and incremental updates reuse the same assistant-step state.
 
 ### 2. Incremental canonical updates
 

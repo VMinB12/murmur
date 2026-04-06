@@ -11,6 +11,7 @@ defmodule MurmurWeb.Components.Workspace.UnifiedView do
   attr :agent_sessions, :list, required: true
   attr :agent_statuses, :map, required: true
   attr :messages, :map, required: true
+  attr :pending_messages, :map, required: true
   attr :artifacts, :map, required: true
   attr :active_artifact, :any, required: true
   attr :show_task_board, :boolean, required: true
@@ -19,7 +20,12 @@ defmodule MurmurWeb.Components.Workspace.UnifiedView do
   attr :markdown_renderer, :any, required: true
 
   def unified_view(assigns) do
-    assigns = assign(assigns, :timeline, WorkspaceState.unified_timeline(assigns.messages, assigns.agent_sessions))
+    assigns =
+      assign(
+        assigns,
+        :timeline,
+        WorkspaceState.unified_timeline(assigns.messages, assigns.pending_messages, assigns.agent_sessions)
+      )
 
     ~H"""
     <div class="flex-1 flex min-h-0">

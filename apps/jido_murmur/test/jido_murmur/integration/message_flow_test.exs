@@ -172,6 +172,11 @@ defmodule JidoMurmur.Integration.MessageFlowTest do
 
     assert :queued = Ingress.deliver(session, "first message")
 
+    assert_receive %Jido.Signal{type: "murmur.message.received", data: %{message: first_message}},
+                   10_000
+
+    assert first_message.content == "first message"
+
     assert_receive(
       {:mock_llm_phase, :started, %{request_id: first_request_id, waiter_pid: first_waiter_pid}},
       10_000
@@ -181,6 +186,12 @@ defmodule JidoMurmur.Integration.MessageFlowTest do
     assert first_turn.session_id == session.id
 
     assert :queued = Ingress.deliver(session, "second message")
+
+    assert_receive %Jido.Signal{type: "murmur.message.received", data: %{message: second_message}},
+             10_000
+
+    assert second_message.content == "second message"
+    assert second_message.kind == :steering
 
     assert_receive {:mock_llm_control, :steer, %{content: "second message"}}, 10_000
     assert [{^first_request_id, still_active_turn}] = :ets.lookup(@turn_table, first_request_id)
@@ -210,6 +221,11 @@ defmodule JidoMurmur.Integration.MessageFlowTest do
                sender_name: "Alice",
                sender_trace_id: "trace-parent-1"
              )
+
+    assert_receive %Jido.Signal{type: "murmur.message.received", data: %{message: message}}, 10_000
+    assert message.content == "background update"
+    assert message.sender_name == "Alice"
+    assert message.sender_trace_id == "trace-parent-1"
 
     assert_receive(
       {:mock_llm_phase, :started, %{request_id: request_id, waiter_pid: waiter_pid}},

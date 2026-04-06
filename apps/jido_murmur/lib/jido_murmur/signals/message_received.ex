@@ -1,6 +1,6 @@
 defmodule JidoMurmur.Signals.MessageReceived do
   @moduledoc """
-  Signal emitted when an inter-agent message is delivered.
+  Signal emitted when a visible ingress message is delivered.
 
   Type: `murmur.message.received`
   Subject: `/workspaces/{wid}/agents/{sid}`
@@ -13,17 +13,17 @@ defmodule JidoMurmur.Signals.MessageReceived do
           required(:role) => String.t(),
           required(:content) => String.t(),
           required(:kind) => atom() | String.t(),
-          required(:sender_name) => String.t(),
-          required(:sender_trace_id) => String.t() | nil,
-      optional(:first_seen_at) => non_neg_integer(),
-      optional(:first_seen_seq) => non_neg_integer(),
+          optional(:sender_name) => String.t(),
+          optional(:sender_trace_id) => String.t(),
+          optional(:first_seen_at) => non_neg_integer(),
+          optional(:first_seen_seq) => non_neg_integer(),
           optional(:origin_actor) => map(),
           optional(:hop_count) => non_neg_integer()
         }
 
   use Jido.Signal,
     type: "murmur.message.received",
-    default_source: "/jido_murmur/ingress/programmatic_delivery",
+    default_source: "/jido_murmur/ingress",
     schema: [
       session_id: [type: :string, required: true, doc: "Target agent session ID"],
       message: [
@@ -39,7 +39,7 @@ defmodule JidoMurmur.Signals.MessageReceived do
          :ok <- validate_required_binary(message, :role),
          :ok <- validate_required_binary(message, :content),
          :ok <- validate_kind(Map.get(message, :kind)),
-         :ok <- validate_required_binary(message, :sender_name),
+         :ok <- validate_optional_binary(Map.get(message, :sender_name)),
         :ok <- validate_optional_non_neg_integer(Map.get(message, :first_seen_at)),
         :ok <- validate_optional_non_neg_integer(Map.get(message, :first_seen_seq)),
          :ok <- validate_optional_actor(Map.get(message, :origin_actor)),
@@ -81,7 +81,7 @@ defmodule JidoMurmur.Signals.MessageReceived do
     end
   end
 
-  defp validate_kind(value) when is_atom(value) or is_binary(value), do: :ok
+  defp validate_kind(value) when (is_atom(value) and not is_nil(value)) or is_binary(value), do: :ok
   defp validate_kind(_value), do: {:error, :kind}
 
   defp validate_hop_count(nil), do: :ok
@@ -90,6 +90,6 @@ defmodule JidoMurmur.Signals.MessageReceived do
 
   defp invalid_message_error do
     {:error,
-     "must be a message map with id, role, content, kind, sender_name, and sender_trace_id fields"}
+     "must be a message map with id, role, content, kind, and optional sender metadata fields"}
   end
 end

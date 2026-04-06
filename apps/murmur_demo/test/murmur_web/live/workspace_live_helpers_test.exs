@@ -52,13 +52,16 @@ defmodule MurmurWeb.WorkspaceLiveHelpersTest do
     end
 
     test "returns projector-backed messages when a snapshot exists", %{session: session} do
-      snapshot = [DisplayMessage.assistant("Hi there!", id: "req-1-step-1", request_id: "req-1", step_index: 1, status: :running)]
+      snapshot =
+        JidoMurmur.ConversationReadModel.new(session.id, [
+          DisplayMessage.assistant("Hi there!", id: "req-1-step-1", request_id: "req-1", step_index: 1, status: :running)
+        ])
 
       :ets.insert(:jido_murmur_conversation_snapshots, {session.id, snapshot})
 
       on_exit(fn -> JidoMurmur.ConversationProjector.clear(session.id) end)
 
-      assert WorkspaceState.load_messages_for_session(session) == snapshot
+      assert WorkspaceState.load_messages_for_session(session) == snapshot.messages
     end
 
     test "unified_timeline attaches canonical assistant actor identity", %{session: session} do
@@ -68,7 +71,7 @@ defmodule MurmurWeb.WorkspaceLiveHelpersTest do
         ]
       }
 
-      timeline = WorkspaceState.unified_timeline(messages_map, [session])
+      timeline = WorkspaceState.unified_timeline(messages_map, %{}, [session])
 
       assert [%{actor: %ActorIdentity{kind: :agent, name: "Helper", id: actor_id}}] = timeline
       assert actor_id == session.id
@@ -82,9 +85,26 @@ defmodule MurmurWeb.WorkspaceLiveHelpersTest do
         ]
       }
 
-      timeline = WorkspaceState.unified_timeline(messages_map, [session])
+      timeline = WorkspaceState.unified_timeline(messages_map, %{}, [session])
 
       assert Enum.map(timeline, & &1.content) == ["earlier", "later"]
+    end
+
+    test "display_messages merges pending UI messages without mutating canonical history", %{session: session} do
+      messages_map = %{session.id => [DisplayMessage.assistant("Ready", first_seen_at: 100, first_seen_seq: 1)]}
+
+      pending_messages = %{
+        session.id => [
+          DisplayMessage.user("Queued", first_seen_at: 200, first_seen_seq: 2)
+          |> Map.from_struct()
+          |> Map.put(:client_ref, "client-1")
+        ]
+      }
+
+      merged = WorkspaceState.display_messages(messages_map, pending_messages, session.id)
+
+      assert Enum.map(merged, & &1.content) == ["Ready", "Queued"]
+      assert messages_map[session.id] |> Enum.map(& &1.content) == ["Ready"]
     end
   end
 

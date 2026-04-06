@@ -12,6 +12,7 @@ defmodule MurmurWeb.Components.Workspace.SplitView do
   attr :agent_sessions, :list, required: true
   attr :agent_statuses, :map, required: true
   attr :messages, :map, required: true
+  attr :pending_messages, :map, required: true
   attr :artifacts, :map, required: true
   attr :active_artifact, :any, required: true
   attr :show_task_board, :boolean, required: true
@@ -25,7 +26,7 @@ defmodule MurmurWeb.Components.Workspace.SplitView do
       <div class="flex-1 flex overflow-x-auto min-h-0">
         <%= for session <- @agent_sessions do %>
           <% colors = Catalog.agent_color(session.agent_profile_id, session.display_name) %>
-          <% messages = Map.get(@messages, session.id, []) %>
+          <% messages = WorkspaceState.display_messages(@messages, @pending_messages, session.id) %>
           <% artifacts = visible_artifacts(Map.get(@artifacts, session.id, %{})) %>
 
           <section class="flex flex-col flex-1 min-w-[300px] border-r border-base-300/50 last:border-r-0 agent-column-enter transition-all duration-200">

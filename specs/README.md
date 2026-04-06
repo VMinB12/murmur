@@ -6,7 +6,7 @@
 
 | Metric | Value |
 |--------|-------|
-| Active tickets | 3 |
+| Active tickets | 4 |
 | Last updated | 2026-04-06 |
 
 ## Active Tickets
@@ -16,6 +16,7 @@
 | 019 | [Core-Owned Visible Ingress Messages](tickets/019-core-owned-visible-ingress-messages/) | planned | |
 | 020 | [Conversation Projection State Consolidation](tickets/020-conversation-projection-state-consolidation/) | planned | |
 | 021 | [Agent Lifecycle Boundary Cleanup](tickets/021-agent-lifecycle-boundary-cleanup/) | planned | |
+| 022 | [Data Model And Contract Architecture](tickets/022-data-model-and-contract-architecture/) | planned | |
 
 ## Archived / Superseded
 

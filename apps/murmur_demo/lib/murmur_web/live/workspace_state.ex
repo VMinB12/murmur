@@ -47,7 +47,7 @@ defmodule MurmurWeb.Live.WorkspaceState do
         })
       end)
     end)
-    |> Enum.sort_by(& &1.id)
+    |> DisplayMessage.sort_messages()
   end
 
   defp maybe_attach_assistant_actor(message, agent_name, session_id) do

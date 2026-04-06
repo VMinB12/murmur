@@ -2,18 +2,23 @@ defmodule JidoMurmur.ConversationReadModel.Turn do
   @moduledoc false
 
   alias JidoMurmur.DisplayMessage
-  alias JidoMurmur.UITurn.ToolCall
+  alias JidoMurmur.DisplayMessage.ToolCall
 
-  @spec turn_id(String.t()) :: String.t()
-  def turn_id(request_id) when is_binary(request_id), do: request_id <> "-turn"
+  @spec step_id(String.t(), pos_integer()) :: String.t()
+  def step_id(request_id, step_index) when is_binary(request_id) and is_integer(step_index) and step_index > 0 do
+    request_id <> "-step-" <> Integer.to_string(step_index)
+  end
 
-  @spec new(String.t()) :: DisplayMessage.t()
-  def new(request_id) when is_binary(request_id) do
+  @spec new(String.t(), pos_integer(), keyword()) :: DisplayMessage.t()
+  def new(request_id, step_index, opts \\ []) when is_binary(request_id) and is_integer(step_index) and step_index > 0 do
     DisplayMessage.assistant("",
-      id: turn_id(request_id),
+      id: Keyword.get(opts, :id, step_id(request_id, step_index)),
       request_id: request_id,
+      step_index: step_index,
       tool_calls: [],
-      status: :running
+      status: :running,
+      first_seen_at: Keyword.get(opts, :first_seen_at),
+      first_seen_seq: Keyword.get(opts, :first_seen_seq)
     )
   end
 
@@ -29,6 +34,24 @@ defmodule JidoMurmur.ConversationReadModel.Turn do
     update_message(message, fn current ->
       thinking = (current.thinking || "") <> delta
       %{current | thinking: thinking, status: :running}
+    end)
+  end
+
+  @spec put_response(DisplayMessage.t(), keyword()) :: DisplayMessage.t()
+  def put_response(message, opts) when is_list(opts) do
+    update_message(message, fn current ->
+      tool_calls = Keyword.get(opts, :tool_calls, [])
+
+      updated_tool_calls =
+        Enum.reduce(tool_calls, current.tool_calls || [], fn tool_call, acc ->
+          upsert_tool_call(normalize_pending_tool_call(tool_call), acc)
+        end)
+
+      current
+      |> maybe_put_content(Keyword.get(opts, :content))
+      |> maybe_put_thinking(Keyword.get(opts, :thinking))
+      |> Map.put(:tool_calls, updated_tool_calls)
+      |> Map.put(:status, status_from_tool_calls(updated_tool_calls, :completed))
     end)
   end
 
@@ -67,7 +90,18 @@ defmodule JidoMurmur.ConversationReadModel.Turn do
     }
 
     update_message(message, fn current ->
-      %{current | tool_calls: upsert_tool_call(tool_call, current.tool_calls || []), status: :running}
+      updated_tool_calls = upsert_tool_call(tool_call, current.tool_calls || [])
+      %{current | tool_calls: updated_tool_calls, status: status_from_tool_calls(updated_tool_calls, current.status || :running)}
+    end)
+  end
+
+  @spec put_persisted_tool_result(DisplayMessage.t(), String.t() | nil, String.t()) :: DisplayMessage.t()
+  def put_persisted_tool_result(message, tool_call_id, result_content) when is_binary(result_content) do
+    tool_call = %ToolCall{id: tool_call_id, result: result_content, status: :completed}
+
+    update_message(message, fn current ->
+      updated_tool_calls = upsert_tool_call(tool_call, current.tool_calls || [])
+      %{current | tool_calls: updated_tool_calls, status: status_from_tool_calls(updated_tool_calls, current.status || :running)}
     end)
   end
 
@@ -82,11 +116,33 @@ defmodule JidoMurmur.ConversationReadModel.Turn do
     }
 
     update_message(message, fn current ->
-      %{current | usage: merge_usage_maps(current.usage, usage), status: :running}
+      %{current | usage: merge_usage_maps(current.usage, usage), status: current.status || :running}
     end)
   end
 
   defp update_message(%DisplayMessage{} = message, updater), do: updater.(message)
+
+  defp maybe_put_content(message, nil), do: message
+  defp maybe_put_content(message, ""), do: message
+
+  defp maybe_put_content(message, content) do
+    if message.content in [nil, ""] do
+      %{message | content: content}
+    else
+      message
+    end
+  end
+
+  defp maybe_put_thinking(message, nil), do: message
+  defp maybe_put_thinking(message, ""), do: message
+
+  defp maybe_put_thinking(message, thinking) do
+    if message.thinking in [nil, ""] do
+      %{message | thinking: thinking}
+    else
+      message
+    end
+  end
 
   defp normalize_pending_tool_call(tc) do
     %ToolCall{
@@ -103,11 +159,31 @@ defmodule JidoMurmur.ConversationReadModel.Turn do
   defp upsert_tool_call(%ToolCall{id: id} = tool_call, tool_calls) do
     if Enum.any?(tool_calls, &(&1.id == id)) do
       Enum.map(tool_calls, fn
-        %ToolCall{id: ^id} = existing -> Map.merge(existing, tool_call)
+        %ToolCall{id: ^id} = existing -> merge_tool_call(existing, tool_call)
         existing -> existing
       end)
     else
       tool_calls ++ [tool_call]
+    end
+  end
+
+  defp merge_tool_call(%ToolCall{} = existing, %ToolCall{} = incoming) do
+    %ToolCall{
+      id: incoming.id || existing.id,
+      name: incoming.name || existing.name,
+      args: incoming.args || existing.args,
+      result: incoming.result || existing.result,
+      status: incoming.status || existing.status
+    }
+  end
+
+  defp status_from_tool_calls([], fallback_status), do: fallback_status
+
+  defp status_from_tool_calls(tool_calls, _fallback_status) do
+    if Enum.all?(tool_calls, &(&1.status != :running)) do
+      :completed
+    else
+      :running
     end
   end
 

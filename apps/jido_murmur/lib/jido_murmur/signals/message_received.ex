@@ -15,6 +15,8 @@ defmodule JidoMurmur.Signals.MessageReceived do
           required(:kind) => atom() | String.t(),
           required(:sender_name) => String.t(),
           required(:sender_trace_id) => String.t() | nil,
+      optional(:first_seen_at) => non_neg_integer(),
+      optional(:first_seen_seq) => non_neg_integer(),
           optional(:origin_actor) => map(),
           optional(:hop_count) => non_neg_integer()
         }
@@ -38,6 +40,8 @@ defmodule JidoMurmur.Signals.MessageReceived do
          :ok <- validate_required_binary(message, :content),
          :ok <- validate_kind(Map.get(message, :kind)),
          :ok <- validate_required_binary(message, :sender_name),
+        :ok <- validate_optional_non_neg_integer(Map.get(message, :first_seen_at)),
+        :ok <- validate_optional_non_neg_integer(Map.get(message, :first_seen_seq)),
          :ok <- validate_optional_actor(Map.get(message, :origin_actor)),
          :ok <- validate_optional_binary(Map.get(message, :sender_trace_id)),
          :ok <- validate_hop_count(Map.get(message, :hop_count)) do
@@ -63,6 +67,10 @@ defmodule JidoMurmur.Signals.MessageReceived do
   defp validate_optional_binary(nil), do: :ok
   defp validate_optional_binary(value) when is_binary(value), do: :ok
   defp validate_optional_binary(_value), do: {:error, :sender_trace_id}
+
+  defp validate_optional_non_neg_integer(nil), do: :ok
+  defp validate_optional_non_neg_integer(value) when is_integer(value) and value >= 0, do: :ok
+  defp validate_optional_non_neg_integer(_value), do: {:error, :first_seen}
 
   defp validate_optional_actor(nil), do: :ok
 

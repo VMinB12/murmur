@@ -52,7 +52,7 @@ defmodule MurmurWeb.WorkspaceLiveHelpersTest do
     end
 
     test "returns projector-backed messages when a snapshot exists", %{session: session} do
-      snapshot = [DisplayMessage.assistant("Hi there!", id: "req-1-turn", request_id: "req-1", status: :running)]
+      snapshot = [DisplayMessage.assistant("Hi there!", id: "req-1-step-1", request_id: "req-1", step_index: 1, status: :running)]
 
       :ets.insert(:jido_murmur_conversation_snapshots, {session.id, snapshot})
 
@@ -72,6 +72,19 @@ defmodule MurmurWeb.WorkspaceLiveHelpersTest do
 
       assert [%{actor: %ActorIdentity{kind: :agent, name: "Helper", id: actor_id}}] = timeline
       assert actor_id == session.id
+    end
+
+    test "unified_timeline sorts by canonical first-seen metadata", %{session: session} do
+      messages_map = %{
+        session.id => [
+          DisplayMessage.assistant("later", first_seen_at: 200, first_seen_seq: 2),
+          DisplayMessage.user("earlier", first_seen_at: 100, first_seen_seq: 1)
+        ]
+      }
+
+      timeline = WorkspaceState.unified_timeline(messages_map, [session])
+
+      assert Enum.map(timeline, & &1.content) == ["earlier", "later"]
     end
   end
 

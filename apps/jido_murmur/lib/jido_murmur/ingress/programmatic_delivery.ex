@@ -6,6 +6,7 @@ defmodule JidoMurmur.Ingress.ProgrammaticDelivery do
   canonical ingress input delivered through `JidoMurmur.Ingress`.
   """
 
+  alias Jido.Signal.ID, as: SignalID
   alias JidoMurmur.ActorIdentity
   alias JidoMurmur.Ingress
   alias JidoMurmur.Ingress.Input
@@ -60,17 +61,20 @@ defmodule JidoMurmur.Ingress.ProgrammaticDelivery do
 
   defp broadcast_received(session, input, message_kind) do
     {:ok, metadata} = Input.metadata(input)
+    message_id = Uniq.UUID.uuid7()
 
     signal =
       MessageReceived.new!(
         %{
           session_id: session.id,
           message: %{
-            id: Uniq.UUID.uuid7(),
+            id: message_id,
             role: "user",
             content: input.content,
             kind: message_kind,
             sender_name: metadata.sender_name,
+            first_seen_at: SignalID.extract_timestamp(message_id),
+            first_seen_seq: SignalID.sequence_number(message_id),
             origin_actor: ActorIdentity.serialize(metadata.origin_actor),
             sender_trace_id: metadata.sender_trace_id,
             hop_count: metadata.hop_count

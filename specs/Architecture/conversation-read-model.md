@@ -4,22 +4,29 @@
 
 This document defines Murmur's canonical conversation projection model for chat rendering.
 
-It answers one question: how does Murmur keep live in-progress turns, refreshed history, and reconnect state consistent without asking the UI to reconstruct meaning from raw `ai.*` lifecycle signals?
+It answers one question: how does Murmur keep live in-progress assistant steps, refreshed history, and reconnect state consistent without asking the UI to reconstruct meaning from raw `ai.*` lifecycle signals?
 
 ## Problem
 
 Before ticket 016, Murmur had two different rendering paths:
 
 - a live path where `WorkspaceLive` reduced raw `ai.llm.delta`, `ai.llm.response`, `ai.tool.result`, and `ai.usage` signals into an ad hoc `%{content, thinking, tool_calls, usage}` map
-- a refresh path where Murmur reloaded thread entries and projected them into richer display messages through `UITurn`
+- a refresh path where Murmur reloaded thread entries and projected them through a separate request-level adapter
 
 That made the UI vulnerable to ordering differences between topics and left refreshed history richer than the live view.
+
+Ticket 017 exposed a second problem: Murmur was still treating one outer ReAct request as one assistant message. That was too coarse for steering and `tell` ordering because a single outer request can contain several LLM/tool phases.
 
 ## Core Rule
 
 `jido_murmur` owns the canonical conversation state.
 
-The frontend no longer treats raw `ai.*` signals as the rendering contract. Instead, Murmur reduces those raw facts into canonical turn state and emits Murmur-owned conversation updates.
+The frontend no longer treats raw `ai.*` signals as the rendering contract. Instead, Murmur reduces those raw facts into canonical top-level message state and emits Murmur-owned conversation updates.
+
+The canonical assistant message is now an assistant step:
+
+- one LLM invocation
+- plus the tool calls and tool results produced before the next LLM invocation or request completion
 
 ## High-Level Flow
 
@@ -31,7 +38,7 @@ That snapshot is derived from:
 
 - live thread state when the agent is running
 - thawed persisted thread state when the agent is not live
-- any in-memory projector state that represents the current in-progress turn
+- any in-memory projector state that represents the current in-progress assistant step sequence
 
 ### 2. Incremental canonical updates
 
@@ -44,9 +51,9 @@ While a run is active, Murmur still receives low-level lifecycle facts such as:
 - `ai.usage`
 - `murmur.message.completed`
 
-Those are reduced inside the core package into one canonical assistant turn identified by a stable `request_id`.
+Those are reduced inside the core package into canonical assistant-step messages. One outer `request_id` may therefore yield multiple assistant messages over time.
 
-The UI receives Murmur-owned conversation updates for the affected turn rather than reducing raw lifecycle signals itself.
+The UI receives Murmur-owned conversation updates for the affected top-level message rather than reducing raw lifecycle signals itself.
 
 ### 3. Completion reconciliation
 
@@ -54,7 +61,7 @@ When a run completes, finalized thread-backed history reconciles through the sam
 
 This means the live UI and refreshed UI answer the same question:
 
-- what is the current canonical visible turn state for this session?
+- what is the current canonical top-level conversation state for this session?
 
 ## Identity Model
 
@@ -64,20 +71,34 @@ This means the live UI and refreshed UI answer the same question:
 
 ### Turn identity
 
-`request_id` identifies one assistant turn or run.
+`request_id` identifies one outer run.
+
+### Assistant-step identity
+
+Murmur owns assistant-step identity inside that outer run. A single `request_id` may map to `step-1`, `step-2`, and later assistant-step messages as the ReAct loop continues.
 
 ### Tool identity
 
-`tool_call_id` identifies one tool lifecycle within a turn.
+`tool_call_id` identifies one tool lifecycle within an assistant step.
 
-The projector must attach or preserve these identities so that late or out-of-order facts can still merge into the correct turn.
+The projector must attach or preserve these identities so that late or out-of-order facts can still merge into the correct assistant step.
+
+## Ordering Model
+
+Top-level conversation messages are ordered by Murmur-owned first-seen metadata.
+
+- human and `tell` messages remain top-level user messages
+- assistant messages are ordered assistant steps
+- tool calls and tool results remain nested inside the assistant step that produced them
+
+This keeps the visible model aligned with what later steering can influence without promoting every sub-element into its own top-level timeline item.
 
 ## Transport Model
 
 The UI contract is:
 
 - full snapshot on mount or reconnect
-- canonical incremental turn updates while connected
+- canonical incremental top-level message updates while connected
 
 It is intentionally **not**:
 
@@ -92,8 +113,8 @@ The browser still re-renders the currently active turn as content grows, which i
 
 However, Murmur avoids the worst architectural form of duplication by:
 
-- centralizing turn reduction in the core package
-- sending only the affected canonical turn update during streaming
+- centralizing assistant-step reduction in the core package
+- sending only the affected canonical message update during streaming
 - loading the full snapshot only on mount or reconnect
 
 If token frequency becomes too high later, batching or coalescing can be added at the projector boundary without changing the UI contract.
@@ -103,13 +124,13 @@ If token frequency becomes too high later, batching or coalescing can be added a
 ### `jido_murmur`
 
 - owns conversation reduction
-- owns stable turn identity attachment
+- owns assistant-step identity and first-seen ordering attachment
 - owns projector-backed snapshots
 - owns the Murmur conversation update contract
 
 ### `jido_murmur_web`
 
-- owns generic rendering primitives for canonical message or turn state
+- owns generic rendering primitives for canonical top-level message state
 - does not own reduction of raw agent lifecycle facts
 
 ### `murmur_demo`

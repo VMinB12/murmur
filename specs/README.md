@@ -13,10 +13,17 @@
 
 No active tickets.
 
+## Archived / Superseded
+
+| # | Title | Status | Notes |
+|---|-------|--------|-------|
+| 018 | [Retire Legacy UITurn Projection](tickets/018-retire-legacy-ui-turn-projection/) | archived | Superseded by ticket 017 so assistant-step ordering and `UITurn` removal land in one pass. |
+
 ## Recently Completed
 
 | # | Title | Completed |
 |---|-------|-----------|
+| 017 | [Canonical Conversation Step Ordering](tickets/017-canonical-conversation-message-ordering/) | 2026-04-06 |
 | 016 | [Conversation Read Model And Streaming Consistency](tickets/016-conversation-read-model-and-streaming-consistency/) | 2026-04-06 |
 | 013 | [Agent-Centric Phoenix Sessions](tickets/013-agent-centric-phoenix-sessions/) | 2026-04-05 |
 | 015 | [Actor Identity And Display Projection Cleanup](tickets/015-actor-identity-and-display-projection-cleanup/) | 2026-04-05 |
@@ -38,6 +45,7 @@ No active tickets.
 
 | ADR | Title | Date |
 |-----|-------|------|
+| ADR-007 | [Explicit First-Seen Conversation Message Ordering](decisions/ADR-007-explicit-first-seen-conversation-message-ordering.md) | 2026-04-06 |
 | ADR-006 | [Agent-Centric Phoenix Sessions And Immediate Trace Causation](decisions/ADR-006-agent-centric-phoenix-sessions-and-immediate-trace-causation.md) | 2026-04-05 |
 | ADR-004 | [Canonical Actor Identity And Display Boundary](decisions/ADR-004-canonical-actor-identity-and-display-boundary.md) | 2026-04-05 |
 | ADR-003 | [Runtime Metadata Projection Boundary](decisions/ADR-003-runtime-metadata-projection-boundary.md) | 2026-04-05 |

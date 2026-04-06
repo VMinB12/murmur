@@ -61,12 +61,15 @@ defmodule MurmurWeb.WorkspaceLiveTest do
     request_id = Keyword.get(opts, :request_id, Ecto.UUID.generate())
 
     DisplayMessage.assistant(content,
-      id: Keyword.get(opts, :id, request_id <> "-turn"),
+      id: Keyword.get(opts, :id, request_id <> "-step-1"),
       request_id: request_id,
+      step_index: Keyword.get(opts, :step_index, 1),
       thinking: Keyword.get(opts, :thinking),
       tool_calls: Keyword.get(opts, :tool_calls, []),
       usage: Keyword.get(opts, :usage),
-      status: Keyword.get(opts, :status, :completed)
+      status: Keyword.get(opts, :status, :completed),
+      first_seen_at: Keyword.get(opts, :first_seen_at),
+      first_seen_seq: Keyword.get(opts, :first_seen_seq)
     )
   end
 
@@ -393,7 +396,7 @@ defmodule MurmurWeb.WorkspaceLiveTest do
       refute has_element?(view, "#msg-form-#{session.id} button[disabled]")
     end
 
-    test "message sent while busy renders before the active assistant turn", %{
+    test "message sent while busy renders after the current assistant step and before the next one", %{
       conn: conn,
       workspace: workspace,
       session: session
@@ -407,7 +410,7 @@ defmodule MurmurWeb.WorkspaceLiveTest do
         build_conversation_updated(
           session.id,
           workspace.id,
-          assistant_message("Working on it", request_id: "req-busy", status: :running)
+          assistant_message("Working on it", request_id: "req-busy", id: "req-busy-step-1", step_index: 1, status: :running)
         )
       )
 
@@ -415,11 +418,61 @@ defmodule MurmurWeb.WorkspaceLiveTest do
       |> form("#msg-form-#{session.id}", message: %{content: "Stop this.", session_id: session.id})
       |> render_submit()
 
-      html = render(view)
-      {user_pos, _} = :binary.match(html, "Stop this.")
-      {assistant_pos, _} = :binary.match(html, "Working on it")
+      send(
+        view.pid,
+        build_conversation_updated(
+          session.id,
+          workspace.id,
+          assistant_message("Stopping now.",
+            request_id: "req-busy",
+            id: "req-busy-step-2",
+            step_index: 2,
+            first_seen_at: 9_000_000_000_000,
+            first_seen_seq: 3,
+            status: :completed
+          )
+        )
+      )
 
-      assert user_pos < assistant_pos
+      html = render(view)
+      {current_step_pos, _} = :binary.match(html, "Working on it")
+      {user_pos, _} = :binary.match(html, "Stop this.")
+      {next_step_pos, _} = :binary.match(html, "Stopping now.")
+
+      assert current_step_pos < user_pos
+      assert user_pos < next_step_pos
+    end
+
+    test "conversation updates render by canonical first-seen order rather than arrival order", %{
+      conn: conn,
+      workspace: workspace,
+      session: session
+    } do
+      {:ok, view, _html} = live(conn, ~p"/workspaces/#{workspace.id}")
+
+      send(
+        view.pid,
+        build_conversation_updated(
+          session.id,
+          workspace.id,
+          assistant_message("later", request_id: "req-later", first_seen_at: 200, first_seen_seq: 2)
+        )
+      )
+
+      send(
+        view.pid,
+        build_conversation_updated(
+          session.id,
+          workspace.id,
+          assistant_message("earlier", request_id: "req-earlier", first_seen_at: 100, first_seen_seq: 1)
+        )
+      )
+
+      html = render(view)
+      {earlier_pos, _} = :binary.match(html, "earlier")
+      {later_pos, _} = :binary.match(html, "later")
+
+      assert earlier_pos < later_pos
     end
   end
 

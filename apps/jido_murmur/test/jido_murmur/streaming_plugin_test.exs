@@ -99,7 +99,7 @@ defmodule JidoMurmur.StreamingPluginTest do
                        }
                      }
 
-      assert message_id == request_id <> "-turn"
+      assert message_id == request_id <> "-step-1"
     end
 
     test "handles ai.request.started signal" do

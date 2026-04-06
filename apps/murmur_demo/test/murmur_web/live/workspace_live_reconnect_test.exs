@@ -111,8 +111,9 @@ defmodule MurmurWeb.WorkspaceLiveReconnectTest do
         {session.id,
          [
            JidoMurmur.DisplayMessage.assistant("Still working",
-             id: "req-live-turn",
+             id: "req-live-step-1",
              request_id: "req-live",
+             step_index: 1,
              status: :running
            )
          ]}
@@ -138,8 +139,9 @@ defmodule MurmurWeb.WorkspaceLiveReconnectTest do
       # Simulate a completed response arriving
       message =
         DisplayMessage.assistant("I am Alice",
-          id: "req-reconnect-turn",
+          id: "req-reconnect-step-1",
           request_id: "req-reconnect",
+          step_index: 1,
           status: :completed
         )
 

@@ -1,10 +1,11 @@
 defmodule JidoMurmur.ConversationProjectorTest do
   use JidoMurmur.Case, async: true
 
+  alias Jido.Signal.ID, as: SignalID
   alias JidoMurmur.ConversationReadModel
 
   describe "ConversationReadModel.apply_signal/2" do
-    test "content deltas append into one canonical turn by request_id" do
+    test "content deltas append into one canonical assistant step by request_id" do
       model = ConversationReadModel.new("session-1")
 
       assert {:ok, model, message} =
@@ -17,7 +18,7 @@ defmodule JidoMurmur.ConversationProjectorTest do
                  )
                )
 
-      assert message.id == "req-1-turn"
+      assert message.id == "req-1-step-1"
       assert message.request_id == "req-1"
       assert message.content == "Hello"
       assert message.status == :running
@@ -36,7 +37,7 @@ defmodule JidoMurmur.ConversationProjectorTest do
       assert length(model.messages) == 1
     end
 
-    test "tool lifecycle merges pending and completed tool calls into the same turn" do
+    test "tool lifecycle merges pending and completed tool calls into the same assistant step" do
       model = ConversationReadModel.new("session-1")
 
       llm_response =
@@ -68,9 +69,10 @@ defmodule JidoMurmur.ConversationProjectorTest do
 
       assert [%{id: "call-1", name: "search", status: :completed, result: result}] = message.tool_calls
       assert result =~ "3 results"
+      assert message.id == "req-2-step-1"
     end
 
-    test "usage merges across multiple signals for one turn" do
+    test "usage merges across multiple signals for one assistant step" do
       model = ConversationReadModel.new("session-1")
 
       assert {:ok, model, _message} =
@@ -111,6 +113,50 @@ defmodule JidoMurmur.ConversationProjectorTest do
       assert message.usage.output_tokens == 130
       assert message.usage.total_tokens == 430
       assert message.usage.duration_ms == 1200
+    end
+
+    test "next llm phase opens a second assistant step for the same request" do
+      model = ConversationReadModel.new("session-1")
+      timestamp = 1_700_000_000_000
+
+      {:ok, model, _step_one} =
+        ConversationReadModel.apply_signal(
+          model,
+          Jido.Signal.new!(
+            "ai.llm.response",
+            %{
+              request_id: "req-4",
+              result: {:ok, %{text: "Need a tool", tool_calls: [%{id: "call-2", name: "search", arguments: %{query: "phoenix"}}]}, []}
+            },
+            source: "/test",
+            id: SignalID.generate_sequential(timestamp, 1)
+          )
+        )
+
+      {:ok, model, _step_one} =
+        ConversationReadModel.apply_signal(
+          model,
+          Jido.Signal.new!(
+            "ai.tool.result",
+            %{request_id: "req-4", call_id: "call-2", tool_name: "search", result: {:ok, "done", []}},
+            source: "/test",
+            id: SignalID.generate_sequential(timestamp, 2)
+          )
+        )
+
+      {:ok, model, step_two} =
+        ConversationReadModel.apply_signal(
+          model,
+          Jido.Signal.new!(
+            "ai.llm.delta",
+            %{request_id: "req-4", delta: "Final answer", chunk_type: :content},
+            source: "/test",
+            id: SignalID.generate_sequential(timestamp, 3)
+          )
+        )
+
+      assert Enum.map(model.messages, & &1.id) == ["req-4-step-1", "req-4-step-2"]
+      assert step_two.id == "req-4-step-2"
     end
   end
 end

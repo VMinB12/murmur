@@ -84,12 +84,11 @@ defmodule MurmurWeb.WorkspaceLive do
 
       # Add user message to local display immediately
       user_msg = JidoMurmur.DisplayMessage.user(content)
-      status = Map.get(socket.assigns.agent_statuses, session_id, :idle)
 
       socket =
         socket
         |> update(:messages, fn msgs ->
-          Map.update(msgs, session_id, [user_msg], &insert_user_message(&1, user_msg, status))
+          Map.update(msgs, session_id, [user_msg], &append_message(&1, user_msg))
         end)
         |> update(:agent_statuses, &Map.put(&1, session_id, :busy))
 
@@ -317,7 +316,7 @@ defmodule MurmurWeb.WorkspaceLive do
     socket =
       socket
       |> update(:messages, fn msgs ->
-        Map.update(msgs, session_id, [error_msg], &(&1 ++ [error_msg]))
+        Map.update(msgs, session_id, [error_msg], &append_message(&1, error_msg))
       end)
       |> update(:agent_statuses, &Map.put(&1, session_id, :idle))
 
@@ -331,7 +330,7 @@ defmodule MurmurWeb.WorkspaceLive do
 
     socket =
       update(socket, :messages, fn msgs ->
-        Map.update(msgs, session_id, [message], &(&1 ++ [message]))
+        Map.update(msgs, session_id, [message], &upsert_message(&1, message))
       end)
 
     {:noreply, socket}
@@ -450,30 +449,17 @@ defmodule MurmurWeb.WorkspaceLive do
   # --- Thread / State Helpers ---
 
   defp upsert_message(messages, message) do
-    case Enum.find_index(messages, &(&1.id == message.id)) do
-      nil -> messages ++ [message]
-      index -> List.replace_at(messages, index, message)
-    end
-  end
-
-  defp insert_user_message(messages, message, :busy) do
-    case find_last_running_assistant_index(messages) do
-      nil -> messages ++ [message]
-      index -> List.insert_at(messages, index, message)
-    end
-  end
-
-  defp insert_user_message(messages, message, _status), do: messages ++ [message]
-
-  defp find_last_running_assistant_index(messages) do
-    messages
-    |> Enum.with_index()
-    |> Enum.reverse()
-    |> Enum.find_value(fn {message, index} ->
-      if JidoMurmur.DisplayMessage.assistant_message?(message) and Map.get(message, :status) == :running do
-        index
+    updated =
+      case Enum.find_index(messages, &(&1.id == message.id)) do
+        nil -> messages ++ [message]
+        index -> List.replace_at(messages, index, message)
       end
-    end)
+
+    JidoMurmur.DisplayMessage.sort_messages(updated)
+  end
+
+  defp append_message(messages, message) do
+    JidoMurmur.DisplayMessage.sort_messages(messages ++ [message])
   end
 
   defp cleanup_storage(session) do
@@ -554,12 +540,11 @@ defmodule MurmurWeb.WorkspaceLive do
     topic = Topics.agent_messages(workspace_id, target_session.id)
 
     user_msg = JidoMurmur.DisplayMessage.user(content)
-    status = Map.get(socket.assigns.agent_statuses, target_session.id, :idle)
 
     socket =
       socket
       |> update(:messages, fn msgs ->
-        Map.update(msgs, target_session.id, [user_msg], &insert_user_message(&1, user_msg, status))
+        Map.update(msgs, target_session.id, [user_msg], &append_message(&1, user_msg))
       end)
       |> update(:agent_statuses, &Map.put(&1, target_session.id, :busy))
 

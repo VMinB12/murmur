@@ -87,15 +87,16 @@ The main LiveView handles:
 
 - Demo-owned workspace views (`SplitView`, `UnifiedView`) consume canonical `JidoMurmur.DisplayMessage` values rather than repairing raw thread-entry payloads locally
 - `WorkspaceState.project_thread/1` and `WorkspaceState.unified_timeline/2` are the demo boundary for enriching display messages with session-owned agent identity and color metadata
-- `WorkspaceLive` creates optimistic local messages with `DisplayMessage.user/2` and consumes visible programmatic messages through `DisplayMessage.from_received/1`
+- `WorkspaceLive` creates optimistic local human messages at the LiveView edge and consumes visible programmatic messages through `DisplayMessage.from_received/1`
 - Human-facing task-assignment wording is chosen in the LiveView edge while the runtime payload carries explicit `origin_actor` metadata for downstream rendering
 
 ## Canonical Conversation Update Flow
 
-- `WorkspaceLive` mounts from projector-backed conversation snapshots instead of reconstructing live assistant turns from raw `ai.*` lifecycle signals
-- During a connected session, the demo subscribes to Murmur-owned `murmur.conversation.updated` events for canonical assistant-turn updates
+- `WorkspaceLive` mounts from projector-backed conversation snapshots instead of reconstructing live assistant steps from raw `ai.*` lifecycle signals
+- During a connected session, the demo subscribes to Murmur-owned `murmur.conversation.updated` events for canonical top-level message updates
 - `murmur.message.completed` still matters for run lifecycle and busy or idle status, but it is no longer the source of truth for rendered assistant content
 - Raw `ai.*` signals are not the demo rendering contract for chat surfaces anymore
+- The demo no longer keeps a local busy-follow-up insertion heuristic; later assistant steps are positioned by canonical first-seen ordering from core
 
 ## Dependencies
 

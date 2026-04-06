@@ -67,7 +67,7 @@ Murmur is a real-time multi-agent chat platform built as an Elixir/Phoenix umbre
 
 - **Actor identity boundary**: Murmur now treats current actor and origin actor as explicit data, not as overloaded `sender_name` strings. Canonical ingress metadata is projected once into runtime context and visible message payloads, then reused consistently downstream.
 - **Display projection boundary**: UI consumers are expected to render canonical display messages instead of raw thread-entry payloads. Shared and demo-owned views branch on actor semantics rather than parsing content prefixes or comparing display labels such as `"You"`.
-- **Conversation projection boundary**: `jido_murmur` owns the canonical conversation projector for live and persisted chat state. UIs mount from projector-backed snapshots and then consume Murmur-owned incremental turn updates instead of reducing raw `ai.*` lifecycle signals directly.
+- **Conversation projection boundary**: `jido_murmur` owns the canonical conversation projector for live and persisted chat state. UIs mount from projector-backed snapshots and then consume Murmur-owned incremental top-level message updates instead of reducing raw `ai.*` lifecycle signals directly. Assistant messages are segmented by assistant step rather than by whole outer requests.
 - **Presentation-owned wording**: Human-facing labels remain a rendering concern. Runtime payloads carry actor metadata; host apps choose wording like `"You"` or `"A human"` at the UI edge.
 
 ## Sub-documents

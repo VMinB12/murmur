@@ -106,17 +106,19 @@ All topics follow `workspace:{wid}:...` for multi-workspace isolation:
 ### Canonical Display Projection
 
 - `JidoMurmur.DisplayMessage` is the canonical UI-facing message model for chat surfaces
-- `UITurn.project_entries/1` is the shared projection boundary that converts persisted thread entries into display messages with explicit actor semantics
+- `JidoMurmur.DisplayMessage.ToolCall` is the canonical nested tool-call value type for assistant messages
+- `JidoMurmur.ConversationReadModel.EntryProjector` is the shared projection boundary that converts persisted thread entries into canonical top-level messages with explicit actor semantics
 - The projection boundary normalizes persisted string-keyed payloads once, but it no longer infers actor identity from content prefixes such as `"[Alice]: ..."`
 - Display labels are derived from actor metadata and rendering helpers, not treated as the runtime source of truth
 
 ### Canonical Conversation Projector
 
-- `JidoMurmur.ConversationProjector` owns the core conversation snapshot and incremental update boundary for assistant turns
-- `JidoMurmur.ConversationReadModel` reduces raw `ai.*` lifecycle facts into canonical in-progress turn state keyed by stable `request_id`
+- `JidoMurmur.ConversationProjector` owns the core conversation snapshot and incremental update boundary for top-level assistant steps
+- `JidoMurmur.ConversationReadModel` reduces raw `ai.*` lifecycle facts into canonical assistant-step state keyed by Murmur-owned step ids within a stable outer `request_id`
 - `JidoMurmur.Signals.ConversationUpdated` is the Murmur-owned UI update contract for connected clients
 - Raw `ai.*` signals may still exist for observability or internal runtime use, but they are no longer the rendering contract for chat surfaces
 - Finalized thread-backed history reconciles through the same canonical projection model instead of remaining a separate richer UI path
+- Request-level collapsing through `UITurn` is no longer part of the canonical read path
 
 ### Request Transformation Pipeline
 
@@ -219,27 +221,18 @@ jido_murmur_thread_entries
 ```elixir
 %DisplayMessage{
   id: String.t(),
+  request_id: String.t() | nil,
+  step_index: pos_integer() | nil,
   role: String.t(),
   content: String.t(),
   actor: ActorIdentity.t() | nil,
   sender_name: String.t() | nil,
   thinking: String.t() | nil,
-  tool_calls: [%ToolCall{}],
+  tool_calls: [%DisplayMessage.ToolCall{}],
   usage: map() | nil,
-  status: atom() | nil
-}
-```
-
-### UITurn (projection helper)
-
-```elixir
-%UITurn{
-  id: String.t(),
-  thinking: String.t() | nil,
-  tool_calls: [%ToolCall{id, name, args, result, status}],
-  content: String.t(),
-  sender_name: String.t() | nil,
-  status: :thinking | :tool_calling | :completed | :error
+  status: atom() | nil,
+  first_seen_at: non_neg_integer(),
+  first_seen_seq: non_neg_integer()
 }
 ```
 

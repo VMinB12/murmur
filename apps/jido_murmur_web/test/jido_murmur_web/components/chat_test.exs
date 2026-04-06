@@ -4,7 +4,7 @@ defmodule JidoMurmurWeb.Components.ChatTest do
   import Phoenix.LiveViewTest
 
   alias JidoMurmur.ActorIdentity
-  alias JidoMurmur.UITurn.ToolCall
+  alias JidoMurmur.DisplayMessage.ToolCall
   alias JidoMurmurWeb.Components.ChatMessage
   alias JidoMurmurWeb.Components.MessageInput
 
@@ -94,7 +94,7 @@ defmodule JidoMurmurWeb.Components.ChatTest do
       assert html =~ "animate-pulse"
     end
 
-    test "renders UITurn tool call structs without Access errors" do
+    test "renders canonical tool call structs without Access errors" do
       message = %{
         id: "msg-struct-tool-call",
         role: "assistant",

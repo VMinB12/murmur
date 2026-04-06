@@ -80,12 +80,12 @@ defmodule MurmurWeb.Components.Workspace.UnifiedView do
               </div>
             <% else %>
               <div id={"unified-msg-#{message.id}"} class="flex gap-3 items-start">
-                <div class="avatar placeholder shrink-0 pt-1">
+                <div class="shrink-0 pt-1">
                   <div class={[
-                    "w-9 rounded-full text-white text-xs font-semibold",
+                    "inline-flex h-9 w-9 items-center justify-center rounded-full text-xs leading-none font-semibold text-white",
                     message.agent_color.dot
                   ]}>
-                    <span>{String.first(message.agent_name || "?")}</span>
+                    <span>{message.agent_name |> Kernel.||("?") |> String.first() |> String.upcase()}</span>
                   </div>
                 </div>
                 <div class="min-w-0 max-w-[72%] flex-1">

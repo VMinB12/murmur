@@ -11,7 +11,6 @@ defmodule JidoMurmurWeb.Components do
   This makes the following function components available:
 
     * `chat_message/1` — Single chat message bubble
-    * `chat_stream/1` — Live streaming tokens/thinking/tool output
     * `agent_header/1` — Agent column header bar
     * `message_input/1` — Chat textarea with keyboard shortcuts
     * `streaming_indicator/1` — Agent busy/idle indicator
@@ -25,7 +24,6 @@ defmodule JidoMurmurWeb.Components do
   defmacro __using__(_opts) do
     quote do
       import JidoMurmurWeb.Components.ChatMessage
-      import JidoMurmurWeb.Components.ChatStream
       import JidoMurmurWeb.Components.AgentHeader
       import JidoMurmurWeb.Components.MessageInput
       import JidoMurmurWeb.Components.StreamingIndicator

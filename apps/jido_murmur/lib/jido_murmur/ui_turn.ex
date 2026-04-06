@@ -122,6 +122,7 @@ defmodule JidoMurmur.UITurn do
     payload = Map.get(entry, :payload, %{})
     refs = Map.get(entry, :refs, %{})
     content = Map.get(payload, :content, "")
+    request_id = Map.get(payload, :request_id)
     payload_sender_name = Map.get(payload, :sender_name)
     actor = normalize_actor(Map.get(payload, :origin_actor) || Map.get(refs, :origin_actor), default_user_actor(entry, payload_sender_name))
     sender_name = payload_sender_name || actor_display_name(actor)
@@ -129,6 +130,7 @@ defmodule JidoMurmur.UITurn do
     [
       DisplayMessage.user(content,
         id: Map.get(entry, :id, Uniq.UUID.uuid7()),
+        request_id: request_id,
         actor: actor,
         sender_name: sender_name
       )
@@ -136,14 +138,21 @@ defmodule JidoMurmur.UITurn do
   end
 
   defp build_assistant_turn(entries) do
+    request_id = get_request_id(hd(entries))
     {thinking, tool_calls, content, sender_name, actor} =
       Enum.reduce(entries, {nil, [], "", nil, nil}, &reduce_entry/2)
 
-    id = (hd(entries).id || Uniq.UUID.uuid7()) <> "-turn"
+    id =
+      if is_binary(request_id) do
+        request_id <> "-turn"
+      else
+        (hd(entries).id || Uniq.UUID.uuid7()) <> "-turn"
+      end
 
     [
       DisplayMessage.assistant(content,
         id: id,
+        request_id: request_id,
         actor: actor,
         sender_name: sender_name,
         thinking: if(thinking && thinking != "", do: thinking),

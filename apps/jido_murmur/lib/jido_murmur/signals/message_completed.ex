@@ -13,6 +13,7 @@ defmodule JidoMurmur.Signals.MessageCompleted do
     default_source: "/jido_murmur/runner",
     schema: [
       session_id: [type: :string, required: true, doc: "Agent session ID"],
+      request_id: [type: :string, required: true, doc: "Stable turn/request identifier"],
       response: [
         type: {:custom, __MODULE__, :validate_response, []},
         required: true,

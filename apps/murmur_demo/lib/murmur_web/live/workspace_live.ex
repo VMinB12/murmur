@@ -2,7 +2,6 @@ defmodule MurmurWeb.WorkspaceLive do
   @moduledoc false
   use MurmurWeb, :live_view
 
-  alias Jido.AI.Signal.LLMResponse
   alias JidoArtifacts.Envelope
   alias JidoArtifacts.SignalUpdate
   alias JidoMurmur.Catalog
@@ -16,8 +15,6 @@ defmodule MurmurWeb.WorkspaceLive do
   alias MurmurWeb.Live.WorkspaceState
 
   require Logger
-
-  @empty_stream %{content: "", thinking: "", tool_calls: [], usage: nil}
 
   @impl true
   def mount(%{"id" => workspace_id}, _session, socket) do
@@ -42,7 +39,6 @@ defmodule MurmurWeb.WorkspaceLive do
       |> assign(:agent_sessions, agent_sessions)
       |> assign(:profiles, profiles)
       |> assign(:agent_statuses, Map.new(agent_sessions, &{&1.id, :idle}))
-      |> assign(:streaming, Map.new(agent_sessions, &{&1.id, @empty_stream}))
       |> assign(:messages, messages_map)
       |> assign(:artifacts, artifacts_map)
       |> assign(:active_artifact, nil)
@@ -59,7 +55,7 @@ defmodule MurmurWeb.WorkspaceLive do
 
         Enum.reduce(agent_sessions, socket, fn session, acc ->
           Phoenix.PubSub.subscribe(Murmur.PubSub, Topics.agent_messages(workspace_id, session.id))
-          Phoenix.PubSub.subscribe(Murmur.PubSub, Topics.agent_stream(workspace_id, session.id))
+          Phoenix.PubSub.subscribe(Murmur.PubSub, Topics.agent_conversation(workspace_id, session.id))
           Phoenix.PubSub.subscribe(Murmur.PubSub, Topics.agent_artifacts(workspace_id, session.id))
           ensure_agent_started(session)
 
@@ -88,11 +84,12 @@ defmodule MurmurWeb.WorkspaceLive do
 
       # Add user message to local display immediately
       user_msg = JidoMurmur.DisplayMessage.user(content)
+      status = Map.get(socket.assigns.agent_statuses, session_id, :idle)
 
       socket =
         socket
         |> update(:messages, fn msgs ->
-          Map.update(msgs, session_id, [user_msg], &(&1 ++ [user_msg]))
+          Map.update(msgs, session_id, [user_msg], &insert_user_message(&1, user_msg, status))
         end)
         |> update(:agent_statuses, &Map.put(&1, session_id, :busy))
 
@@ -113,7 +110,7 @@ defmodule MurmurWeb.WorkspaceLive do
          }) do
       {:ok, session} ->
         Phoenix.PubSub.subscribe(Murmur.PubSub, Topics.agent_messages(workspace.id, session.id))
-        Phoenix.PubSub.subscribe(Murmur.PubSub, Topics.agent_stream(workspace.id, session.id))
+        Phoenix.PubSub.subscribe(Murmur.PubSub, Topics.agent_conversation(workspace.id, session.id))
         Phoenix.PubSub.subscribe(Murmur.PubSub, Topics.agent_artifacts(workspace.id, session.id))
         ensure_agent_started(session)
 
@@ -122,7 +119,6 @@ defmodule MurmurWeb.WorkspaceLive do
           |> update(:agent_sessions, &(&1 ++ [session]))
           |> update(:messages, &Map.put(&1, session.id, []))
           |> update(:agent_statuses, &Map.put(&1, session.id, :idle))
-          |> update(:streaming, &Map.put(&1, session.id, @empty_stream))
           |> update(:artifacts, &Map.put(&1, session.id, %{}))
           |> assign(
             :add_agent_form,
@@ -158,14 +154,12 @@ defmodule MurmurWeb.WorkspaceLive do
 
     empty_messages = Map.new(socket.assigns.agent_sessions, &{&1.id, []})
     empty_statuses = Map.new(socket.assigns.agent_sessions, &{&1.id, :idle})
-    empty_streaming = Map.new(socket.assigns.agent_sessions, &{&1.id, @empty_stream})
     empty_artifacts = Map.new(socket.assigns.agent_sessions, &{&1.id, %{}})
 
     {:noreply,
      socket
      |> assign(:messages, empty_messages)
      |> assign(:agent_statuses, empty_statuses)
-     |> assign(:streaming, empty_streaming)
      |> assign(:artifacts, empty_artifacts)
      |> assign(:active_artifact, nil)
      |> assign(:tasks, [])}
@@ -282,7 +276,7 @@ defmodule MurmurWeb.WorkspaceLive do
     session = Workspaces.get_agent_session!(session_id)
     workspace_id = socket.assigns.workspace.id
     Phoenix.PubSub.unsubscribe(Murmur.PubSub, Topics.agent_messages(workspace_id, session_id))
-    Phoenix.PubSub.unsubscribe(Murmur.PubSub, Topics.agent_stream(workspace_id, session_id))
+    Phoenix.PubSub.unsubscribe(Murmur.PubSub, Topics.agent_conversation(workspace_id, session_id))
     Phoenix.PubSub.unsubscribe(Murmur.PubSub, Topics.agent_artifacts(workspace_id, session_id))
     stop_agent(session_id)
     cleanup_storage(session)
@@ -295,7 +289,6 @@ defmodule MurmurWeb.WorkspaceLive do
       end)
       |> update(:messages, &Map.delete(&1, session_id))
       |> update(:agent_statuses, &Map.delete(&1, session_id))
-      |> update(:streaming, &Map.delete(&1, session_id))
       |> update(:artifacts, &Map.delete(&1, session_id))
       |> then(fn s ->
         if s.assigns.active_artifact && s.assigns.active_artifact.session_id == session_id do
@@ -311,46 +304,8 @@ defmodule MurmurWeb.WorkspaceLive do
   # --- PubSub Handlers ---
 
   @impl true
-  def handle_info(%Jido.Signal{type: "murmur.message.completed", data: data}, socket) do
-    session_id = data.session_id
-    response = data.response
-
-    # Try to reload full history from agent thread to capture thinking/tool calls.
-    # Falls back to appending the response text if thread hasn't been populated
-    # (e.g. when using a mock LLM adapter in tests).
-    session = find_session(socket, session_id)
-    current_messages = Map.get(socket.assigns.messages, session_id, [])
-
-    messages =
-      if session do
-        loaded = WorkspaceState.load_messages_for_session(session)
-
-        if length(loaded) > length(current_messages) do
-          loaded
-        else
-          append_assistant_message(current_messages, response)
-        end
-      else
-        append_assistant_message(current_messages, response)
-      end
-
-    # Transfer accumulated usage from streaming state to the last assistant message
-    stream_state = Map.get(socket.assigns.streaming, session_id, @empty_stream)
-
-    messages =
-      if stream_state.usage do
-        attach_usage_to_last_assistant(messages, stream_state.usage)
-      else
-        messages
-      end
-
-    socket =
-      socket
-      |> update(:messages, &Map.put(&1, session_id, messages))
-      |> update(:agent_statuses, &Map.put(&1, session_id, :idle))
-      |> update(:streaming, &Map.put(&1, session_id, @empty_stream))
-
-    {:noreply, socket}
+  def handle_info(%Jido.Signal{type: "murmur.message.completed", data: %{session_id: session_id}}, socket) do
+    {:noreply, update(socket, :agent_statuses, &Map.put(&1, session_id, :idle))}
   end
 
   @impl true
@@ -384,89 +339,14 @@ defmodule MurmurWeb.WorkspaceLive do
 
   @impl true
   def handle_info({:status_change, session_id, status}, socket) do
-    socket = update(socket, :agent_statuses, &Map.put(&1, session_id, status))
+    {:noreply, update(socket, :agent_statuses, &Map.put(&1, session_id, status))}
+  end
 
+  @impl true
+  def handle_info(%Jido.Signal{type: "murmur.conversation.updated", data: %{session_id: session_id, message: message}}, socket) do
     socket =
-      if status == :idle do
-        update(socket, :streaming, &Map.put(&1, session_id, @empty_stream))
-      else
-        socket
-      end
-
-    {:noreply, socket}
-  end
-
-  @impl true
-  def handle_info(%Jido.Signal{type: "ai.llm.delta", data: data} = signal, socket) do
-    session_id = extract_session_id(signal)
-
-    case data do
-      %{delta: delta, chunk_type: :content} when is_binary(delta) and delta != "" ->
-        {:noreply, update_streaming(socket, session_id, :content, delta)}
-
-      %{delta: delta, chunk_type: :thinking} when is_binary(delta) and delta != "" ->
-        {:noreply, update_streaming(socket, session_id, :thinking, delta)}
-
-      _ ->
-        {:noreply, socket}
-    end
-  end
-
-  @impl true
-  def handle_info(%Jido.Signal{type: "ai.llm.response"} = signal, socket) do
-    session_id = extract_session_id(signal)
-
-    # Ignore stale signals that arrive after the request has completed
-    if Map.get(socket.assigns.agent_statuses, session_id) == :idle do
-      {:noreply, socket}
-    else
-      tool_calls = LLMResponse.extract_tool_calls(signal)
-
-      if tool_calls != [] do
-        pending = Enum.map(tool_calls, &build_pending_tool_call/1)
-        {:noreply, append_streaming_tool_calls(socket, session_id, pending)}
-      else
-        {:noreply, socket}
-      end
-    end
-  end
-
-  @impl true
-  def handle_info(%Jido.Signal{type: "ai.tool.result", data: data} = signal, socket) do
-    session_id = extract_session_id(signal)
-
-    # Ignore stale signals that arrive after the request has completed
-    if Map.get(socket.assigns.agent_statuses, session_id) == :idle do
-      {:noreply, socket}
-    else
-      call_id = data[:call_id] || data["call_id"]
-      tool_name = data[:tool_name] || data["tool_name"] || "tool"
-      result = data[:result] || data["result"]
-      formatted_result = format_tool_result(result)
-      status = tool_result_status(result)
-
-      completed = %{id: call_id, name: tool_name, result: formatted_result, status: status}
-      {:noreply, merge_tool_result(socket, session_id, completed)}
-    end
-  end
-
-  @impl true
-  def handle_info(%Jido.Signal{type: "ai.usage", data: data} = signal, socket) do
-    session_id = extract_session_id(signal)
-    usage = %{
-      input_tokens: data[:input_tokens] || data["input_tokens"] || 0,
-      output_tokens: data[:output_tokens] || data["output_tokens"] || 0,
-      total_tokens: data[:total_tokens] || data["total_tokens"] || 0,
-      model: data[:model] || data["model"],
-      duration_ms: data[:duration_ms] || data["duration_ms"]
-    }
-
-    # Accumulate usage across multiple LLM calls in a ReAct loop
-    socket =
-      update(socket, :streaming, fn streams ->
-        Map.update(streams, session_id, Map.put(@empty_stream, :usage, usage), fn s ->
-          Map.update(s, :usage, usage, &merge_usage_or_set(&1, usage))
-        end)
+      update(socket, :messages, fn messages_map ->
+        Map.update(messages_map, session_id, [message], &upsert_message(&1, message))
       end)
 
     {:noreply, socket}
@@ -569,96 +449,32 @@ defmodule MurmurWeb.WorkspaceLive do
 
   # --- Thread / State Helpers ---
 
-  defp update_streaming(socket, session_id, field, delta) do
-    update(socket, :streaming, fn streams ->
-      Map.update(streams, session_id, Map.put(@empty_stream, field, delta), fn s ->
-        Map.update(s, field, delta, &(&1 <> delta))
-      end)
-    end)
+  defp upsert_message(messages, message) do
+    case Enum.find_index(messages, &(&1.id == message.id)) do
+      nil -> messages ++ [message]
+      index -> List.replace_at(messages, index, message)
+    end
   end
 
-  defp build_pending_tool_call(tc) do
-    %{
-      id: tc[:id] || tc["id"],
-      name: tc[:name] || tc["name"] || "tool",
-      args: tc[:arguments] || tc["arguments"] || %{},
-      result: nil,
-      status: :running
-    }
+  defp insert_user_message(messages, message, :busy) do
+    case find_last_running_assistant_index(messages) do
+      nil -> messages ++ [message]
+      index -> List.insert_at(messages, index, message)
+    end
   end
 
-  defp append_streaming_tool_calls(socket, session_id, pending) do
-    update(socket, :streaming, fn streams ->
-      Map.update(streams, session_id, Map.put(@empty_stream, :tool_calls, pending), fn s ->
-        Map.update(s, :tool_calls, pending, &(&1 ++ pending))
-      end)
-    end)
-  end
+  defp insert_user_message(messages, message, _status), do: messages ++ [message]
 
-  defp merge_tool_result(socket, session_id, %{id: call_id} = completed) do
-    update(socket, :streaming, fn streams ->
-      Map.update(streams, session_id, @empty_stream, fn s ->
-        Map.update(s, :tool_calls, [], &update_or_append_tool_call(&1, call_id, completed))
-      end)
-    end)
-  end
-
-  defp update_or_append_tool_call(tcs, call_id, completed) do
-    if call_id && Enum.any?(tcs, &(&1[:id] == call_id)),
-      do: Enum.map(tcs, &maybe_merge_tool_call(&1, call_id, completed)),
-      else: tcs ++ [completed]
-  end
-
-  defp maybe_merge_tool_call(%{id: id} = tc, call_id, completed) when id == call_id,
-    do: Map.merge(tc, completed)
-
-  defp maybe_merge_tool_call(tc, _call_id, _completed), do: tc
-
-  defp format_tool_result({:ok, result, _effects}), do: truncate_result(inspect(result))
-  defp format_tool_result({:error, reason, _effects}), do: truncate_result("Error: #{inspect(reason)}")
-  defp format_tool_result({:ok, result}), do: truncate_result(inspect(result))
-  defp format_tool_result({:error, reason}), do: truncate_result("Error: #{inspect(reason)}")
-  defp format_tool_result(other), do: truncate_result(inspect(other))
-
-  defp truncate_result(str) when byte_size(str) > 500, do: String.slice(str, 0, 500) <> "…"
-  defp truncate_result(str), do: str
-
-  defp tool_result_status({:ok, _, _}), do: :completed
-  defp tool_result_status({:ok, _}), do: :completed
-  defp tool_result_status({:error, _, _}), do: :error
-  defp tool_result_status({:error, _}), do: :error
-  defp tool_result_status(_), do: :completed
-
-  defp merge_usage_or_set(nil, usage), do: usage
-  defp merge_usage_or_set(prev, usage), do: merge_usage(prev, usage)
-
-  defp merge_usage(prev, new) do
-    %{
-      input_tokens: (prev.input_tokens || 0) + (new.input_tokens || 0),
-      output_tokens: (prev.output_tokens || 0) + (new.output_tokens || 0),
-      total_tokens: (prev.total_tokens || 0) + (new.total_tokens || 0),
-      model: new.model || prev.model,
-      duration_ms: sum_duration(prev.duration_ms, new.duration_ms)
-    }
-  end
-
-  defp sum_duration(nil, nil), do: nil
-  defp sum_duration(a, nil), do: a
-  defp sum_duration(nil, b), do: b
-  defp sum_duration(a, b), do: a + b
-
-  defp attach_usage_to_last_assistant(messages, usage) do
+  defp find_last_running_assistant_index(messages) do
     messages
+    |> Enum.with_index()
     |> Enum.reverse()
-    |> do_attach_usage(usage)
-    |> Enum.reverse()
+    |> Enum.find_value(fn {message, index} ->
+      if JidoMurmur.DisplayMessage.assistant_message?(message) and Map.get(message, :status) == :running do
+        index
+      end
+    end)
   end
-
-  defp do_attach_usage([%{role: "assistant"} = msg | rest], usage) do
-    [Map.put(msg, :usage, usage) | rest]
-  end
-
-  defp do_attach_usage(other, _usage), do: other
 
   defp cleanup_storage(session) do
     {adapter, opts} = Murmur.Jido.__jido_storage__()
@@ -667,6 +483,7 @@ defmodule MurmurWeb.WorkspaceLive do
 
     adapter.delete_checkpoint(checkpoint_key, opts)
     adapter.delete_thread(session.id, opts)
+    JidoMurmur.ConversationProjector.clear(session.id)
   rescue
     e ->
       Logger.warning("Failed to cleanup storage for session #{session.id}: #{Exception.message(e)}")
@@ -728,10 +545,6 @@ defmodule MurmurWeb.WorkspaceLive do
 
   defp extract_session_id(_), do: nil
 
-  defp find_session(socket, session_id) do
-    Enum.find(socket.assigns.agent_sessions, &(&1.id == session_id))
-  end
-
   defp send_to_target(socket, nil, _content) do
     {:noreply, put_flash(socket, :error, "No agents available. Add an agent first.")}
   end
@@ -741,11 +554,12 @@ defmodule MurmurWeb.WorkspaceLive do
     topic = Topics.agent_messages(workspace_id, target_session.id)
 
     user_msg = JidoMurmur.DisplayMessage.user(content)
+    status = Map.get(socket.assigns.agent_statuses, target_session.id, :idle)
 
     socket =
       socket
       |> update(:messages, fn msgs ->
-        Map.update(msgs, target_session.id, [user_msg], &(&1 ++ [user_msg]))
+        Map.update(msgs, target_session.id, [user_msg], &insert_user_message(&1, user_msg, status))
       end)
       |> update(:agent_statuses, &Map.put(&1, target_session.id, :busy))
 
@@ -769,19 +583,6 @@ defmodule MurmurWeb.WorkspaceLive do
         {List.first(sessions), content}
     end
   end
-
-  defp append_assistant_message(messages, response) do
-    content = extract_response_content(response)
-
-    assistant_msg = JidoMurmur.DisplayMessage.assistant(content)
-
-    messages ++ [assistant_msg]
-  end
-
-  defp extract_response_content(response) when is_binary(response), do: response
-  defp extract_response_content(%{result: result}) when is_binary(result), do: result
-  defp extract_response_content(%{content: content}) when is_binary(content), do: content
-  defp extract_response_content(response), do: inspect(response)
 
   defp get_agent_status(agent_session_id) do
     pid = Murmur.Jido.whereis(agent_session_id)

@@ -12,7 +12,7 @@ if Code.ensure_loaded?(Igniter) do
 
     ## Component Groups
 
-      * `chat` — ChatMessage, ChatStream, MessageInput, StreamingIndicator
+      * `chat` — ChatMessage, MessageInput, StreamingIndicator
       * `workspace` — WorkspaceList, AgentSelector, AgentHeader
       * `artifacts` — ArtifactPanel with Generic fallback renderer
       * `all` — All components from all groups
@@ -30,7 +30,6 @@ if Code.ensure_loaded?(Igniter) do
     @component_groups %{
       "chat" => [
         %{template: "chat_message.ex", target: "chat_message.ex"},
-        %{template: "chat_stream.ex", target: "chat_stream.ex"},
         %{template: "message_input.ex", target: "message_input.ex"},
         %{template: "streaming_indicator.ex", target: "streaming_indicator.ex"}
       ],
@@ -82,7 +81,6 @@ if Code.ensure_loaded?(Igniter) do
       Import them in your LiveView or add to your app's html_helpers:
 
           import #{app_module}Web.Components.ChatMessage
-          import #{app_module}Web.Components.ChatStream
           # ... etc
       """)
     end

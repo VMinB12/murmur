@@ -110,6 +110,9 @@ defmodule JidoMurmurWeb.Components.ChatMessage do
             {@message.content}
           <% else %>
             {render_content(@message.content, @markdown_renderer)}
+            <%= if Map.get(@message, :status) == :running do %>
+              <span class="inline-block w-1 h-4 bg-primary animate-pulse ml-0.5 align-text-bottom"></span>
+            <% end %>
           <% end %>
         </div>
         <.usage_tooltip usage={Map.get(@message, :usage)} />

@@ -18,6 +18,10 @@ defmodule JidoMurmur.Topics do
   def agent_messages(workspace_id, session_id),
     do: "workspace:#{workspace_id}:agent:#{session_id}:messages"
 
+  @spec agent_conversation(String.t(), String.t()) :: String.t()
+  def agent_conversation(workspace_id, session_id),
+    do: "workspace:#{workspace_id}:agent:#{session_id}:conversation"
+
   @spec workspace_tasks(String.t()) :: String.t()
   def workspace_tasks(workspace_id),
     do: "workspace:#{workspace_id}:tasks"

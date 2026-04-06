@@ -38,19 +38,27 @@ So even when timing is favorable, live rendering is driven by a smaller, more fr
 
 This duplication increases the cost of fixing the stream-versus-refresh split because there is no single package-owned conversation read boundary yet.
 
+### 5. The live stream path does not currently expose a stable turn identity to the UI
+
+- `Runner` already creates a stable `request_id` for each agent run.
+- Persisted assistant turns are later reconstructed around `request_id` and `tool_call_id` semantics in the thread-backed projection path.
+- `StreamingPlugin` currently forwards raw `ai.*` signals directly, and `WorkspaceLive` reduces them by `session_id` plus best-effort `call_id` handling instead of one stable turn identifier.
+
+This means the live UI does not currently reduce events around the same turn identity that the completed path already depends on, which makes out-of-order reconciliation weaker than it needs to be.
+
 ## Options Considered
 
 | Option | Pros | Cons |
 |--------|------|------|
 | Patch the race only by relaxing the idle guard or reordering signal handling | Smallest change, could fix the immediate visibility bug quickly | Leaves two rendering models in place and does not address live/persisted divergence |
 | Keep separate live and persisted paths but enrich the live stream map until it matches completed messages better | Lower churn than a full redesign | Preserves duplicated concepts and keeps UI state ad hoc instead of package-owned |
-| Introduce a canonical conversation read model and reducer for both live and persisted output | One source of truth for in-progress and completed turns, clearer ownership, easier testing | Requires a focused architectural cleanup across `jido_murmur`, `jido_murmur_web`, and `murmur_demo` |
+| Introduce a core-owned conversation projector plus one Murmur-owned UI update contract for both live and persisted output | One source of truth for in-progress and completed turns, clearer ownership, easier testing, and no raw `ai.*` rendering protocol in the UI | Requires a focused architectural cleanup across `jido_murmur`, `jido_murmur_web`, and `murmur_demo` |
 
 ## Recommendation
 
-Create a focused follow-up that introduces a canonical conversation read model for both live and persisted output.
+Create a focused follow-up that introduces a core-owned conversation projector for both live and persisted output, then expose one Murmur-owned conversation update contract to UI consumers.
 
-The key idea is not just to fix the timing bug, but to remove the separate rendering models that made the bug possible and hard to reason about. Live streaming signals and persisted thread entries should converge through one package-owned reduction/projection boundary, so the UI renders the same conceptual turn before, during, and after completion.
+The key idea is not just to fix the timing bug, but to remove the separate rendering models that made the bug possible and hard to reason about. Live streaming signals and persisted thread entries should converge through one package-owned projector or equivalent read boundary, and all facts entering that boundary should be associated with a stable turn identity even when upstream raw signals do not provide one directly.
 
 ## References
 

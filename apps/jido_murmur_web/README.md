@@ -71,7 +71,7 @@ Copy component source files into your project for full customization:
 mix jido_murmur_web.install all
 
 # Copy specific groups
-mix jido_murmur_web.install chat        # ChatMessage, ChatStream, MessageInput
+mix jido_murmur_web.install chat        # ChatMessage, MessageInput, StreamingIndicator
 mix jido_murmur_web.install workspace   # WorkspaceList
 mix jido_murmur_web.install artifacts   # ArtifactPanel
 ```
@@ -82,8 +82,7 @@ Copied files land in `lib/my_app_web/components/jido_murmur/` with your app's na
 
 | Component | Function | Description |
 |-----------|----------|-------------|
-| `ChatMessage` | `chat_message/1` | Single chat message bubble with role, content, timestamps |
-| `ChatStream` | `chat_stream/1` | Live streaming tokens, thinking indicators, tool output |
+| `ChatMessage` | `chat_message/1` | Canonical chat bubble for in-progress or completed messages, including thinking, tool calls, and usage |
 | `AgentHeader` | `agent_header/1` | Agent column header with name, color, status |
 | `MessageInput` | `message_input/1` | Chat textarea with Enter-to-send keyboard shortcut |
 | `StreamingIndicator` | `streaming_indicator/1` | Agent busy/idle animation |

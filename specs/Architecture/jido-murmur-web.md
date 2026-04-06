@@ -9,15 +9,14 @@ Pre-built Phoenix LiveView component library providing drop-in UI building block
 ### Component Registry
 
 ```elixir
-import JidoMurmurWeb.Components  # imports all 10 component functions
+import JidoMurmurWeb.Components  # imports the shared chat, workspace, and artifact components
 ```
 
 ### Components
 
 | Component | Function | Purpose |
 |-----------|----------|---------|
-| `ChatMessage` | `chat_message/1` | Completed message bubble with thinking trace, tool calls, usage stats |
-| `ChatStream` | `chat_stream/1` | In-flight streaming state: thinking, tool calls, token-by-token content |
+| `ChatMessage` | `chat_message/1` | Canonical message bubble for in-progress or completed turns, including thinking trace, tool calls, usage stats, and running cursor |
 | `MessageInput` | `message_input/1` | Auto-resizing textarea with Enter-to-send keyboard shortcut |
 | `StreamingIndicator` | `streaming_indicator/1` | Animated dot indicator showing agent busy/idle status |
 | `AgentHeader` | `agent_header/1` | Column header with agent name, color dot, status, remove button |
@@ -48,7 +47,7 @@ renderers = %{
 
 ### Workspace Shell Boundaries
 
-- Shared chat primitives (`ChatMessage`, `ChatStream`, `MessageInput`, `AgentHeader`) provide the reusable interaction model and DaisyUI-aligned presentation primitives.
+- Shared chat primitives (`ChatMessage`, `MessageInput`, `AgentHeader`) provide the reusable interaction model and DaisyUI-aligned presentation primitives.
 - `ArtifactPanel` owns generic artifact shell concerns only: badge dispatch, detail dispatch, active artifact state, and safe fallback rendering.
 - Consumer applications are responsible for plugin-specific renderers, artifact follow-up actions, and any orchestration that depends on domain packages.
 
@@ -57,6 +56,12 @@ renderers = %{
 - `ChatMessage` renders headers and user-message styling from `JidoMurmur.DisplayMessage` helpers rather than comparing raw label strings
 - Shared components expect canonical display messages with explicit `actor` semantics
 - Presentation wording remains overridable by the consuming application because the shared library treats actor metadata as authoritative and labels as derived output
+
+### Canonical Conversation Rendering
+
+- Host applications are expected to render projector-backed canonical turn or message state rather than reducing raw `ai.*` lifecycle signals in the UI layer
+- Shared chat components may render in-progress and completed turns differently, but they should consume the same canonical message or turn shape
+- The shared package no longer assumes a separate UI-owned stream-state model is the source of truth
 
 ### Color Customization
 
@@ -75,7 +80,7 @@ Components accept optional `color` maps with `:dot`, `:header`, `:text`, `:bg` k
 mix jido_murmur_web.install all
 
 # Or selective groups:
-mix jido_murmur_web.install chat        # ChatMessage, ChatStream, MessageInput, StreamingIndicator
+mix jido_murmur_web.install chat        # ChatMessage, MessageInput, StreamingIndicator
 mix jido_murmur_web.install workspace   # WorkspaceList, AgentSelector, AgentHeader
 mix jido_murmur_web.install artifacts   # ArtifactPanel + generic fallback renderer
 ```

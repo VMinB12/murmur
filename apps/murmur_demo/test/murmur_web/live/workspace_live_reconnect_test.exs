@@ -11,6 +11,8 @@ defmodule MurmurWeb.WorkspaceLiveReconnectTest do
 
   import Phoenix.LiveViewTest
 
+  alias JidoMurmur.DisplayMessage
+  alias JidoMurmur.Signals.ConversationUpdated
   alias JidoMurmur.Signals.MessageCompleted
   alias JidoMurmur.Workspaces
 
@@ -95,6 +97,32 @@ defmodule MurmurWeb.WorkspaceLiveReconnectTest do
   end
 
   describe "messages from completed responses survive reconnect" do
+    test "projector snapshot is visible on fresh mount", %{conn: conn, workspace: workspace} do
+      {:ok, session} =
+        Workspaces.create_agent_session(workspace.id, %{
+          "agent_profile_id" => "general_agent",
+          "display_name" => "Alice"
+        })
+
+      on_exit(fn -> JidoMurmur.ConversationProjector.clear(session.id) end)
+
+      :ets.insert(
+        :jido_murmur_conversation_snapshots,
+        {session.id,
+         [
+           JidoMurmur.DisplayMessage.assistant("Still working",
+             id: "req-live-turn",
+             request_id: "req-live",
+             status: :running
+           )
+         ]}
+      )
+
+      {:ok, view, _html} = live(conn, ~p"/workspaces/#{workspace.id}")
+
+      assert has_element?(view, "#messages-#{session.id}", "Still working")
+    end
+
     test "PubSub message_completed from previous session shows in chat", %{
       conn: conn,
       workspace: workspace
@@ -108,10 +136,25 @@ defmodule MurmurWeb.WorkspaceLiveReconnectTest do
       {:ok, view, _html} = live(conn, ~p"/workspaces/#{workspace.id}")
 
       # Simulate a completed response arriving
+      message =
+        DisplayMessage.assistant("I am Alice",
+          id: "req-reconnect-turn",
+          request_id: "req-reconnect",
+          status: :completed
+        )
+
+      send(
+        view.pid,
+        ConversationUpdated.new!(
+          %{session_id: session.id, message: message},
+          subject: ConversationUpdated.subject(workspace.id, session.id)
+        )
+      )
+
       send(
         view.pid,
         MessageCompleted.new!(
-          %{session_id: session.id, response: "I am Alice"},
+          %{session_id: session.id, request_id: "req-reconnect", response: "I am Alice"},
           subject: MessageCompleted.subject(workspace.id, session.id)
         )
       )

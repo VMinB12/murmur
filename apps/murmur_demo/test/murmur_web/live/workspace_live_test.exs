@@ -18,6 +18,8 @@ defmodule MurmurWeb.WorkspaceLiveTest do
 
   alias JidoMurmur.ActorIdentity
   alias JidoMurmur.Catalog
+  alias JidoMurmur.DisplayMessage
+  alias JidoMurmur.Signals.ConversationUpdated
   alias JidoMurmur.Signals.MessageCompleted
   alias JidoMurmur.Signals.MessageReceived
   alias JidoMurmur.Workspaces
@@ -41,10 +43,30 @@ defmodule MurmurWeb.WorkspaceLiveTest do
 
   # --- Signal test helpers ---
 
-  defp build_message_completed(session_id, workspace_id, response) do
+  defp build_message_completed(session_id, workspace_id, response, request_id \\ Ecto.UUID.generate()) do
     MessageCompleted.new!(
-      %{session_id: session_id, response: response},
+      %{session_id: session_id, request_id: request_id, response: response},
       subject: MessageCompleted.subject(workspace_id, session_id)
+    )
+  end
+
+  defp build_conversation_updated(session_id, workspace_id, message) do
+    ConversationUpdated.new!(
+      %{session_id: session_id, message: message},
+      subject: ConversationUpdated.subject(workspace_id, session_id)
+    )
+  end
+
+  defp assistant_message(content, opts) do
+    request_id = Keyword.get(opts, :request_id, Ecto.UUID.generate())
+
+    DisplayMessage.assistant(content,
+      id: Keyword.get(opts, :id, request_id <> "-turn"),
+      request_id: request_id,
+      thinking: Keyword.get(opts, :thinking),
+      tool_calls: Keyword.get(opts, :tool_calls, []),
+      usage: Keyword.get(opts, :usage),
+      status: Keyword.get(opts, :status, :completed)
     )
   end
 
@@ -54,15 +76,6 @@ defmodule MurmurWeb.WorkspaceLiveTest do
       %{session_id: session_id, reason: reason},
       source: "/jido_murmur/runner",
       subject: "/workspaces/#{workspace_id}/agents/#{session_id}"
-    )
-  end
-
-  defp build_ai_signal(session_id, type, data) do
-    Jido.Signal.new!(
-      type,
-      data,
-      source: "/jido_ai",
-      subject: "/agents/#{session_id}"
     )
   end
 
@@ -235,14 +248,19 @@ defmodule MurmurWeb.WorkspaceLiveTest do
 
       # Send a message so there's conversation history
       topic = JidoMurmur.Topics.agent_messages(workspace.id, session.id)
+      conversation_topic = JidoMurmur.Topics.agent_conversation(workspace.id, session.id)
+      message = assistant_message("Hello from Alice", status: :completed)
+
+      Phoenix.PubSub.broadcast!(
+        Murmur.PubSub,
+        conversation_topic,
+        build_conversation_updated(session.id, workspace.id, message)
+      )
 
       Phoenix.PubSub.broadcast!(
         Murmur.PubSub,
         topic,
-        MessageCompleted.new!(
-          %{session_id: session.id, response: "Hello from Alice"},
-          subject: MessageCompleted.subject(workspace.id, session.id)
-        )
+        build_message_completed(session.id, workspace.id, message.content, message.request_id)
       )
 
       html = render(view)
@@ -374,6 +392,35 @@ defmodule MurmurWeb.WorkspaceLiveTest do
       # The form submit button should NOT have disabled attribute
       refute has_element?(view, "#msg-form-#{session.id} button[disabled]")
     end
+
+    test "message sent while busy renders before the active assistant turn", %{
+      conn: conn,
+      workspace: workspace,
+      session: session
+    } do
+      {:ok, view, _html} = live(conn, ~p"/workspaces/#{workspace.id}")
+
+      send(view.pid, {:status_change, session.id, :busy})
+
+      send(
+        view.pid,
+        build_conversation_updated(
+          session.id,
+          workspace.id,
+          assistant_message("Working on it", request_id: "req-busy", status: :running)
+        )
+      )
+
+      view
+      |> form("#msg-form-#{session.id}", message: %{content: "Stop this.", session_id: session.id})
+      |> render_submit()
+
+      html = render(view)
+      {user_pos, _} = :binary.match(html, "Stop this.")
+      {assistant_pos, _} = :binary.match(html, "Working on it")
+
+      assert user_pos < assistant_pos
+    end
   end
 
   describe "message completion via PubSub" do
@@ -395,7 +442,9 @@ defmodule MurmurWeb.WorkspaceLiveTest do
       {:ok, view, _html} = live(conn, ~p"/workspaces/#{workspace.id}")
 
       # Simulate PubSub message delivery
-      send(view.pid, build_message_completed(session.id, workspace.id, "Hello! How can I help?"))
+      message = assistant_message("Hello! How can I help?", status: :completed)
+      send(view.pid, build_conversation_updated(session.id, workspace.id, message))
+      send(view.pid, build_message_completed(session.id, workspace.id, message.content, message.request_id))
 
       html = render(view)
       assert html =~ "Hello! How can I help?"
@@ -417,6 +466,31 @@ defmodule MurmurWeb.WorkspaceLiveTest do
       html = render(view)
 
       # Loading indicator should be gone
+      refute html =~ "loading-dots"
+    end
+
+    test "late canonical conversation update still appears after completion", %{
+      conn: conn,
+      workspace: workspace,
+      session: session
+    } do
+      {:ok, view, _html} = live(conn, ~p"/workspaces/#{workspace.id}")
+
+      request_id = Ecto.UUID.generate()
+      send(view.pid, {:status_change, session.id, :busy})
+      send(view.pid, build_message_completed(session.id, workspace.id, "Done", request_id))
+
+      send(
+        view.pid,
+        build_conversation_updated(
+          session.id,
+          workspace.id,
+          assistant_message("Done", request_id: request_id, status: :completed)
+        )
+      )
+
+      html = render(view)
+      assert html =~ "Done"
       refute html =~ "loading-dots"
     end
 
@@ -454,8 +528,25 @@ defmodule MurmurWeb.WorkspaceLiveTest do
     } do
       {:ok, view, _html} = live(conn, ~p"/workspaces/#{workspace.id}")
 
-      send(view.pid, build_ai_signal(session.id, "ai.llm.delta", %{delta: "Hello", chunk_type: :content}))
-      send(view.pid, build_ai_signal(session.id, "ai.llm.delta", %{delta: " world", chunk_type: :content}))
+      request_id = Ecto.UUID.generate()
+
+      send(
+        view.pid,
+        build_conversation_updated(
+          session.id,
+          workspace.id,
+          assistant_message("Hello", request_id: request_id, status: :running)
+        )
+      )
+
+      send(
+        view.pid,
+        build_conversation_updated(
+          session.id,
+          workspace.id,
+          assistant_message("Hello world", request_id: request_id, status: :running)
+        )
+      )
 
       html = render(view)
       assert html =~ "Hello world"
@@ -468,14 +559,29 @@ defmodule MurmurWeb.WorkspaceLiveTest do
     } do
       {:ok, view, _html} = live(conn, ~p"/workspaces/#{workspace.id}")
 
+      request_id = Ecto.UUID.generate()
+
       send(
         view.pid,
-        build_ai_signal(session.id, "ai.llm.delta", %{delta: "partial...", chunk_type: :content})
+        build_conversation_updated(
+          session.id,
+          workspace.id,
+          assistant_message("partial...", request_id: request_id, status: :running)
+        )
       )
 
       assert render(view) =~ "partial..."
 
-      send(view.pid, build_message_completed(session.id, workspace.id, "Full response"))
+      send(
+        view.pid,
+        build_conversation_updated(
+          session.id,
+          workspace.id,
+          assistant_message("Full response", request_id: request_id, status: :completed)
+        )
+      )
+
+      send(view.pid, build_message_completed(session.id, workspace.id, "Full response", request_id))
       html = render(view)
 
       # Streaming area should be cleared, full message shown
@@ -489,12 +595,16 @@ defmodule MurmurWeb.WorkspaceLiveTest do
     } do
       {:ok, view, _html} = live(conn, ~p"/workspaces/#{workspace.id}")
 
-      # Agent must be busy for tool result signals to be processed
-      send(view.pid, {:status_change, session.id, :busy})
-
       send(
         view.pid,
-        build_ai_signal(session.id, "ai.tool.result", %{tool_name: "search_web", result: {:ok, "3 results", []}})
+        build_conversation_updated(
+          session.id,
+          workspace.id,
+          assistant_message("",
+            status: :running,
+            tool_calls: [%{id: "call-1", name: "search_web", result: "3 results", status: :completed}]
+          )
+        )
       )
 
       html = render(view)
@@ -509,12 +619,14 @@ defmodule MurmurWeb.WorkspaceLiveTest do
     } do
       {:ok, view, _html} = live(conn, ~p"/workspaces/#{workspace.id}")
 
-      send(
-        view.pid,
-        build_ai_signal(session.id, "ai.usage", %{input_tokens: 100, output_tokens: 50, total_tokens: 150, model: "gpt-5-mini", duration_ms: 1200})
-      )
+      message =
+        assistant_message("Done",
+          status: :completed,
+          usage: %{input_tokens: 100, output_tokens: 50, total_tokens: 150, model: "gpt-5-mini", duration_ms: 1200}
+        )
 
-      send(view.pid, build_message_completed(session.id, workspace.id, "Done"))
+      send(view.pid, build_conversation_updated(session.id, workspace.id, message))
+      send(view.pid, build_message_completed(session.id, workspace.id, "Done", message.request_id))
 
       html = render(view)
       assert html =~ "100 in"
@@ -529,17 +641,14 @@ defmodule MurmurWeb.WorkspaceLiveTest do
     } do
       {:ok, view, _html} = live(conn, ~p"/workspaces/#{workspace.id}")
 
-      send(
-        view.pid,
-        build_ai_signal(session.id, "ai.usage", %{input_tokens: 100, output_tokens: 50, total_tokens: 150, model: "gpt-5-mini", duration_ms: 500})
-      )
+      message =
+        assistant_message("Final answer",
+          status: :completed,
+          usage: %{input_tokens: 300, output_tokens: 130, total_tokens: 430, model: "gpt-5-mini", duration_ms: 1200}
+        )
 
-      send(
-        view.pid,
-        build_ai_signal(session.id, "ai.usage", %{input_tokens: 200, output_tokens: 80, total_tokens: 280, model: "gpt-5-mini", duration_ms: 700})
-      )
-
-      send(view.pid, build_message_completed(session.id, workspace.id, "Final answer"))
+      send(view.pid, build_conversation_updated(session.id, workspace.id, message))
+      send(view.pid, build_message_completed(session.id, workspace.id, "Final answer", message.request_id))
 
       html = render(view)
       assert html =~ "300 in"
@@ -633,7 +742,9 @@ defmodule MurmurWeb.WorkspaceLiveTest do
     } do
       {:ok, view, _html} = live(conn, ~p"/workspaces/#{workspace.id}")
 
-      send(view.pid, build_message_completed(alice.id, workspace.id, "Alice says hi"))
+      message = assistant_message("Alice says hi", status: :completed)
+      send(view.pid, build_conversation_updated(alice.id, workspace.id, message))
+      send(view.pid, build_message_completed(alice.id, workspace.id, message.content, message.request_id))
 
       _html = render(view)
       # The message should appear in Alice's column only
@@ -805,7 +916,9 @@ defmodule MurmurWeb.WorkspaceLiveTest do
       assert html =~ "Hello!"
 
       # Message was routed to Alice (first agent), so it should be in her messages
-      send(view.pid, build_message_completed(alice.id, workspace.id, "Hi from Alice"))
+      message = assistant_message("Hi from Alice", status: :completed)
+      send(view.pid, build_conversation_updated(alice.id, workspace.id, message))
+      send(view.pid, build_message_completed(alice.id, workspace.id, message.content, message.request_id))
       html = render(view)
       assert html =~ "Hi from Alice"
     end
@@ -824,7 +937,9 @@ defmodule MurmurWeb.WorkspaceLiveTest do
 
       # The actual content sent should be "Write tests" (stripped @mention)
       # Bob should get the message
-      send(view.pid, build_message_completed(bob.id, workspace.id, "Tests written!"))
+      message = assistant_message("Tests written!", status: :completed)
+      send(view.pid, build_conversation_updated(bob.id, workspace.id, message))
+      send(view.pid, build_message_completed(bob.id, workspace.id, message.content, message.request_id))
       html = render(view)
       assert html =~ "Tests written!"
     end
@@ -838,8 +953,13 @@ defmodule MurmurWeb.WorkspaceLiveTest do
       {:ok, view, _html} = live(conn, ~p"/workspaces/#{workspace.id}")
       view |> element("#view-unified-btn") |> render_click()
 
-      send(view.pid, build_message_completed(alice.id, workspace.id, "Hello from Alice"))
-      send(view.pid, build_message_completed(bob.id, workspace.id, "Hello from Bob"))
+      alice_message = assistant_message("Hello from Alice", status: :completed)
+      bob_message = assistant_message("Hello from Bob", status: :completed)
+
+      send(view.pid, build_conversation_updated(alice.id, workspace.id, alice_message))
+      send(view.pid, build_message_completed(alice.id, workspace.id, alice_message.content, alice_message.request_id))
+      send(view.pid, build_conversation_updated(bob.id, workspace.id, bob_message))
+      send(view.pid, build_message_completed(bob.id, workspace.id, bob_message.content, bob_message.request_id))
 
       html = render(view)
       assert html =~ "Hello from Alice"

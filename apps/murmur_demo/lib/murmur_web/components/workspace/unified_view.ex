@@ -4,7 +4,6 @@ defmodule MurmurWeb.Components.Workspace.UnifiedView do
 
   alias JidoMurmur.DisplayMessage
   import JidoMurmurWeb.Components.ChatMessage
-  import JidoMurmurWeb.Components.ChatStream
   import JidoMurmurWeb.Components.MessageInput
 
   alias MurmurWeb.Live.WorkspaceState
@@ -12,7 +11,6 @@ defmodule MurmurWeb.Components.Workspace.UnifiedView do
   attr :agent_sessions, :list, required: true
   attr :agent_statuses, :map, required: true
   attr :messages, :map, required: true
-  attr :streaming, :map, required: true
   attr :artifacts, :map, required: true
   attr :active_artifact, :any, required: true
   attr :show_task_board, :boolean, required: true
@@ -65,7 +63,7 @@ defmodule MurmurWeb.Components.Workspace.UnifiedView do
 
       <div class="flex-1 flex flex-col min-w-0">
         <div id="unified-messages" phx-hook="AutoScroll" class="flex-1 overflow-y-auto px-4 py-4 space-y-4">
-          <%= if @timeline == [] and Enum.all?(@streaming, fn {_id, stream} -> empty_stream?(stream) end) do %>
+          <%= if @timeline == [] do %>
             <div class="flex items-center justify-center h-full text-base-content/40 text-sm">
               Send a message to start chatting. Use @name to target a specific agent.
             </div>
@@ -101,28 +99,6 @@ defmodule MurmurWeb.Components.Workspace.UnifiedView do
             <% end %>
           <% end %>
 
-          <%= for session <- @agent_sessions do %>
-            <% stream = Map.get(@streaming, session.id, empty_stream()) %>
-            <%= if not empty_stream?(stream) do %>
-              <% colors = Catalog.agent_color(session.agent_profile_id, session.display_name) %>
-              <div class="flex gap-3 items-start">
-                <div class="avatar placeholder shrink-0 pt-1">
-                  <div class={[
-                    "w-9 rounded-full text-white text-xs font-semibold",
-                    colors.dot
-                  ]}>
-                    <span>{String.first(session.display_name || "?")}</span>
-                  </div>
-                </div>
-                <div class="min-w-0 max-w-[72%] flex-1">
-                  <.chat_stream
-                    stream={stream}
-                    color={Map.put(colors, :label, session.display_name)}
-                  />
-                </div>
-              </div>
-            <% end %>
-          <% end %>
         </div>
 
         <%= if visible_artifacts?(@artifacts) do %>
@@ -168,12 +144,6 @@ defmodule MurmurWeb.Components.Workspace.UnifiedView do
     </div>
     """
   end
-
-  defp empty_stream?(stream) do
-    stream.content == "" and stream.thinking == "" and stream.tool_calls == []
-  end
-
-  defp empty_stream, do: %{content: "", thinking: "", tool_calls: [], usage: nil}
 
   defp visible_artifacts?(artifacts), do: visible_artifacts(artifacts) != []
 

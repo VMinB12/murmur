@@ -6,7 +6,6 @@ defmodule JidoMurmurWeb.Components.ChatTest do
   alias JidoMurmur.ActorIdentity
   alias JidoMurmur.UITurn.ToolCall
   alias JidoMurmurWeb.Components.ChatMessage
-  alias JidoMurmurWeb.Components.ChatStream
   alias JidoMurmurWeb.Components.MessageInput
 
   describe "ChatMessage.chat_message/1" do
@@ -78,6 +77,21 @@ defmodule JidoMurmurWeb.Components.ChatTest do
       assert html =~ "Completed"
       assert html =~ "add_task"
       assert html =~ "Error"
+    end
+
+    test "renders running assistant cursor for in-progress turns" do
+      message = %{
+        id: "msg-running",
+        role: "assistant",
+        content: "Still working",
+        sender_name: nil,
+        status: :running
+      }
+
+      html = render_component(&ChatMessage.chat_message/1, message: message)
+
+      assert html =~ "Still working"
+      assert html =~ "animate-pulse"
     end
 
     test "renders UITurn tool call structs without Access errors" do
@@ -164,85 +178,6 @@ defmodule JidoMurmurWeb.Components.ChatTest do
       html = render_component(&ChatMessage.chat_message/1, message: message)
 
       refute html =~ "bg-base-200"
-    end
-  end
-
-  describe "ChatStream.chat_stream/1" do
-    test "renders streaming content with cursor" do
-      stream = %{content: "Hello world", thinking: "", tool_calls: []}
-
-      html = render_component(&ChatStream.chat_stream/1, stream: stream)
-
-      assert html =~ "Hello world"
-      assert html =~ "animate-pulse"
-      assert html =~ "assistant"
-      assert html =~ "chat-bubble"
-    end
-
-    test "renders thinking state" do
-      stream = %{content: "", thinking: "Analyzing the problem...", tool_calls: []}
-
-      html = render_component(&ChatStream.chat_stream/1, stream: stream)
-
-      assert html =~ "Analyzing the problem..."
-      assert html =~ "Thinking..."
-      assert html =~ "loading loading-dots"
-    end
-
-    test "renders streaming tool calls" do
-      stream = %{
-        content: "",
-        thinking: "",
-        tool_calls: [
-          %{name: "search_papers", result: "3 results", status: :completed}
-        ]
-      }
-
-      html = render_component(&ChatStream.chat_stream/1, stream: stream)
-
-      assert html =~ "search_papers"
-      assert html =~ "Completed"
-      assert html =~ "3 results"
-    end
-
-    test "renders UITurn tool call structs in streaming state" do
-      stream = %{
-        content: "",
-        thinking: "",
-        tool_calls: [
-          %ToolCall{
-            id: "call-2",
-            name: "tell",
-            args: %{"target_agent" => "bob", "message" => "Hi"},
-            result: nil,
-            status: :running
-          }
-        ]
-      }
-
-      html = render_component(&ChatStream.chat_stream/1, stream: stream)
-
-      assert html =~ "tell"
-      assert html =~ "target_agent"
-      assert html =~ "Running"
-    end
-
-    test "renders nothing when stream is empty" do
-      stream = %{content: "", thinking: "", tool_calls: []}
-
-      html = render_component(&ChatStream.chat_stream/1, stream: stream)
-
-      refute html =~ "assistant"
-      refute html =~ "Thinking"
-    end
-
-    test "applies color when provided" do
-      stream = %{content: "Some text", thinking: "", tool_calls: []}
-      color = %{bg: "bg-emerald-500/10"}
-
-      html = render_component(&ChatStream.chat_stream/1, stream: stream, color: color)
-
-      assert html =~ "bg-emerald-500/10"
     end
   end
 

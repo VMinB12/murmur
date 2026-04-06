@@ -7,8 +7,8 @@ defmodule JidoMurmur.AgentHelper do
   """
 
   alias JidoMurmur.Catalog
+  alias JidoMurmur.ConversationProjector
   alias JidoMurmur.Observability.SessionCache
-  alias JidoMurmur.UITurn
 
   require Logger
 
@@ -55,20 +55,10 @@ defmodule JidoMurmur.AgentHelper do
   @doc """
   Load messages from an agent's thread, projected into UI-ready format.
 
-  Tries the live agent process first, then falls back to persisted storage.
+  Uses Murmur's canonical conversation projector snapshot.
   """
   def load_messages(session) do
-    jido_mod = JidoMurmur.jido_mod()
-    pid = jido_mod.whereis(session.id)
-
-    if pid do
-      case Jido.AgentServer.state(pid) do
-        {:ok, %{agent: agent}} -> project_thread(agent)
-        _ -> load_messages_from_storage(session)
-      end
-    else
-      load_messages_from_storage(session)
-    end
+    ConversationProjector.snapshot(session)
   end
 
   @doc """
@@ -95,6 +85,7 @@ defmodule JidoMurmur.AgentHelper do
     pubsub = JidoMurmur.pubsub()
     Phoenix.PubSub.subscribe(pubsub, JidoMurmur.Topics.agent_messages(session.workspace_id, session.id))
     Phoenix.PubSub.subscribe(pubsub, JidoMurmur.Topics.agent_stream(session.workspace_id, session.id))
+    Phoenix.PubSub.subscribe(pubsub, JidoMurmur.Topics.agent_conversation(session.workspace_id, session.id))
     Phoenix.PubSub.subscribe(pubsub, JidoMurmur.Topics.agent_artifacts(session.workspace_id, session.id))
     :ok
   end
@@ -117,6 +108,7 @@ defmodule JidoMurmur.AgentHelper do
 
       adapter.delete_checkpoint(checkpoint_key, opts)
       adapter.delete_thread(session.id, opts)
+      ConversationProjector.clear(session.id)
     end)
 
     :ok
@@ -127,29 +119,6 @@ defmodule JidoMurmur.AgentHelper do
   end
 
   # --- Private Helpers ---
-
-  defp load_messages_from_storage(session) do
-    jido_mod = JidoMurmur.jido_mod()
-    agent_module = Catalog.agent_module(session.agent_profile_id)
-
-    case jido_mod.thaw(agent_module, session.id) do
-      {:ok, agent} -> project_thread(agent)
-      {:error, :not_found} -> []
-    end
-  end
-
-  defp project_thread(agent) do
-    thread = get_in_thread(agent)
-
-    if thread do
-      UITurn.project_entries(thread.entries)
-    else
-      []
-    end
-  end
-
-  defp get_in_thread(%{state: %{__thread__: thread}}) when not is_nil(thread), do: thread
-  defp get_in_thread(_), do: nil
 
   defp load_artifacts_from_storage(session) do
     jido_mod = JidoMurmur.jido_mod()

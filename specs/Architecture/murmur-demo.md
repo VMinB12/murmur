@@ -90,6 +90,13 @@ The main LiveView handles:
 - `WorkspaceLive` creates optimistic local messages with `DisplayMessage.user/2` and consumes visible programmatic messages through `DisplayMessage.from_received/1`
 - Human-facing task-assignment wording is chosen in the LiveView edge while the runtime payload carries explicit `origin_actor` metadata for downstream rendering
 
+## Canonical Conversation Update Flow
+
+- `WorkspaceLive` mounts from projector-backed conversation snapshots instead of reconstructing live assistant turns from raw `ai.*` lifecycle signals
+- During a connected session, the demo subscribes to Murmur-owned `murmur.conversation.updated` events for canonical assistant-turn updates
+- `murmur.message.completed` still matters for run lifecycle and busy or idle status, but it is no longer the source of truth for rendered assistant content
+- Raw `ai.*` signals are not the demo rendering contract for chat surfaces anymore
+
 ## Dependencies
 
 ### Umbrella Packages

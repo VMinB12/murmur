@@ -25,6 +25,7 @@ defmodule JidoMurmur.StreamingPlugin do
     ]
 
   alias JidoMurmur.Observability
+  alias JidoMurmur.Runner
 
   @impl Jido.Plugin
   def handle_signal(signal, context) do
@@ -46,6 +47,10 @@ defmodule JidoMurmur.StreamingPlugin do
         %{signal | subject: "/agents/#{session_id}"}
       end
 
+    signal = maybe_attach_request_id(signal, session_id)
+
+    _ = JidoMurmur.ConversationProjector.apply_signal(workspace_id, session_id, context.agent, signal)
+
     Observability.record_signal(signal, %{workspace_id: workspace_id, session_id: session_id})
 
     Phoenix.PubSub.broadcast(JidoMurmur.pubsub(), topic, signal)
@@ -55,4 +60,16 @@ defmodule JidoMurmur.StreamingPlugin do
   @doc "Returns the PubSub topic for agent signals for the given session."
   def stream_topic(workspace_id, session_id),
     do: JidoMurmur.Topics.agent_stream(workspace_id, session_id)
+
+  defp maybe_attach_request_id(%Jido.Signal{data: data} = signal, _session_id) when not is_map(data), do: signal
+
+  defp maybe_attach_request_id(%Jido.Signal{data: data} = signal, session_id) do
+    request_id = Map.get(data, :request_id) || Map.get(data, "request_id") || Runner.active_request_id(session_id)
+
+    if is_binary(request_id) do
+      %{signal | data: Map.put(data, :request_id, request_id)}
+    else
+      signal
+    end
+  end
 end

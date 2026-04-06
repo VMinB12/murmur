@@ -7,10 +7,11 @@ defmodule JidoMurmur.DisplayMessage do
   alias JidoMurmur.UITurn.ToolCall
 
   @enforce_keys [:id, :role, :content]
-  defstruct [:id, :role, :content, :actor, :sender_name, :thinking, :tool_calls, :usage, :status]
+  defstruct [:id, :request_id, :role, :content, :actor, :sender_name, :thinking, :tool_calls, :usage, :status]
 
   @type t :: %__MODULE__{
           id: String.t(),
+      request_id: String.t() | nil,
           role: String.t(),
           content: String.t(),
           actor: ActorIdentity.t() | nil,
@@ -27,6 +28,7 @@ defmodule JidoMurmur.DisplayMessage do
 
     %__MODULE__{
       id: Keyword.get(opts, :id, Uniq.UUID.uuid7()),
+      request_id: Keyword.get(opts, :request_id),
       role: "user",
       content: content,
       actor: actor,
@@ -42,6 +44,7 @@ defmodule JidoMurmur.DisplayMessage do
   def assistant(content, opts \\ []) when is_binary(content) do
     %__MODULE__{
       id: Keyword.get(opts, :id, Uniq.UUID.uuid7()),
+      request_id: Keyword.get(opts, :request_id),
       role: "assistant",
       content: content,
       actor: normalize_actor(Keyword.get(opts, :actor)),
@@ -64,6 +67,7 @@ defmodule JidoMurmur.DisplayMessage do
       "assistant" ->
         assistant(content,
           id: Map.get(message, :id, Uniq.UUID.uuid7()),
+          request_id: Map.get(message, :request_id),
           actor: actor,
           sender_name: sender_name,
           thinking: Map.get(message, :thinking),
@@ -75,6 +79,7 @@ defmodule JidoMurmur.DisplayMessage do
       _ ->
         user(content,
           id: Map.get(message, :id, Uniq.UUID.uuid7()),
+          request_id: Map.get(message, :request_id),
           actor: actor,
           sender_name: sender_name,
           thinking: Map.get(message, :thinking),

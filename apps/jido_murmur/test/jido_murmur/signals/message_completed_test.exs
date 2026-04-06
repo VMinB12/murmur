@@ -6,11 +6,12 @@ defmodule JidoMurmur.Signals.MessageCompletedTest do
   describe "new/2" do
     test "creates signal with correct type and source" do
       {:ok, signal} =
-        MessageCompleted.new(%{session_id: "sess_abc", response: "Hello!"})
+        MessageCompleted.new(%{session_id: "sess_abc", request_id: "req_123", response: "Hello!"})
 
       assert signal.type == "murmur.message.completed"
       assert signal.source == "/jido_murmur/runner"
       assert signal.data.session_id == "sess_abc"
+      assert signal.data.request_id == "req_123"
       assert signal.data.response == "Hello!"
       assert signal.id != nil
       assert signal.time != nil
@@ -21,7 +22,7 @@ defmodule JidoMurmur.Signals.MessageCompletedTest do
 
       {:ok, signal} =
         MessageCompleted.new(
-          %{session_id: "sess_abc", response: "Hi"},
+          %{session_id: "sess_abc", request_id: "req_123", response: "Hi"},
           subject: subject
         )
 
@@ -29,15 +30,20 @@ defmodule JidoMurmur.Signals.MessageCompletedTest do
     end
 
     test "rejects missing session_id" do
-      assert {:error, _} = MessageCompleted.new(%{response: "Hello!"})
+      assert {:error, _} = MessageCompleted.new(%{request_id: "req_123", response: "Hello!"})
+    end
+
+    test "rejects missing request_id" do
+      assert {:error, _} = MessageCompleted.new(%{session_id: "sess_abc", response: "Hello!"})
     end
 
     test "rejects missing response" do
-      assert {:error, _} = MessageCompleted.new(%{session_id: "sess_abc"})
+      assert {:error, _} = MessageCompleted.new(%{session_id: "sess_abc", request_id: "req_123"})
     end
 
     test "rejects response payloads that are neither strings nor maps" do
-      assert {:error, _} = MessageCompleted.new(%{session_id: "sess_abc", response: [:not, :valid]})
+      assert {:error, _} =
+               MessageCompleted.new(%{session_id: "sess_abc", request_id: "req_123", response: [:not, :valid]})
     end
   end
 

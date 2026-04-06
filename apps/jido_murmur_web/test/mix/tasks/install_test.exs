@@ -10,15 +10,13 @@ defmodule Mix.Tasks.JidoMurmurWeb.InstallTest do
   describe "jido_murmur_web.install" do
     test "copies chat group components", %{tmp_dir: tmp_dir} do
       in_project(tmp_dir, fn ->
-        output = capture_io(fn -> Install.run(["chat"]) end)
-
-        assert output =~ "chat_message.ex"
-        assert output =~ "chat_stream.ex"
-        assert output =~ "message_input.ex"
-        assert output =~ "streaming_indicator.ex"
+        capture_io(fn -> Install.run(["chat"]) end)
 
         target_dir = Path.join(tmp_dir, "lib/jido_murmur_web_web/components/jido_murmur")
         assert File.dir?(target_dir)
+        assert File.exists?(Path.join(target_dir, "chat_message.ex"))
+        assert File.exists?(Path.join(target_dir, "message_input.ex"))
+        assert File.exists?(Path.join(target_dir, "streaming_indicator.ex"))
 
         chat_message = File.read!(Path.join(target_dir, "chat_message.ex"))
         assert chat_message =~ "JidoMurmurWebWeb.Components.ChatMessage"
@@ -28,19 +26,18 @@ defmodule Mix.Tasks.JidoMurmurWeb.InstallTest do
 
     test "copies workspace group components", %{tmp_dir: tmp_dir} do
       in_project(tmp_dir, fn ->
-        output = capture_io(fn -> Install.run(["workspace"]) end)
+        capture_io(fn -> Install.run(["workspace"]) end)
 
-        assert output =~ "workspace_list.ex"
-        assert output =~ "agent_selector.ex"
-        assert output =~ "agent_header.ex"
+        target_dir = Path.join(tmp_dir, "lib/jido_murmur_web_web/components/jido_murmur")
+        assert File.exists?(Path.join(target_dir, "workspace_list.ex"))
+        assert File.exists?(Path.join(target_dir, "agent_selector.ex"))
+        assert File.exists?(Path.join(target_dir, "agent_header.ex"))
       end)
     end
 
     test "copies artifacts group components", %{tmp_dir: tmp_dir} do
       in_project(tmp_dir, fn ->
-        output = capture_io(fn -> Install.run(["artifacts"]) end)
-
-        assert output =~ "artifact_panel.ex"
+        capture_io(fn -> Install.run(["artifacts"]) end)
 
         target_dir = Path.join(tmp_dir, "lib/jido_murmur_web_web/components/jido_murmur")
         assert File.exists?(Path.join(target_dir, "artifact_panel.ex"))
@@ -50,17 +47,17 @@ defmodule Mix.Tasks.JidoMurmurWeb.InstallTest do
 
     test "copies all components with 'all' group", %{tmp_dir: tmp_dir} do
       in_project(tmp_dir, fn ->
-        output = capture_io(fn -> Install.run(["all"]) end)
+        capture_io(fn -> Install.run(["all"]) end)
 
-        assert output =~ "chat_message.ex"
-        assert output =~ "chat_stream.ex"
-        assert output =~ "message_input.ex"
-        assert output =~ "streaming_indicator.ex"
-        assert output =~ "workspace_list.ex"
-        assert output =~ "agent_selector.ex"
-        assert output =~ "agent_header.ex"
-        assert output =~ "artifact_panel.ex"
-        assert output =~ "artifact_panel/generic.ex"
+        target_dir = Path.join(tmp_dir, "lib/jido_murmur_web_web/components/jido_murmur")
+        assert File.exists?(Path.join(target_dir, "chat_message.ex"))
+        assert File.exists?(Path.join(target_dir, "message_input.ex"))
+        assert File.exists?(Path.join(target_dir, "streaming_indicator.ex"))
+        assert File.exists?(Path.join(target_dir, "workspace_list.ex"))
+        assert File.exists?(Path.join(target_dir, "agent_selector.ex"))
+        assert File.exists?(Path.join(target_dir, "agent_header.ex"))
+        assert File.exists?(Path.join(target_dir, "artifact_panel.ex"))
+        assert File.exists?(Path.join(target_dir, "artifact_panel/generic.ex"))
       end)
     end
 
@@ -70,12 +67,11 @@ defmodule Mix.Tasks.JidoMurmurWeb.InstallTest do
         File.mkdir_p!(target_dir)
         File.write!(Path.join(target_dir, "chat_message.ex"), "# existing")
 
-        output = capture_io(fn -> Install.run(["chat"]) end)
-
-        assert output =~ "chat_message.ex already exists, skipping"
-        assert output =~ "chat_stream.ex"
+        capture_io(fn -> Install.run(["chat"]) end)
 
         assert File.read!(Path.join(target_dir, "chat_message.ex")) == "# existing"
+        assert File.exists?(Path.join(target_dir, "message_input.ex"))
+        assert File.exists?(Path.join(target_dir, "streaming_indicator.ex"))
       end)
     end
 

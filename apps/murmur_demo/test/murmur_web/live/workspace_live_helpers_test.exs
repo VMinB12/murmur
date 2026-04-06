@@ -1,7 +1,6 @@
 defmodule MurmurWeb.WorkspaceLiveHelpersTest do
   @moduledoc """
-  Tests for WorkspaceLive internal helpers: thread projection and hibernate.
-  Validates that AgentServer.State is correctly unwrapped to extract the Agent.
+  Tests for workspace state helpers after the conversation projector refactor.
 
   Uses LLM mock — no real API calls.
   """
@@ -9,6 +8,7 @@ defmodule MurmurWeb.WorkspaceLiveHelpersTest do
 
   alias JidoMurmur.ActorIdentity
   alias JidoMurmur.Catalog
+  alias JidoMurmur.DisplayMessage
   alias JidoMurmur.Workspaces
   alias MurmurWeb.Live.WorkspaceState
 
@@ -45,53 +45,26 @@ defmodule MurmurWeb.WorkspaceLiveHelpersTest do
     end
   end
 
-  describe "project_thread/1 extracts thread from agent" do
-    test "returns empty list when agent has no thread yet", %{pid: pid} do
-      {:ok, server_state} = Jido.AgentServer.state(pid)
-      agent = server_state.agent
-
-      messages = WorkspaceState.project_thread(agent)
+  describe "load_messages_for_session/1 uses canonical snapshots" do
+    test "returns empty list when no projector snapshot exists", %{session: session} do
+      messages = WorkspaceState.load_messages_for_session(session)
       assert is_list(messages)
     end
 
-    test "returns messages from a populated thread", %{pid: pid} do
-      # Inject a thread with entries directly into agent state (no LLM call needed)
-      {:ok, server_state} = Jido.AgentServer.state(pid)
-      agent = server_state.agent
+    test "returns projector-backed messages when a snapshot exists", %{session: session} do
+      snapshot = [DisplayMessage.assistant("Hi there!", id: "req-1-turn", request_id: "req-1", status: :running)]
 
-      now = System.system_time(:millisecond)
+      :ets.insert(:jido_murmur_conversation_snapshots, {session.id, snapshot})
 
-      thread =
-        [id: "test-thread"]
-        |> Jido.Thread.new()
-        |> Jido.Thread.append(%{
-          kind: :message,
-          payload: %{role: "user", content: "Hello"},
-          at: now
-        })
-        |> Jido.Thread.append(%{
-          kind: :ai_message,
-          payload: %{role: "assistant", content: "Hi there!"},
-          at: now + 1
-        })
+      on_exit(fn -> JidoMurmur.ConversationProjector.clear(session.id) end)
 
-      agent = put_in(agent.state[:__thread__], thread)
-
-      messages = WorkspaceState.project_thread(agent)
-      assert length(messages) == 2
-
-      roles = Enum.map(messages, & &1.role)
-      assert "user" in roles
-      assert "assistant" in roles
-
-      assert Enum.any?(messages, &(&1.actor == ActorIdentity.human()))
-      assert Enum.any?(messages, &(&1.role == "assistant" and is_nil(&1.actor)))
+      assert WorkspaceState.load_messages_for_session(session) == snapshot
     end
 
     test "unified_timeline attaches canonical assistant actor identity", %{session: session} do
       messages_map = %{
         session.id => [
-          JidoMurmur.DisplayMessage.assistant("Ready")
+          DisplayMessage.assistant("Ready")
         ]
       }
 

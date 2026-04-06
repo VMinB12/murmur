@@ -39,6 +39,15 @@ defmodule JidoMurmur.Runner do
     :ets.lookup(@active_table, session_id) != []
   end
 
+  @doc "Return the active request id for a session, if any."
+  @spec active_request_id(String.t()) :: String.t() | nil
+  def active_request_id(session_id) when is_binary(session_id) do
+    case :ets.lookup(@active_table, session_id) do
+      [{^session_id, request_id}] when is_binary(request_id) -> request_id
+      _ -> nil
+    end
+  end
+
   # --- Private ---
 
   defp do_start_run(session, input, pid) do
@@ -151,11 +160,13 @@ defmodule JidoMurmur.Runner do
           %{session_id: session.id, request_id: request_id}
         )
 
+        JidoMurmur.ConversationProjector.reconcile_session(session)
+
         hibernate_agent(session.id)
 
         signal =
           MessageCompleted.new!(
-            %{session_id: session.id, response: response},
+            %{session_id: session.id, request_id: request_id, response: response},
             subject: MessageCompleted.subject(session.workspace_id, session.id)
           )
 

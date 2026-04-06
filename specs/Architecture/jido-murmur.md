@@ -110,6 +110,14 @@ All topics follow `workspace:{wid}:...` for multi-workspace isolation:
 - The projection boundary normalizes persisted string-keyed payloads once, but it no longer infers actor identity from content prefixes such as `"[Alice]: ..."`
 - Display labels are derived from actor metadata and rendering helpers, not treated as the runtime source of truth
 
+### Canonical Conversation Projector
+
+- `JidoMurmur.ConversationProjector` owns the core conversation snapshot and incremental update boundary for assistant turns
+- `JidoMurmur.ConversationReadModel` reduces raw `ai.*` lifecycle facts into canonical in-progress turn state keyed by stable `request_id`
+- `JidoMurmur.Signals.ConversationUpdated` is the Murmur-owned UI update contract for connected clients
+- Raw `ai.*` signals may still exist for observability or internal runtime use, but they are no longer the rendering contract for chat surfaces
+- Finalized thread-backed history reconciles through the same canonical projection model instead of remaining a separate richer UI path
+
 ### Request Transformation Pipeline
 
 Multiple transformers are chained via `ComposableRequestTransformer`:
@@ -239,6 +247,7 @@ jido_murmur_thread_entries
 
 | Signal | Type | Emitted By |
 |--------|------|------------|
+| `ConversationUpdated` | `murmur.conversation.updated` | `ConversationProjector` |
 | `MessageReceived` | `murmur.message.received` | `Ingress.ProgrammaticDelivery` |
 | `MessageCompleted` | `murmur.message.completed` | `Runner` |
 

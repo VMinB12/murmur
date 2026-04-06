@@ -63,6 +63,45 @@ defmodule JidoMurmur.StreamingPluginTest do
       assert_receive %Jido.Signal{type: "ai.tool.started", subject: "/agents/" <> _}
     end
 
+    test "emits canonical conversation updates when a request id is active" do
+      workspace_id = Ecto.UUID.generate()
+      session_id = Ecto.UUID.generate()
+      request_id = Ecto.UUID.generate()
+
+      stream_topic = StreamingPlugin.stream_topic(workspace_id, session_id)
+      conversation_topic = JidoMurmur.Topics.agent_conversation(workspace_id, session_id)
+
+      Phoenix.PubSub.subscribe(JidoMurmur.pubsub(), stream_topic)
+      Phoenix.PubSub.subscribe(JidoMurmur.pubsub(), conversation_topic)
+      :ets.insert(:jido_murmur_active_runners, {session_id, request_id})
+
+      on_exit(fn ->
+        :ets.delete(:jido_murmur_active_runners, session_id)
+        JidoMurmur.ConversationProjector.clear(session_id)
+      end)
+
+      signal =
+        Jido.Signal.new!(
+          "ai.llm.delta",
+          %{delta: "Hello", chunk_type: :content},
+          source: "/test"
+        )
+
+      assert {:ok, :continue} = StreamingPlugin.handle_signal(signal, build_context(session_id, workspace_id))
+
+      assert_receive %Jido.Signal{type: "ai.llm.delta", subject: "/agents/" <> _}
+
+      assert_receive %Jido.Signal{
+                       type: "murmur.conversation.updated",
+                       data: %{
+                         session_id: ^session_id,
+                         message: %{id: message_id, request_id: ^request_id, content: "Hello"}
+                       }
+                     }
+
+      assert message_id == request_id <> "-turn"
+    end
+
     test "handles ai.request.started signal" do
       workspace_id = Ecto.UUID.generate()
       session_id = Ecto.UUID.generate()

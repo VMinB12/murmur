@@ -4,47 +4,18 @@ defmodule MurmurWeb.Live.WorkspaceState do
   """
 
   alias JidoArtifacts.Envelope
+  alias JidoMurmur.AgentHelper
   alias JidoMurmur.Catalog
   alias JidoMurmur.DisplayMessage
-  alias JidoMurmur.UITurn
 
   @spec load_messages_for_session(map()) :: list()
   def load_messages_for_session(session) do
-    pid = Murmur.Jido.whereis(session.id)
-
-    if pid do
-      case Jido.AgentServer.state(pid) do
-        {:ok, %{agent: agent}} -> project_thread(agent)
-        _ -> load_messages_from_storage(session)
-      end
-    else
-      load_messages_from_storage(session)
-    end
+    AgentHelper.load_messages(session)
   end
 
   @spec load_artifacts_for_session(map()) :: map()
   def load_artifacts_for_session(session) do
-    pid = Murmur.Jido.whereis(session.id)
-
-    if pid do
-      case Jido.AgentServer.state(pid) do
-        {:ok, %{agent: agent}} -> extract_artifacts(agent)
-        _ -> load_artifacts_from_storage(session)
-      end
-    else
-      load_artifacts_from_storage(session)
-    end
-  end
-
-  @spec project_thread(map()) :: list()
-  def project_thread(agent) do
-    thread = get_in_thread(agent)
-
-    if thread do
-      UITurn.project_entries(thread.entries)
-    else
-      []
-    end
+    AgentHelper.load_artifacts(session)
   end
 
   @spec extract_artifacts(map()) :: map()
@@ -101,24 +72,4 @@ defmodule MurmurWeb.Live.WorkspaceState do
     end
   end
 
-  defp load_messages_from_storage(session) do
-    agent_module = Catalog.agent_module(session.agent_profile_id)
-
-    case Murmur.Jido.thaw(agent_module, session.id) do
-      {:ok, agent} -> project_thread(agent)
-      {:error, :not_found} -> []
-    end
-  end
-
-  defp load_artifacts_from_storage(session) do
-    agent_module = Catalog.agent_module(session.agent_profile_id)
-
-    case Murmur.Jido.thaw(agent_module, session.id) do
-      {:ok, agent} -> extract_artifacts(agent)
-      {:error, :not_found} -> %{}
-    end
-  end
-
-  defp get_in_thread(%{state: %{__thread__: thread}}) when not is_nil(thread), do: thread
-  defp get_in_thread(_agent), do: nil
 end

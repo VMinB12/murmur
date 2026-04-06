@@ -5,7 +5,6 @@ defmodule MurmurWeb.Components.Workspace.SplitView do
   alias JidoMurmur.DisplayMessage
   import JidoMurmurWeb.Components.AgentHeader
   import JidoMurmurWeb.Components.ChatMessage
-  import JidoMurmurWeb.Components.ChatStream
   import JidoMurmurWeb.Components.MessageInput
 
   alias MurmurWeb.Live.WorkspaceState
@@ -13,7 +12,6 @@ defmodule MurmurWeb.Components.Workspace.SplitView do
   attr :agent_sessions, :list, required: true
   attr :agent_statuses, :map, required: true
   attr :messages, :map, required: true
-  attr :streaming, :map, required: true
   attr :artifacts, :map, required: true
   attr :active_artifact, :any, required: true
   attr :show_task_board, :boolean, required: true
@@ -27,7 +25,6 @@ defmodule MurmurWeb.Components.Workspace.SplitView do
       <div class="flex-1 flex overflow-x-auto min-h-0">
         <%= for session <- @agent_sessions do %>
           <% colors = Catalog.agent_color(session.agent_profile_id, session.display_name) %>
-          <% stream = Map.get(@streaming, session.id, empty_stream()) %>
           <% messages = Map.get(@messages, session.id, []) %>
           <% artifacts = visible_artifacts(Map.get(@artifacts, session.id, %{})) %>
 
@@ -43,7 +40,7 @@ defmodule MurmurWeb.Components.Workspace.SplitView do
               phx-hook="AutoScroll"
               class="flex-1 overflow-y-auto px-3 py-3 space-y-3"
             >
-              <%= if messages == [] and empty_stream?(stream) do %>
+              <%= if messages == [] do %>
                 <div class="flex items-center justify-center h-full text-base-content/40 text-sm">
                   Send a message to start chatting
                 </div>
@@ -56,8 +53,6 @@ defmodule MurmurWeb.Components.Workspace.SplitView do
                   markdown_renderer={@markdown_renderer}
                 />
               <% end %>
-
-              <.chat_stream stream={stream} color={colors} />
             </div>
 
             <%= if artifacts != [] do %>
@@ -107,12 +102,6 @@ defmodule MurmurWeb.Components.Workspace.SplitView do
   defp visible_artifacts(artifacts) do
     artifacts
     |> Enum.filter(fn {_name, data} -> WorkspaceState.artifact_present?(data) end)
-  end
-
-  defp empty_stream, do: %{content: "", thinking: "", tool_calls: [], usage: nil}
-
-  defp empty_stream?(stream) do
-    stream.content == "" and stream.thinking == "" and stream.tool_calls == []
   end
 
   defp message_color(message) do

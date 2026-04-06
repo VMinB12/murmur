@@ -44,6 +44,7 @@ defmodule JidoMurmur.UITurnTest do
       assert length(result) == 1
       msg = hd(result)
       assert msg.role == "assistant"
+      assert msg.id == "req-1-turn"
       assert msg.content == "Hi there!"
       assert msg.sender_name == "Bot"
       assert msg.actor == ActorIdentity.unknown("Bot")
@@ -76,6 +77,7 @@ defmodule JidoMurmur.UITurnTest do
       result = UITurn.project_entries(entries)
       assert length(result) == 1
       msg = hd(result)
+      assert msg.id == "req-2-turn"
       assert msg.content == "Final answer"
       assert msg.thinking == "Let me think..."
     end

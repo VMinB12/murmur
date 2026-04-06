@@ -17,6 +17,7 @@ defmodule JidoMurmur.TableOwner do
   @impl true
   def init(_opts) do
     :ets.new(:jido_murmur_active_runners, [:set, :public, :named_table])
+    :ets.new(:jido_murmur_conversation_snapshots, [:set, :public, :named_table])
     SessionCache.create_table()
     Store.create_tables()
     {:ok, %{}}

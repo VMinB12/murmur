@@ -6,12 +6,16 @@
 
 | Metric | Value |
 |--------|-------|
-| Active tickets | 0 |
+| Active tickets | 3 |
 | Last updated | 2026-04-06 |
 
 ## Active Tickets
 
-No active tickets.
+| # | Title | Status | Owner |
+|---|-------|--------|-------|
+| 019 | [Core-Owned Visible Ingress Messages](tickets/019-core-owned-visible-ingress-messages/) | planned | |
+| 020 | [Conversation Projection State Consolidation](tickets/020-conversation-projection-state-consolidation/) | planned | |
+| 021 | [Agent Lifecycle Boundary Cleanup](tickets/021-agent-lifecycle-boundary-cleanup/) | planned | |
 
 ## Archived / Superseded
 
@@ -45,6 +49,7 @@ No active tickets.
 
 | ADR | Title | Date |
 |-----|-------|------|
+| ADR-008 | [Core-Owned Visible Ingress Messages](decisions/ADR-008-core-owned-visible-ingress-messages.md) | 2026-04-06 |
 | ADR-007 | [Explicit First-Seen Conversation Message Ordering](decisions/ADR-007-explicit-first-seen-conversation-message-ordering.md) | 2026-04-06 |
 | ADR-006 | [Agent-Centric Phoenix Sessions And Immediate Trace Causation](decisions/ADR-006-agent-centric-phoenix-sessions-and-immediate-trace-causation.md) | 2026-04-05 |
 | ADR-004 | [Canonical Actor Identity And Display Boundary](decisions/ADR-004-canonical-actor-identity-and-display-boundary.md) | 2026-04-05 |

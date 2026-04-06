@@ -28,7 +28,8 @@ npx skills add b12consulting/skills --skill <missing_skill>
 
 1. Verify `specs/` folder exists with `Vision.md`, `PRD.md`, `Goals.md`, and `Architecture/README.md`. If missing, prompt the user to run the [specs-setup](../specs-setup/SKILL.md) skill first.
 2. Read `specs/README.md`, then `specs/Vision.md`, `specs/PRD.md`, `specs/Goals.md`, and `specs/Architecture/README.md` to understand the project context.
-3. Check for coding standards (`.instructions.md`, `CLAUDE.md`, etc.). If missing, prompt the user to create them before implementation begins.
+3. If the work touches entities, payloads, signals, public structs, APIs, or persisted read models, also read the relevant architecture sub-documents such as `specs/Architecture/data-model.md` and `specs/Architecture/data-contracts.md` when they exist.
+4. Check for coding standards (`.instructions.md`, `CLAUDE.md`, etc.). If missing, prompt the user to create them before implementation begins.
 
 ---
 
@@ -36,8 +37,8 @@ npx skills add b12consulting/skills --skill <missing_skill>
 
 Determine whether the user wants to **create a new ticket** or **continue an existing one**.
 
-- If the user describes new work → go to [New Ticket](#new-ticket)
-- If the user references an existing ticket → go to [Resume Ticket](#resume-ticket)
+- If the user describes new work → go to the New Ticket section below
+- If the user references an existing ticket → go to the Resume Ticket section below
 - If unclear, ask the user
 
 ---
@@ -72,7 +73,7 @@ updated: YYYY-MM-DD
 
 Follow with a one-paragraph summary of the ticket.
 
-Then proceed to [Phase 1: Research](#phase-1-research).
+Then proceed to Phase 1: Research.
 
 ---
 
@@ -129,11 +130,11 @@ Based on the current status, pick up at the appropriate phase:
 
 | Current Status   | Next Action                                                                                                                 |
 | ---------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `research`       | Review Research.md findings. Proceed to [Phase 2: Specify](#phase-2-specify).                                               |
-| `specifying`     | Check if Spec.md has been validated. If yes, proceed to [Phase 3: Plan](#phase-3-plan). If no, present for validation.      |
+| `research`       | Review Research.md findings. Proceed to Phase 2: Specify.                                                                    |
+| `specifying`     | Check if Spec.md has been validated. If yes, proceed to Phase 3: Plan. If no, present for validation.                       |
 | `open-questions` | Resolve questions (step 4), then return to previous phase.                                                                  |
-| `planned`        | Check if Tasks.md exists. If yes, present for validation. If no, proceed to [Phase 4: Define Tasks](#phase-4-define-tasks). |
-| `in-progress`    | Check Tasks.md for uncompleted tasks. Continue from [Phase 5: Implement](#phase-5-implement).                               |
+| `planned`        | Check if Tasks.md exists. If yes, present for validation. If no, proceed to Phase 4: Define Tasks.                          |
+| `in-progress`    | Check Tasks.md for uncompleted tasks. Continue from Phase 5: Implement.                                                      |
 | `done`           | Inform the user the ticket is complete. Ask if they want to reopen or create a follow-up.                                   |
 | `archived`       | Inform the user the ticket was archived. Ask if they want to create a new ticket instead.                                   |
 
@@ -166,13 +167,18 @@ The lifecycle has six phases. Each produces specific documents. User validation 
 
 1. Investigate the codebase, existing documentation, and any external resources relevant to the ticket.
 2. Identify technical constraints, existing patterns, and potential approaches.
-3. Document findings in `Research.md`:
+3. If the ticket may affect domain entities or boundary payloads, identify:
+   - the canonical domain concepts involved
+   - the canonical boundary contract involved
+   - the owner, producers, and consumers of that contract
+   - whether serialization or persistence format differs from the canonical in-memory shape
+4. Document findings in `Research.md`:
    - Objective: what we're trying to learn
    - Findings: organized by topic
    - Options considered with pros/cons
    - Recommendation
    - References
-4. Update ticket status to `research`.
+5. Update ticket status to `research`.
 
 **Research.md is optional for straightforward tickets.** If the path is clear from the user's description, skip directly to Phase 2. A one-line bug fix doesn't need research, but a new feature with multiple possible approaches does.
 
@@ -199,31 +205,49 @@ The lifecycle has six phases. Each produces specific documents. User validation 
 
    For each category that is **partial or missing**, decide whether clarification materially affects implementation. If it does, ask the user — limit yourself to the most impactful questions and ask them directly in conversation (no special format required). If a gap is better deferred to planning, note it internally and move on.
 
-3. If the ticket has **cross-ticket dependencies**, create `Dependencies.md`:
+3. **Data model / contract classification.** If the ticket affects data shape, classify the change explicitly:
+   - **Domain model** — entities, identity, lifecycle, relationships, invariants
+   - **Data contract** — signals, events, API payloads, public structs, renderer inputs, read-model outputs
+   - **Serialization / persistence** — wire formats, storage rows, persistence encoding, migration or cutover behavior
+
+   For any category that matters beyond this ticket, update or create the relevant architecture document:
+   - `specs/Architecture/data-model.md` for stable domain concepts
+   - `specs/Architecture/data-contracts.md` for stable boundary contracts
+
+   Answer these questions during planning or specification when relevant:
+   - What is the canonical shape?
+   - Who owns it?
+   - Who produces it?
+   - Who consumes it?
+   - Is the serialized or persisted form different from the canonical in-memory shape?
+   - What is the compatibility, migration, or cutover policy?
+
+4. If the ticket has **cross-ticket dependencies**, create `Dependencies.md`:
    - What this ticket is blocked by
    - What this ticket blocks
    - External dependencies
 
-4. If there are **unresolved questions** that block specification, create `Decisions.md`:
+5. If there are **unresolved questions** that block specification, create `Decisions.md`:
    - List each question with context in the **Open** section
    - Provide options with trade-offs for each
    - Include a suggested answer for each
    - **Ask the user to decide on ALL open questions before proceeding**
    - Move resolved questions to the **Resolved** section with the decision, date, and rationale
 
-5. **Self-validate the spec.** Before presenting to the user, check:
+6. **Self-validate the spec.** Before presenting to the user, check:
    - No implementation details (frameworks, libraries, APIs) have leaked into the spec
    - Every requirement is testable and unambiguous
    - Acceptance criteria are measurable
    - Scope is clearly bounded (both in-scope and out-of-scope stated)
    - No more than 3 items remain marked `[NEEDS CLARIFICATION]` — resolve or ask the user about the rest
    - All user stories have a priority (P1/P2/P3) and an independent-test description
+   - Field-level schema details appear in the spec only when they are part of a user-visible or product-level contract; stable technical contract definitions live in architecture docs or the plan
 
    If any check fails, fix the spec before presenting it.
 
-6. Update ticket status to `specifying` (or `open-questions` if questions exist).
+7. Update ticket status to `specifying` (or `open-questions` if questions exist).
 
-7. **Present Spec.md to the user for validation.**
+8. **Present Spec.md to the user for validation.**
 
 > **CHECKPOINT: Do not proceed to Phase 3 until the user has validated the spec.**
 
@@ -236,12 +260,19 @@ The lifecycle has six phases. Each produces specific documents. User validation 
 1. Based on the confirmed spec, write `Plan.md`:
    - **Approach**: High-level implementation strategy
    - **Key design decisions**: Important choices and their rationale
+   - **Data model & contract impact**: Canonical entities, boundary contracts, serialization differences, and compatibility or cutover policy when relevant
    - **Risks & mitigations**: What could go wrong and how to handle it
 
-2. **Check alignment with Architecture/README.md.** If the plan requires architectural changes:
+2. **Check alignment with Architecture/README.md and any relevant architecture sub-documents.** If the plan requires architectural changes:
    - Flag this to the user explicitly
    - Propose an ADR in `specs/decisions/`
-   - Update `specs/Architecture/README.md` only after user approval
+   - Update `specs/Architecture/README.md` and any affected sub-documents such as `data-model.md` or `data-contracts.md` only after user approval
+
+   Contract-affecting tickets should explicitly document:
+   - the canonical shape and owner
+   - the producers and consumers
+   - whether transport or persistence differs from canonical shape
+   - the compatibility, migration, or cutover policy
 
 3. Update ticket status to `planned`.
 
@@ -285,6 +316,12 @@ Build a coverage map:
    - **Uncovered requirements** — requirements with no corresponding task.
    - **Orphan tasks** — tasks that don't map to any requirement (may indicate scope creep or a missing spec entry).
    - **Terminology drift** — the same concept named differently across the three files.
+
+For tickets that affect data modeling or boundary contracts, also verify:
+
+- every changed canonical entity or contract is reflected in the relevant architecture doc
+- every contract change has explicit verification tasks for producer and consumer alignment
+- compatibility or migration work is represented in Tasks.md when needed
 
 If gaps are found, update Tasks.md (or Spec.md if a requirement was missed) before proceeding. This check is lightweight — skip it for small tickets with ≤ 5 tasks.
 
@@ -331,8 +368,9 @@ Requirements often change during implementation. When they do:
 1. Update `Spec.md` with the new or changed requirements.
 2. Log the change and rationale in `Journal.md`.
 3. If the change affects Vision, PRD, Goals, or Architecture, create an ADR.
-4. If the change invalidates completed tasks, update `Tasks.md` accordingly.
-5. Re-validate with the user if the change is significant.
+4. If the change alters canonical entities, boundary contracts, or serialization policy, update `specs/Architecture/data-model.md` and/or `specs/Architecture/data-contracts.md` when those definitions are part of the long-lived system design.
+5. If the change invalidates completed tasks, update `Tasks.md` accordingly.
+6. Re-validate with the user if the change is significant.
 
 The spec is always the source of truth for the ticket, not the code. Keep them in sync.
 

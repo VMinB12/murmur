@@ -167,6 +167,88 @@ _(none yet)_
 
 ---
 
+## specs/Architecture/data-model.md
+
+```markdown
+# Data Model
+
+## Purpose
+
+What part of the domain does this model describe, and why does it need its own document?
+
+## Canonical Entities
+
+| Entity | Purpose | Identity | Lifecycle / States |
+|--------|---------|----------|--------------------|
+| | | | |
+
+## Relationships
+
+| Source | Relationship | Target | Notes |
+|--------|--------------|--------|-------|
+| | | | |
+
+## Invariants
+
+- <Invariant 1>
+- <Invariant 2>
+
+## State Transitions
+
+| Entity | From | Event / Condition | To | Notes |
+|--------|------|-------------------|----|-------|
+| | | | | |
+
+## Derived / Read Models
+
+Describe any projections or read models derived from the canonical domain entities.
+
+## Related Contracts
+
+Link to [data-contracts.md](data-contracts.md) or other architecture docs that expose these entities at system boundaries.
+```
+
+---
+
+## specs/Architecture/data-contracts.md
+
+```markdown
+# Data Contracts
+
+## Purpose
+
+What boundaries does this document cover, and why do these contracts need explicit ownership?
+
+## Contract Inventory
+
+| Contract | Owner | Producer(s) | Consumer(s) | Canonical Shape |
+|----------|-------|-------------|-------------|-----------------|
+| | | | | |
+
+## Contract Details
+
+### <Contract Name>
+
+**Boundary**: <module/package/API/event/persistence boundary>
+**Owner**: <who owns the canonical shape>
+**Producer(s)**: <who emits it>
+**Consumer(s)**: <who consumes it>
+**Canonical shape**: <struct / fields / payload summary>
+**Transport / serialization**: <JSON / event payload / DB row / binary blob / etc.>
+**Validation**: <types, constructors, schema checks, tests>
+**Compatibility policy**: <strict / additive / cutover / migration>
+
+## Serialization And Persistence Notes
+
+Document any place where the storage or wire format differs from the canonical in-memory shape.
+
+## Verification
+
+List the tests or checks that prove producers and consumers stay aligned.
+```
+
+---
+
 ## specs/Glossary.md
 
 ```markdown
@@ -208,6 +290,10 @@ All notable changes to this project are documented here. Entries are in reverse 
 **Date**: YYYY-MM-DD
 **Ticket**: <link to related ticket, if any>
 
+## Affected Documents
+
+- Vision / PRD / Goals / Architecture files changed by this decision
+
 ## Context
 
 What situation or problem prompted this decision?
@@ -215,6 +301,10 @@ What situation or problem prompted this decision?
 ## Decision
 
 What did we decide?
+
+## Compatibility / Migration
+
+What changes at the boundary? Is there a cutover, compatibility window, migration, or intentional break?
 
 ## Consequences
 
@@ -323,6 +413,13 @@ Describe the implementation strategy at a high level.
 ## Key Design Decisions
 
 Document important choices made during planning and their rationale.
+
+## Data Model & Contract Impact
+
+- Canonical entities or value objects introduced or changed
+- Boundary contracts introduced or changed
+- Transport / persistence / serialization implications
+- Compatibility, migration, or cutover policy
 
 ## Risks & Mitigations
 

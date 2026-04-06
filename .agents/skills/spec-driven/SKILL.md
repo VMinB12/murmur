@@ -45,6 +45,21 @@ Conflicts must be resolved by either:
 - Creating an ADR and updating the higher-level document
 - Creating a ticket to fix the lower-level document or code
 
+## Modeling Layers
+
+When a project has non-trivial entities, cross-module payloads, APIs, events, signals, or persisted read models, keep these layers explicit and separate:
+
+- **Domain model** — the conceptual model: entities, identity rules, relationships, state transitions, and invariants
+- **Data contracts** — the boundary model: signals, events, API payloads, public structs, renderer inputs, tool outputs, and read-model shapes shared across module or package boundaries
+- **Serialization & persistence** — how a canonical shape is stored or transported; this is not the same thing as the canonical in-memory or conceptual model
+
+Rules:
+
+- Document stable domain concepts in `Architecture/data-model.md` when the project has meaningful identity, lifecycle, or invariant rules.
+- Document stable boundary contracts in `Architecture/data-contracts.md` when producers and consumers must stay aligned across modules, packages, services, or persistence boundaries.
+- Do not treat a wire format or persistence encoding as the canonical model unless the project explicitly decides that it is.
+- Do not leave long-lived contract definitions only in a ticket if they matter across more than one implementation pass.
+
 ## Folder Structure
 
 ```
@@ -57,6 +72,8 @@ specs/
 ├── Changelog.md                 # What shipped and when
 ├── Architecture/                # Architecture documentation (always a folder)
 │   ├── README.md                # Architecture overview (entry point)
+│   ├── data-model.md            # Optional: canonical entities, identity, invariants
+│   ├── data-contracts.md        # Optional: payloads, signals, APIs, public structs
 │   └── <topic>.md               # Sub-documents split by concern
 ├── decisions/                   # Architecture Decision Records
 │   ├── ADR-001-<title>.md
@@ -106,10 +123,15 @@ For complete document templates, see [templates.md](./references/templates.md).
 The `Architecture/` folder starts with a single `README.md` as the entry point. Keep architecture documentation high-level and navigable:
 
 - **Start with README.md.** It alone is sufficient for most projects.
-- **Split when a section exceeds ~200 lines** or covers a distinct concern (data model, API contracts, infrastructure).
-- **New files go alongside README.md** and are linked from it (e.g., `data-model.md`, `api-contracts.md`).
+- **Split when a section exceeds ~200 lines** or covers a distinct concern (data model, data contracts, infrastructure).
+- **New files go alongside README.md** and are linked from it (e.g., `data-model.md`, `data-contracts.md`).
 - **Never nest deeper than one level** within `Architecture/`. If you need sub-folders, the architecture docs are too detailed — summarize and elevate.
 - **Keep each file focused** on one architectural concern.
+
+Recommended sub-documents when the project warrants them:
+
+- `Architecture/data-model.md` — use when domain entities, identity, lifecycle, or invariants span multiple modules or tickets
+- `Architecture/data-contracts.md` — use when signals, events, APIs, shared structs, renderer inputs, or persisted boundary shapes must stay aligned across producers and consumers
 
 ## Ticket Naming
 
@@ -174,8 +196,9 @@ Research → Specify → Plan → Define Tasks → Implement → Done
 At the start of every conversation on a project with `specs/`:
 
 1. Read `specs/README.md`, then `Vision.md`, `PRD.md`, `Goals.md`, and `Architecture/README.md`.
-2. If the current code or task contradicts these documents, **alert the user immediately**.
-3. Resolution options:
+2. If the work touches entities, payloads, signals, public structs, APIs, or persisted read models, also read the relevant architecture sub-documents such as `Architecture/data-model.md` and `Architecture/data-contracts.md` when they exist.
+3. If the current code or task contradicts these documents, **alert the user immediately**.
+4. Resolution options:
    - Create an ADR to update the specs (if the code is right and specs are outdated)
    - Create a ticket to fix the code (if the specs are right and code has drifted)
 
@@ -187,6 +210,9 @@ Create an Architecture Decision Record when:
 - The architecture is modified (new component, technology change, pattern shift)
 - A ticket implementation reveals that specs need updating
 - A significant decision is made that future contributors should understand
+- Canonical entity identity, lifecycle, or invariant rules change
+- A public boundary contract changes, such as an API payload, event or signal shape, public struct, renderer input, or persisted read-model contract
+- The project changes how a canonical shape is serialized, persisted, versioned, migrated, or intentionally cut over
 
 ## ADR Format
 
@@ -197,6 +223,10 @@ Create an Architecture Decision Record when:
 **Date**: YYYY-MM-DD
 **Ticket**: <link to related ticket, if any>
 
+## Affected Documents
+
+- Vision / PRD / Goals / Architecture files changed by this decision
+
 ## Context
 
 What situation or problem prompted this decision?
@@ -204,6 +234,10 @@ What situation or problem prompted this decision?
 ## Decision
 
 What did we decide?
+
+## Compatibility / Migration
+
+What changes at the boundary? Is there a cutover, compatibility window, migration, or intentional break?
 
 ## Consequences
 

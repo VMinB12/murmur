@@ -42,6 +42,8 @@ Verify all required files exist:
 
 Report any missing files. Suggest running `specs-setup` if critical files are absent.
 
+If the project is event-driven, API-heavy, multi-package, or persistence-heavy, also check whether optional architecture sub-documents such as `specs/Architecture/data-model.md` and `specs/Architecture/data-contracts.md` would improve clarity.
+
 ### 2. Document Quality
 
 For each project-level document, check:
@@ -57,6 +59,13 @@ For each project-level document, check:
 | `README.md`              | Does the active tickets table match actual ticket statuses? Is the "last updated" date recent?                  |
 
 Flag documents that are empty templates (never filled in) or have placeholder content.
+
+If these optional architecture documents exist, also check:
+
+| Document                      | Check |
+| ----------------------------- | ----- |
+| `Architecture/data-model.md`  | Are canonical entities, identity rules, relationships, state transitions, and invariants documented clearly? |
+| `Architecture/data-contracts.md` | Are contract owners, producers, consumers, canonical shapes, transport or serialization format, and compatibility policy documented clearly? |
 
 ### 3. Ticket Health
 
@@ -99,6 +108,9 @@ Check that documents reference each other correctly:
 - **ADR references**: Are ADRs referenced in the tickets that triggered them? Are ADR-modified documents (Vision, PRD, Goals, Architecture) updated accordingly?
 - **Glossary usage**: Scan Vision, PRD, and Architecture for domain terms. Are they defined in the Glossary? Are there Glossary terms that appear unused?
 - **Architecture sub-documents**: If `Architecture/README.md` links to sub-documents, do those files exist?
+- **Data model consistency**: If `data-model.md` exists, are canonical entities named consistently across PRD, Architecture, and relevant tickets?
+- **Contract consistency**: If `data-contracts.md` exists, do the documented owners, producers, consumers, and canonical shapes match the rest of the architecture docs and tickets?
+- **Serialization clarity**: Do the docs clearly distinguish canonical in-memory shapes from transport or persistence formats?
 
 ### 5. Drift Detection
 
@@ -107,6 +119,9 @@ Compare specs against the codebase:
 - Does the tech stack in `Architecture/README.md` match the actual dependencies (check `package.json`, `pyproject.toml`, `Cargo.toml`, etc.)?
 - Do the key components described in Architecture match the actual project structure?
 - Are there functional requirements in PRD.md that don't correspond to any ticket (planned or completed)?
+- Do public structs, signal payloads, API shapes, or persisted read models used across boundaries have an architecture home when they are central to the system?
+- Where `data-contracts.md` exists, do documented contracts still match the code?
+- Where `data-model.md` exists, do documented identity rules and invariants still match the code and current architecture?
 
 This step requires codebase analysis. Flag potential drift but note that **confirmation with the user is needed** — apparent drift may be intentional and just not yet documented.
 
@@ -132,6 +147,7 @@ Summarize findings in three categories:
 - Missing Glossary terms
 - Tickets without Journal.md that had complex processes
 - Architecture that could benefit from sub-documents
+- Missing `data-model.md` or `data-contracts.md` for projects with non-trivial domain entities or boundary contracts
 
 ### 7. Propose Actions
 

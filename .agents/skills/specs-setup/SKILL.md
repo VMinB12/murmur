@@ -47,6 +47,8 @@ Check which of these exist:
 - [ ] `specs/Goals.md`
 - [ ] `specs/Architecture/` directory
 - [ ] `specs/Architecture/README.md`
+- [ ] `specs/Architecture/data-model.md` (optional)
+- [ ] `specs/Architecture/data-contracts.md` (optional)
 - [ ] `specs/Glossary.md`
 - [ ] `specs/Changelog.md`
 - [ ] `specs/decisions/` directory
@@ -71,6 +73,8 @@ Create in this order:
 9. `specs/Glossary.md`
 10. `specs/Changelog.md`
 11. `specs/README.md` (last, because it links to everything above)
+
+Do **not** create `specs/Architecture/data-model.md` or `specs/Architecture/data-contracts.md` by default. Decide whether they are needed during architecture setup.
 
 ### 3. Populate Vision.md
 
@@ -119,6 +123,26 @@ If the project is **new** (no code yet), work with the user to define the target
 
 Remember: keep it high-level. The architecture entry point should give someone a clear mental model of the system in under 5 minutes of reading. Split into sub-documents only when a section exceeds ~200 lines.
 
+If the project has any of the following, strongly consider creating optional architecture sub-documents now:
+
+- non-trivial domain entities with identity or lifecycle rules
+- signals, events, APIs, or shared structs crossing module or package boundaries
+- persisted read models or storage formats that differ from canonical in-memory shapes
+- compatibility, migration, or cutover concerns around data shape
+
+Use them like this:
+
+- `specs/Architecture/data-model.md` — canonical entities, identity, relationships, state transitions, invariants
+- `specs/Architecture/data-contracts.md` — boundary payloads, owners, producers, consumers, canonical shape, transport or serialization format, compatibility policy
+
+For data-contract work, explicitly distinguish:
+
+- the canonical in-memory or conceptual shape
+- the transport or wire format
+- the persistence or stored representation
+
+If those differ, document the difference rather than collapsing them into one vague "schema".
+
 ### 7. Populate Glossary
 
 Scan the Vision, PRD, and Architecture for domain-specific terms. Draft definitions and **ask the user to confirm them.** Even a small initial glossary (5-10 terms) is valuable — it can grow over time.
@@ -144,6 +168,7 @@ Update `specs/README.md` with:
 - The project name and one-line description
 - Current status (likely "Setting up" or "No active tickets")
 - Working navigation links to all created documents
+- Links to `Architecture/data-model.md` and `Architecture/data-contracts.md` if they were created
 
 ### 10. Suggest Commit
 

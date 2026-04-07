@@ -5,6 +5,7 @@ defmodule JidoMurmurWeb.Components.ChatTest do
 
   alias JidoMurmur.ActorIdentity
   alias JidoMurmur.DisplayMessage.ToolCall
+  alias JidoMurmur.HiddenContent
   alias JidoMurmurWeb.Components.ChatMessage
   alias JidoMurmurWeb.Components.MessageInput
 
@@ -104,7 +105,7 @@ defmodule JidoMurmurWeb.Components.ChatTest do
           %ToolCall{
             id: "call-1",
             name: "tell",
-            args: %{"target_agent" => "bob", "message" => "Hi"},
+            args: %{"target_agent" => "bob", "intent" => "notify", "message" => "Hi"},
             result: ~s({"ok":true}),
             status: :completed
           }
@@ -165,6 +166,48 @@ defmodule JidoMurmurWeb.Components.ChatTest do
       html = render_component(&ChatMessage.chat_message/1, message: message, markdown_renderer: renderer)
 
       assert html =~ "<strong>**bold text**</strong>"
+    end
+
+    test "renders hidden-envelope programmatic user messages through markdown" do
+      message = %{
+        id: "msg-tell-markdown",
+        role: "user",
+        content: HiddenContent.wrap_markdown("**bold tell**", sender: "ResearchBot", intent: "notify"),
+        actor: ActorIdentity.agent("ResearchBot")
+      }
+
+      renderer = fn text ->
+        text
+        |> MDEx.to_html!()
+        |> Phoenix.HTML.raw()
+      end
+
+      html = render_component(&ChatMessage.chat_message/1, message: message, markdown_renderer: renderer)
+
+      assert html =~ "<strong>bold tell</strong>"
+      refute html =~ "&lt;!-- murmur:"
+      refute html =~ "sender&quot;:&quot;ResearchBot&quot;"
+    end
+
+    test "keeps direct human messages as raw text even if they match the hidden-envelope format" do
+      message = %{
+        id: "msg-human-raw",
+        role: "user",
+        content: HiddenContent.wrap_markdown("**not markdown rendered**", sender: "Alice", intent: "notify"),
+        actor: ActorIdentity.human()
+      }
+
+      renderer = fn text ->
+        text
+        |> MDEx.to_html!()
+        |> Phoenix.HTML.raw()
+      end
+
+      html = render_component(&ChatMessage.chat_message/1, message: message, markdown_renderer: renderer)
+
+      assert html =~ "&lt;!-- murmur:"
+      assert html =~ "**not markdown rendered**"
+      refute html =~ "<strong>not markdown rendered</strong>"
     end
 
     test "handles empty content gracefully" do

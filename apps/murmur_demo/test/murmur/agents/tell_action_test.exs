@@ -4,7 +4,7 @@ defmodule Murmur.Agents.TellActionTest do
 
   Covers:
   - FR-009: Agents MUST have "tell" capability
-  - FR-010: Inter-agent messages prefixed with sender name
+  - FR-010: Inter-agent tells carry sender metadata in the hidden envelope
   - FR-011: Tell to idle agent triggers processing
   - FR-015: Loop depth limit
   - Edge: Tell to non-existent agent fails gracefully
@@ -15,6 +15,7 @@ defmodule Murmur.Agents.TellActionTest do
   use Murmur.AgentCase
 
   alias JidoMurmur.Catalog
+  alias JidoMurmur.HiddenContent
   alias JidoMurmur.TellAction
   alias JidoMurmur.Workspaces
 
@@ -56,7 +57,7 @@ defmodule Murmur.Agents.TellActionTest do
 
   describe "run/2 — successful delivery" do
     test "delivers message to target agent by display name", %{workspace: workspace, bob: bob} do
-      params = %{target_agent: "Bob", message: "Hello Bob!"}
+      params = %{target_agent: "Bob", intent: "notify", message: "Hello Bob!"}
       context = %{workspace_id: workspace.id, sender_name: "Alice", hop_count: 0}
 
       assert {:ok, result} = TellAction.run(params, context)
@@ -68,19 +69,19 @@ defmodule Murmur.Agents.TellActionTest do
       assert_receive %Jido.Signal{type: "murmur.message.completed", data: %{session_id: ^bob_id}}, 5000
     end
 
-    # FR-010: Messages prefixed with sender name
-    test "message is prefixed with sender name in PubSub broadcast", %{
+    test "message is wrapped in the hidden tell envelope in PubSub broadcast", %{
       workspace: workspace,
       bob: bob
     } do
-      params = %{target_agent: "Bob", message: "Can you help?"}
+      params = %{target_agent: "Bob", intent: "request", message: "Can you help?"}
       context = %{workspace_id: workspace.id, sender_name: "Alice", hop_count: 0}
 
       TellAction.run(params, context)
 
       bob_id = bob.id
       assert_receive %Jido.Signal{type: "murmur.message.received", data: %{session_id: ^bob_id, message: msg}}, 5000
-      assert msg.content =~ "[Alice]: Can you help?"
+      assert msg.kind == :tell
+      assert msg.content == HiddenContent.wrap_markdown("Can you help?", sender: "Alice", intent: "request")
 
       # Wait for the background Runner Task to finish
       assert_receive %Jido.Signal{type: "murmur.message.completed", data: %{session_id: ^bob_id}}, 5000
@@ -91,7 +92,7 @@ defmodule Murmur.Agents.TellActionTest do
       workspace: workspace,
       bob: bob
     } do
-      params = %{target_agent: "Bob", message: "Process this"}
+      params = %{target_agent: "Bob", intent: "delegate", message: "Process this"}
       context = %{workspace_id: workspace.id, sender_name: "Alice", hop_count: 0}
 
       {:ok, _} = TellAction.run(params, context)
@@ -103,7 +104,7 @@ defmodule Murmur.Agents.TellActionTest do
 
   describe "run/2 — target not found" do
     test "returns error for non-existent agent name", %{workspace: workspace} do
-      params = %{target_agent: "Nobody", message: "Hello?"}
+      params = %{target_agent: "Nobody", intent: "notify", message: "Hello?"}
       context = %{workspace_id: workspace.id, sender_name: "Alice", hop_count: 0}
 
       assert {:error, msg} = TellAction.run(params, context)
@@ -121,7 +122,7 @@ defmodule Murmur.Agents.TellActionTest do
 
       {:ok, my_workspace} = Workspaces.create_workspace(%{"name" => "Mine"})
 
-      params = %{target_agent: "Charlie", message: "Hello?"}
+      params = %{target_agent: "Charlie", intent: "notify", message: "Hello?"}
       context = %{workspace_id: my_workspace.id, sender_name: "Alice", hop_count: 0}
 
       assert {:error, msg} = TellAction.run(params, context)
@@ -132,7 +133,7 @@ defmodule Murmur.Agents.TellActionTest do
   # FR-015: Loop depth limit
   describe "run/2 — hop count limit" do
     test "returns an informative result when hop count reaches the limit", %{workspace: workspace} do
-      params = %{target_agent: "Bob", message: "Loop!"}
+      params = %{target_agent: "Bob", intent: "notify", message: "Loop!"}
       context = %{workspace_id: workspace.id, sender_name: "Alice", hop_count: 5}
 
       assert {:ok, result} = TellAction.run(params, context)
@@ -143,13 +144,14 @@ defmodule Murmur.Agents.TellActionTest do
     end
 
     test "allows tell at hop count 4 (below limit)", %{workspace: workspace, bob: bob} do
-      params = %{target_agent: "Bob", message: "Still ok"}
+      params = %{target_agent: "Bob", intent: "notify", message: "Still ok"}
       context = %{workspace_id: workspace.id, sender_name: "Alice", hop_count: 4}
 
       assert {:ok, _} = TellAction.run(params, context)
 
       bob_id = bob.id
       assert_receive %Jido.Signal{type: "murmur.message.received", data: %{session_id: ^bob_id, message: msg}}, 5000
+      assert msg.kind == :tell
       assert msg.hop_count == 5
 
       # Wait for the background Runner Task to finish
@@ -165,7 +167,7 @@ defmodule Murmur.Agents.TellActionTest do
           "display_name" => "Charlie"
         })
 
-      params = %{target_agent: "Charlie", message: "Hello?"}
+      params = %{target_agent: "Charlie", intent: "notify", message: "Hello?"}
       context = %{workspace_id: workspace.id, sender_name: "Alice", hop_count: 0}
 
       assert {:error, msg} = TellAction.run(params, context)

@@ -7,7 +7,7 @@ defmodule Murmur.Agents.InterAgentTest do
   - FR-009: Tell capability
   - FR-011: Tell to idle agent triggers immediate processing
   - FR-012: Tell to busy agent injects into the active run
-  - FR-010: Inter-agent messages prefixed with sender name
+  - FR-010: Inter-agent tells carry sender metadata in the hidden envelope
   - FR-008: Per-agent history persistence (each agent persists independently)
 
   Uses LLM mock — no real API calls.
@@ -16,6 +16,7 @@ defmodule Murmur.Agents.InterAgentTest do
 
   alias JidoMurmur.ActorIdentity
   alias JidoMurmur.Catalog
+  alias JidoMurmur.HiddenContent
   alias JidoMurmur.Ingress
   alias JidoMurmur.TellAction
   alias JidoMurmur.Workspaces
@@ -74,7 +75,9 @@ defmodule Murmur.Agents.InterAgentTest do
       bob: bob
     } do
       expect_llm_ask(fn _mod, _pid, content, ctx ->
-        assert content == "[Alice]: What is 2+2?"
+        assert content ==
+                 HiddenContent.wrap_markdown("What is 2+2?", sender: "Alice", intent: "request")
+
         assert ctx[:tool_context][:hop_count] == 1
         assert %ActorIdentity{kind: :agent, name: "Bob", id: current_actor_id} = ctx[:tool_context][:current_actor]
         assert current_actor_id == bob.id
@@ -87,13 +90,15 @@ defmodule Murmur.Agents.InterAgentTest do
         {:ok, "Mock agent response"}
       end)
 
-      params = %{target_agent: "Bob", message: "What is 2+2?"}
+      params = %{target_agent: "Bob", intent: "request", message: "What is 2+2?"}
       context = %{workspace_id: workspace.id, sender_name: "Alice", hop_count: 0}
 
       assert {:ok, _} = TellAction.run(params, context)
 
       bob_id = bob.id
       assert_receive %Jido.Signal{type: "murmur.message.received", data: %{session_id: ^bob_id, message: msg}}, 5000
+      assert msg.kind == :tell
+      assert msg.content == HiddenContent.wrap_markdown("What is 2+2?", sender: "Alice", intent: "request")
       assert msg.hop_count == 1
       assert_receive %Jido.Signal{type: "murmur.message.completed", data: %{session_id: ^bob_id, response: "Mock agent response"}}, 5000
     end
@@ -110,7 +115,9 @@ defmodule Murmur.Agents.InterAgentTest do
       end)
 
       expect_llm_inject(fn _mod, _pid, content, opts ->
-        assert content == "[Alice]: Also, what is 3+3?"
+        assert content ==
+                 HiddenContent.wrap_markdown("Also, what is 3+3?", sender: "Alice", intent: "request")
+
         assert opts[:source][:kind] == :programmatic
         assert opts[:extra_refs][:hop_count] == 1
         {:ok, %{}}
@@ -133,11 +140,13 @@ defmodule Murmur.Agents.InterAgentTest do
       assert initial_msg.content == "Think about the meaning of life"
       assert_receive {:await_started, ^pause_ref, waiter_pid}, 5_000
 
-      params = %{target_agent: "Bob", message: "Also, what is 3+3?"}
+      params = %{target_agent: "Bob", intent: "request", message: "Also, what is 3+3?"}
       context = %{workspace_id: workspace.id, sender_name: "Alice", hop_count: 0}
 
       assert {:ok, _} = TellAction.run(params, context)
       assert_receive %Jido.Signal{type: "murmur.message.received", data: %{session_id: ^bob_id, message: msg}}, 5000
+      assert msg.kind == :tell
+      assert msg.content == HiddenContent.wrap_markdown("Also, what is 3+3?", sender: "Alice", intent: "request")
       assert msg.hop_count == 1
 
       send(waiter_pid, {:release_await, pause_ref})
@@ -162,19 +171,19 @@ defmodule Murmur.Agents.InterAgentTest do
   end
 
   describe "inter-agent message via TellAction appears in PubSub" do
-    # FR-010: Messages prefixed with sender name
-    test "tell message to Bob broadcasts message_received signal with sender prefix", %{
+    test "tell message to Bob broadcasts message_received with the hidden tell envelope", %{
       workspace: workspace,
       bob: bob
     } do
-      params = %{target_agent: "Bob", message: "Can you help me?"}
+      params = %{target_agent: "Bob", intent: "request", message: "Can you help me?"}
       context = %{workspace_id: workspace.id, sender_name: "Alice", hop_count: 0}
 
       {:ok, _} = TellAction.run(params, context)
 
       bob_id = bob.id
       assert_receive %Jido.Signal{type: "murmur.message.received", data: %{session_id: ^bob_id, message: msg}}, 5000
-      assert msg.content =~ "[Alice]"
+      assert msg.kind == :tell
+      assert msg.content == HiddenContent.wrap_markdown("Can you help me?", sender: "Alice", intent: "request")
       assert msg.hop_count == 1
 
       assert_receive %Jido.Signal{type: "murmur.message.completed", data: %{session_id: ^bob_id}}, 5000

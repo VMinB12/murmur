@@ -87,11 +87,16 @@ All topics follow `workspace:{wid}:...` for multi-workspace isolation:
 ### Inter-Agent Communication (TellAction + MessageInjector)
 
 - Agents use the `tell` action for fire-and-forget inter-agent messages
+- `tell` requires `target_agent`, `intent`, and `message`
+- The supported intents are `notify`, `request`, `delegate`, `handoff`, `reply`, `ack`, `progress`, `complete`, `decline`, `error`, and `cancel`
 - Messages route by display name through `Ingress.deliver_programmatic/3`
+- Tell content is built with `JidoMurmur.HiddenContent.wrap_markdown/2`, which prepends a Murmur-owned hidden HTML comment envelope carrying sender and intent ahead of the human-facing body
+- Visible tell payloads are emitted with `kind: :tell`, while ingress still uses the programmatic `via` path to decide idle-start versus busy follow-up behavior
 - Inter-agent hop depth is configurable via `config :jido_murmur, tell_hop_limit: <non_negative_integer>` and defaults to `5`
 - Hop-limit exhaustion returns an informative tool result (`delivered: false`, `blocked: :hop_limit_reached`) instead of failing the agent run
 - Hop count propagates through canonical ingress metadata, so downstream runs see the current depth in both tool context and `extra_refs`
 - `MessageInjector` (a ReAct RequestTransformer) adds Murmur team context to the system prompt and does not own follow-up delivery
+- `intent` remains advisory prompt-level guidance. Tell is still asynchronous and Murmur does not track whether the recipient follows the requested behavior.
 
 ### Canonical Ingress Metadata Boundary
 
@@ -108,6 +113,7 @@ All topics follow `workspace:{wid}:...` for multi-workspace isolation:
 - Direct human-visible delivery and visible programmatic delivery now share the same Murmur-owned visible ingress message assembly through `JidoMurmur.Ingress.VisibleMessage`
 - The helper builds canonical ingress input first, delivers it through `Ingress.deliver_input/2`, then emits `MessageReceived` using the same canonical metadata and stable visible message identity
 - Visible programmatic payloads now align on one shape: `content`, `kind`, `sender_name`, `origin_actor`, `sender_trace_id`, and `hop_count`
+- Tell-specific formatting is no longer a visible sender prefix. It is produced by the shared hidden-envelope helper and carried in `content` itself.
 - Task-assignment notifications and tell messages no longer duplicate message-signal assembly, canonical input assembly, or ad hoc metadata shaping in their callers
 
 ### Canonical Display Projection
@@ -117,6 +123,7 @@ All topics follow `workspace:{wid}:...` for multi-workspace isolation:
 - `JidoMurmur.ConversationReadModel.EntryProjector` is the shared projection boundary that converts persisted thread entries into canonical top-level messages with explicit actor semantics
 - The projection boundary normalizes persisted string-keyed payloads once, but it no longer infers actor identity from content prefixes such as `"[Alice]: ..."`
 - Display labels are derived from actor metadata and rendering helpers, not treated as the runtime source of truth
+- Host chat surfaces render assistant messages as markdown and may also render trusted external user messages as markdown when their content uses Murmur's hidden-envelope format. Direct human-authored user messages remain raw text.
 
 ### Canonical Conversation Projector
 

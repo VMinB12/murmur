@@ -96,7 +96,7 @@ defmodule Murmur.Agents.EdgeCaseTest do
       # Remove Bob
       Workspaces.delete_agent_session(bob)
 
-      params = %{target_agent: "Bob", message: "Are you there?"}
+      params = %{target_agent: "Bob", intent: "notify", message: "Are you there?"}
       context = %{workspace_id: workspace.id, sender_name: "Alice", hop_count: 0}
 
       assert {:error, msg} = TellAction.run(params, context)
@@ -134,7 +134,7 @@ defmodule Murmur.Agents.EdgeCaseTest do
     end
 
     test "hop count of 0 succeeds", %{workspace: workspace, bob: bob} do
-      params = %{target_agent: "Bob", message: "Hi"}
+      params = %{target_agent: "Bob", intent: "notify", message: "Hi"}
       context = %{workspace_id: workspace.id, sender_name: "Alice", hop_count: 0}
 
       assert {:ok, _} = TellAction.run(params, context)
@@ -144,7 +144,7 @@ defmodule Murmur.Agents.EdgeCaseTest do
     end
 
     test "hop count of 4 succeeds (just under limit)", %{workspace: workspace, bob: bob} do
-      params = %{target_agent: "Bob", message: "Hi"}
+      params = %{target_agent: "Bob", intent: "notify", message: "Hi"}
       context = %{workspace_id: workspace.id, sender_name: "Alice", hop_count: 4}
 
       assert {:ok, _} = TellAction.run(params, context)
@@ -154,7 +154,7 @@ defmodule Murmur.Agents.EdgeCaseTest do
     end
 
     test "hop count of 5 returns an informative blocked result (at limit)", %{workspace: workspace} do
-      params = %{target_agent: "Bob", message: "Hi"}
+      params = %{target_agent: "Bob", intent: "notify", message: "Hi"}
       context = %{workspace_id: workspace.id, sender_name: "Alice", hop_count: 5}
 
       assert {:ok, result} = TellAction.run(params, context)
@@ -164,7 +164,7 @@ defmodule Murmur.Agents.EdgeCaseTest do
     end
 
     test "hop count of 10 returns an informative blocked result (well over limit)", %{workspace: workspace} do
-      params = %{target_agent: "Bob", message: "Hi"}
+      params = %{target_agent: "Bob", intent: "notify", message: "Hi"}
       context = %{workspace_id: workspace.id, sender_name: "Alice", hop_count: 10}
 
       assert {:ok, result} = TellAction.run(params, context)

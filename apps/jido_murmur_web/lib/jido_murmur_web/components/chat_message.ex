@@ -11,6 +11,7 @@ defmodule JidoMurmurWeb.Components.ChatMessage do
   use Phoenix.Component
 
   alias JidoMurmur.DisplayMessage
+  alias JidoMurmur.HiddenContent
 
   import JidoMurmurWeb, only: [icon: 1]
 
@@ -24,7 +25,8 @@ defmodule JidoMurmurWeb.Components.ChatMessage do
     * `color` — Optional color map with `:dot`, `:text`, `:bg` keys for
       inter-agent message styling. Falls back to primary bubble for user messages.
     * `markdown_renderer` — Optional function `(String.t() -> Phoenix.HTML.safe())`
-      to render markdown in assistant messages. Defaults to raw text output.
+      to render markdown in assistant messages and trusted hidden-envelope
+      programmatic messages. Defaults to raw text output.
   """
   attr :message, :map, required: true
   attr :color, :map, default: nil
@@ -90,14 +92,18 @@ defmodule JidoMurmurWeb.Components.ChatMessage do
       <%!-- Message content --%>
       <%= if @message.content && @message.content != "" do %>
         <% inter_agent? = DisplayMessage.external_user_message?(@message) %>
+        <% render_markdown? = render_markdown_message?(@message) %>
         <div class={[
           "chat-bubble px-3 py-2 text-sm max-w-[85%] break-words shadow-sm",
           cond do
             DisplayMessage.assistant_message?(@message) and @color ->
-              [@color.bg, "border border-base-300/30 text-base-content prose prose-sm max-w-none"]
+              [@color.bg, "border border-base-300/30 text-base-content", markdown_bubble_classes()]
 
             DisplayMessage.assistant_message?(@message) ->
-              "bg-base-200 text-base-content prose prose-sm max-w-none"
+              ["bg-base-200 text-base-content", markdown_bubble_classes()]
+
+            render_markdown? && @color ->
+              [@color.dot, "text-white", markdown_bubble_classes()]
 
             inter_agent? && @color ->
               [@color.dot, "text-white whitespace-pre-wrap"]
@@ -106,13 +112,13 @@ defmodule JidoMurmurWeb.Components.ChatMessage do
               "chat-bubble-primary bg-primary text-primary-content whitespace-pre-wrap"
           end
         ]}>
-          <%= if @message.role == "user" do %>
-            {@message.content}
-          <% else %>
+          <%= if render_markdown? do %>
             {render_content(@message.content, @markdown_renderer)}
-            <%= if Map.get(@message, :status) == :running do %>
-              <span class="inline-block w-1 h-4 bg-primary animate-pulse ml-0.5 align-text-bottom"></span>
-            <% end %>
+          <% else %>
+            {@message.content}
+          <% end %>
+          <%= if DisplayMessage.assistant_message?(@message) and Map.get(@message, :status) == :running do %>
+            <span class="inline-block w-1 h-4 bg-primary animate-pulse ml-0.5 align-text-bottom"></span>
           <% end %>
         </div>
         <.usage_tooltip usage={Map.get(@message, :usage)} />
@@ -175,6 +181,16 @@ defmodule JidoMurmurWeb.Components.ChatMessage do
 
   defp render_content(content, nil), do: content
   defp render_content(content, renderer) when is_function(renderer, 1), do: renderer.(content)
+
+  defp render_markdown_message?(message) when is_map(message) do
+    DisplayMessage.assistant_message?(message) or
+      (DisplayMessage.external_user_message?(message) and
+         HiddenContent.wrapped?(Map.get(message, :content, "")))
+  end
+
+  defp markdown_bubble_classes do
+    "prose prose-sm max-w-none [&_*]:text-inherit [&_p]:my-0 [&_pre]:whitespace-pre-wrap"
+  end
 
   defp tool_call_args(tool_call), do: Map.get(tool_call, :args) || %{}
 

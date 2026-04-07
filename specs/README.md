@@ -24,6 +24,7 @@
 
 | # | Title | Completed |
 |---|-------|-----------|
+| 023 | [Tell Intent Contract](tickets/023-tell-intent-contract/) | 2026-04-07 |
 | 022 | [Data Model And Contract Architecture](tickets/022-data-model-and-contract-architecture/) | 2026-04-07 |
 | 021 | [Agent Lifecycle Boundary Cleanup](tickets/021-agent-lifecycle-boundary-cleanup/) | 2026-04-07 |
 | 020 | [Conversation Projection State Consolidation](tickets/020-conversation-projection-state-consolidation/) | 2026-04-07 |

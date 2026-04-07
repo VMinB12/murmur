@@ -43,12 +43,14 @@ defmodule JidoMurmur.TeamInstructions do
 
     ### How `tell` works
 
-    1. You call `tell(target_agent: "<name>", message: "...")`.
+    1. You call `tell(target_agent: "<name>", intent: "<intent>", message: "...")`.
     2. The message is delivered to the target agent asynchronously.
     3. Your current turn continues — you can make more tool calls or produce a final response.
     4. If the target agent wants to respond, they will use their own `tell` tool to reach you
        at a later time. When that happens you will be woken up with their message even if you
        already finished your current turn.
+
+    Choose the `intent` that best matches the exchange semantics. For example, use `notify` for one-way information, `request` when you need a response, `delegate` for a bounded subtask, and `handoff` when another agent should take over ownership.
 
     ### Collaboration guidelines
 

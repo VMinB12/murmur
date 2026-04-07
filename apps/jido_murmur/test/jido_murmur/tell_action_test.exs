@@ -5,11 +5,46 @@ defmodule JidoMurmur.TellActionTest do
   alias JidoMurmur.TellAction
   alias JidoMurmur.Workspaces
 
+  describe "validate_params/1" do
+    test "requires a valid intent enum" do
+      assert {:ok, validated} =
+               TellAction.validate_params(%{
+                 target_agent: "Bob",
+                 intent: "notify",
+                 message: "hello"
+               })
+
+      assert validated.intent == "notify"
+
+      assert {:error, missing_intent_error} =
+               TellAction.validate_params(%{target_agent: "Bob", message: "hello"})
+
+      assert Exception.message(missing_intent_error) =~ "intent"
+
+      assert {:error, invalid_intent_error} =
+               TellAction.validate_params(%{
+                 target_agent: "Bob",
+                 intent: "ping",
+                 message: "hello"
+               })
+
+      assert Exception.message(invalid_intent_error) =~ "intent"
+    end
+
+    test "exposes the intent enum in the tool schema" do
+      tool = TellAction.to_tool()
+
+      assert get_in(tool, [:parameters_schema, "properties", "intent", "enum"]) == TellAction.intents()
+      assert tool.description =~ "delegate"
+      assert tool.description =~ "handoff"
+    end
+  end
+
   describe "run/2" do
     test "returns error when target agent not found" do
       {:ok, workspace} = Workspaces.create_workspace(%{name: "tell-test"})
 
-      params = %{target_agent: "NonExistent", message: "hello"}
+      params = %{target_agent: "NonExistent", intent: "notify", message: "hello"}
       context = %{workspace_id: workspace.id, current_actor: ActorIdentity.agent("sender"), hop_count: 0}
 
       assert {:error, msg} = TellAction.run(params, context)
@@ -24,7 +59,7 @@ defmodule JidoMurmur.TellActionTest do
         agent_profile_id: "general"
       })
 
-      params = %{target_agent: "Target", message: "hello"}
+      params = %{target_agent: "Target", intent: "notify", message: "hello"}
       context = %{workspace_id: workspace.id, current_actor: ActorIdentity.agent("sender"), hop_count: 5}
 
       assert {:ok, result} = TellAction.run(params, context)
@@ -37,7 +72,7 @@ defmodule JidoMurmur.TellActionTest do
     test "defaults hop_count to 0 when not present in context" do
       {:ok, workspace} = Workspaces.create_workspace(%{name: "default-hop"})
 
-      params = %{target_agent: "Nobody", message: "hello"}
+      params = %{target_agent: "Nobody", intent: "notify", message: "hello"}
       context = %{workspace_id: workspace.id, current_actor: ActorIdentity.agent("sender")}
 
       # Should fail with "not found" (not hop error), proving hop_count defaulted to 0
@@ -54,8 +89,8 @@ defmodule JidoMurmur.TellActionTest do
           agent_profile_id: "general"
         })
 
-      params = %{target_agent: "OfflineAgent", message: "hello"}
-        context = %{workspace_id: workspace.id, current_actor: ActorIdentity.agent("sender"), hop_count: 0}
+      params = %{target_agent: "OfflineAgent", intent: "notify", message: "hello"}
+      context = %{workspace_id: workspace.id, current_actor: ActorIdentity.agent("sender"), hop_count: 0}
 
       assert {:error, msg} = TellAction.run(params, context)
       assert msg =~ "Failed to deliver"
@@ -75,12 +110,13 @@ defmodule JidoMurmur.TellActionTest do
 
       {:ok, workspace} = Workspaces.create_workspace(%{name: "configured-hop-limit"})
 
-      params = %{target_agent: "Nobody", message: "hello"}
+      params = %{target_agent: "Nobody", intent: "notify", message: "hello"}
       context = %{workspace_id: workspace.id, current_actor: ActorIdentity.agent("sender"), hop_count: 2}
 
       assert {:ok, result} = TellAction.run(params, context)
       assert result.blocked == :hop_limit_reached
       assert result.hop_limit == 2
     end
+
   end
 end

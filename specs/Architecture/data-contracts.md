@@ -73,6 +73,8 @@ Known metadata includes:
 - `sender_trace_id`
 - `hop_count`
 
+Tell `intent` is intentionally not a long-lived ingress metadata field in this slice. It is carried inside the tell message body via Murmur's hidden content envelope.
+
 Additional Murmur-owned fields may also travel in `refs` when they are part of a stable boundary, such as visible message identity or presentation reconciliation references.
 
 ### Transport Or Persistence Representation
@@ -115,6 +117,8 @@ The visible ingress payload is a message-like shape with:
 
 This contract is for visible top-level user messages, including both direct human sends and visible programmatic sends.
 
+Tell-generated visible messages use `kind: :tell` and carry sender plus intent inside a Murmur-owned hidden HTML comment envelope at the top of `content`. Direct human messages do not use that envelope.
+
 ### Transport Or Persistence Representation
 
 - transport: `murmur.message.received` PubSub signal payload
@@ -151,6 +155,8 @@ Important semantics:
 - assistant messages are assistant steps, not whole outer requests
 - tool calls and tool results remain nested under the assistant step
 - first-seen metadata defines top-level ordering
+- assistant messages render through markdown, and trusted tell-style hidden-envelope messages may also render through markdown in connected UIs
+- direct human-authored user messages remain raw text in the current UI contract
 
 ### Transport Or Persistence Representation
 

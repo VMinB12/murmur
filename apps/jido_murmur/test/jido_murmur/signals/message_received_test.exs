@@ -2,6 +2,7 @@ defmodule JidoMurmur.Signals.MessageReceivedTest do
   use ExUnit.Case, async: true
 
   alias Jido.Signal.ID, as: SignalID
+  alias JidoMurmur.HiddenContent
   alias JidoMurmur.Signals.MessageReceived
 
   test "validate_message accepts the full inter-agent payload" do
@@ -10,8 +11,8 @@ defmodule JidoMurmur.Signals.MessageReceivedTest do
     payload = %{
       id: message_id,
       role: "user",
-      content: "[Alice]: hello",
-      kind: :steering,
+      content: HiddenContent.wrap_markdown("hello", sender: "Alice", intent: "notify"),
+      kind: :tell,
       sender_name: "Alice",
       first_seen_at: SignalID.extract_timestamp(message_id),
       first_seen_seq: SignalID.sequence_number(message_id),

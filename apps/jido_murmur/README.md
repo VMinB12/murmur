@@ -139,6 +139,20 @@ The coordinator decides whether the input should start a fresh `ask/await` run o
 
 Phoenix session grouping is agent-centric: `session.id` maps to the executing agent session, each executed react loop gets its own `murmur.request_id`, and cross-agent causation is carried only by immediate parent trace metadata such as `sender_trace_id`.
 
+### Tell Contract
+
+`JidoMurmur.TellAction` is still fire-and-forget, but it now requires three parameters:
+
+- `target_agent`
+- `intent`
+- `message`
+
+The supported `intent` values are `notify`, `request`, `delegate`, `handoff`, `reply`, `ack`, `progress`, `complete`, `decline`, `error`, and `cancel`.
+
+Tell content is assembled with `JidoMurmur.HiddenContent.wrap_markdown/2`, which prepends a Murmur-owned hidden HTML comment envelope carrying metadata such as sender and intent ahead of the human-facing body. Visible tell messages are emitted with `kind: :tell`, while ingress still uses the programmatic `via` path for idle-start versus busy follow-up coordination.
+
+Host UIs should keep direct human-authored user messages as raw text. Only trusted programmatic messages that use Murmur's hidden-envelope format should be rendered through markdown outside the assistant-message path.
+
 ### Composing Package and Custom Actions
 
 Add JidoMurmur actions to your agent's tool list alongside custom actions:
@@ -183,7 +197,7 @@ end
 
 | Module | Purpose |
 |--------|---------|
-| `JidoMurmur.TellAction` | Inter-agent fire-and-forget messaging |
+| `JidoMurmur.TellAction` | Inter-agent fire-and-forget messaging with a required advisory `intent` enum |
 | `JidoMurmur.Actions.StoreArtifact` | Artifact state persistence |
 
 ## License

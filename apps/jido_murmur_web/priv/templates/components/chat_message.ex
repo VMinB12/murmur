@@ -6,6 +6,9 @@ defmodule <%= @app_module %>Web.Components.ChatMessage do
 
   use Phoenix.Component
 
+  alias JidoMurmur.DisplayMessage
+  alias JidoMurmur.HiddenContent
+
   import <%= @app_module %>Web.CoreComponents, only: [icon: 1]
 
   attr :message, :map, required: true
@@ -49,17 +52,28 @@ defmodule <%= @app_module %>Web.Components.ChatMessage do
       <%% end %>
 
       <%%= if @message.content && @message.content != "" do %>
+        <%% inter_agent? = DisplayMessage.external_user_message?(@message) %>
+        <%% render_markdown? = render_markdown_message?(@message) %>
         <div class={[
           "rounded-xl px-3 py-2 text-sm max-w-[85%%] break-words",
-          if(@message.role == "user",
-            do: "bg-primary text-primary-content rounded-br-sm whitespace-pre-wrap",
-            else: "bg-base-200 text-base-content rounded-bl-sm prose prose-sm max-w-none"
-          )
+          cond do
+            DisplayMessage.assistant_message?(@message) ->
+              ["bg-base-200 text-base-content rounded-bl-sm", markdown_bubble_classes()]
+
+            render_markdown? && @color ->
+              [@color.dot, "text-white rounded-br-sm", markdown_bubble_classes()]
+
+            inter_agent? && @color ->
+              [@color.dot, "text-white rounded-br-sm whitespace-pre-wrap"]
+
+            true ->
+              "bg-primary text-primary-content rounded-br-sm whitespace-pre-wrap"
+          end
         ]}>
-          <%%= if @message.role == "user" do %>
-            {@message.content}
-          <%% else %>
+          <%%= if render_markdown? do %>
             {render_content(@message.content, @markdown_renderer)}
+          <%% else %>
+            {@message.content}
           <%% end %>
         </div>
       <%% end %>
@@ -69,4 +83,14 @@ defmodule <%= @app_module %>Web.Components.ChatMessage do
 
   defp render_content(content, nil), do: content
   defp render_content(content, renderer) when is_function(renderer, 1), do: renderer.(content)
+
+  defp render_markdown_message?(message) when is_map(message) do
+    DisplayMessage.assistant_message?(message) or
+      (DisplayMessage.external_user_message?(message) and
+         HiddenContent.wrapped?(Map.get(message, :content, "")))
+  end
+
+  defp markdown_bubble_classes do
+    "prose prose-sm max-w-none [&_*]:text-inherit [&_p]:my-0 [&_pre]:whitespace-pre-wrap"
+  end
 end

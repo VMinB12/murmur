@@ -3,6 +3,7 @@ defmodule JidoMurmur.Ingress.VisibleMessage do
 
   alias Jido.Signal.ID, as: SignalID
   alias JidoMurmur.ActorIdentity
+  alias JidoMurmur.ConversationProjector
   alias JidoMurmur.Ingress.Input
   alias JidoMurmur.Signals.MessageReceived
 
@@ -52,6 +53,7 @@ defmodule JidoMurmur.Ingress.VisibleMessage do
         subject: MessageReceived.subject(session.workspace_id, session.id)
       )
 
+    _ = ConversationProjector.put_received_message(session, message)
     Phoenix.PubSub.broadcast(JidoMurmur.pubsub(), topic(session), signal)
   end
 

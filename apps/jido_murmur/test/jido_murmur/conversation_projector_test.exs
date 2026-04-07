@@ -246,5 +246,69 @@ defmodule JidoMurmur.ConversationProjectorTest do
       assert snapshot.messages == [message]
       assert snapshot.step_indexes == %{"req-5" => 1}
     end
+
+    test "visible ingress messages update the cached snapshot" do
+      session_id = Ecto.UUID.generate()
+      workspace_id = Ecto.UUID.generate()
+
+      session = %{
+        id: session_id,
+        workspace_id: workspace_id,
+        agent_profile_id: "general_agent"
+      }
+
+      on_exit(fn -> ConversationProjector.clear(session_id) end)
+
+      :ets.insert(
+        :jido_murmur_conversation_snapshots,
+        {session_id, ConversationReadModel.new(session_id)}
+      )
+
+      message_id = SignalID.generate_sequential(1_700_000_000_000, 5)
+
+      message = %{
+        id: message_id,
+        role: "user",
+        content: "Remember this message",
+        kind: :steering,
+        first_seen_at: SignalID.extract_timestamp(message_id),
+        first_seen_seq: SignalID.sequence_number(message_id)
+      }
+
+      assert %{id: ^message_id, content: "Remember this message"} =
+               ConversationProjector.put_received_message(session, message)
+
+      assert [%{id: ^message_id, content: "Remember this message"}] =
+               ConversationProjector.snapshot(session)
+    end
+
+    test "reconcile_session preserves a non-empty cached snapshot when runtime extraction is empty" do
+      session_id = Ecto.UUID.generate()
+
+      session = %{
+        id: session_id,
+        workspace_id: Ecto.UUID.generate(),
+        agent_profile_id: "general_agent"
+      }
+
+      message =
+        JidoMurmur.DisplayMessage.user("Still here",
+          id: Ecto.UUID.generate(),
+          first_seen_at: 100,
+          first_seen_seq: 1
+        )
+
+      :ets.insert(
+        :jido_murmur_conversation_snapshots,
+        {session_id, ConversationReadModel.new(session_id, [message])}
+      )
+
+      on_exit(fn -> ConversationProjector.clear(session_id) end)
+
+      assert [returned_message] = ConversationProjector.reconcile_session(session)
+      assert returned_message.id == message.id
+      assert [cached_message] = ConversationProjector.snapshot(session)
+      assert cached_message.id == message.id
+    end
   end
 end

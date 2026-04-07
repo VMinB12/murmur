@@ -160,9 +160,9 @@ defmodule JidoMurmur.Runner do
           %{session_id: session.id, request_id: request_id}
         )
 
-        JidoMurmur.ConversationProjector.reconcile_session(session)
-
         hibernate_agent(session.id)
+
+        JidoMurmur.ConversationProjector.reconcile_session(session)
 
         signal =
           MessageCompleted.new!(

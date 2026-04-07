@@ -110,6 +110,9 @@ defmodule JidoMurmur.ConversationReadModel.ReplayEntry do
   defp normalize_key("function_name"), do: :function_name
   defp normalize_key("id"), do: :id
   defp normalize_key("kind"), do: :kind
+  defp normalize_key("message_first_seen_at"), do: :message_first_seen_at
+  defp normalize_key("message_first_seen_seq"), do: :message_first_seen_seq
+  defp normalize_key("message_id"), do: :message_id
   defp normalize_key("name"), do: :name
   defp normalize_key("origin_actor"), do: :origin_actor
   defp normalize_key("request_id"), do: :request_id

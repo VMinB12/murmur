@@ -14,6 +14,7 @@ defmodule MurmurWeb.WorkspaceLivePersistenceTest do
 
   import Phoenix.LiveViewTest
 
+  alias Jido.Signal.ID, as: SignalID
   alias JidoMurmur.Catalog
   alias JidoMurmur.Workspaces
 
@@ -99,6 +100,65 @@ defmodule MurmurWeb.WorkspaceLivePersistenceTest do
 
       # The persisted response should be visible from storage
       assert html =~ "Persisted response from Alice"
+    end
+
+    test "stale empty projector cache is refreshed from persisted storage on mount", %{
+      conn: conn,
+      workspace: workspace,
+      session: session,
+      pid: pid
+    } do
+      user_message_id = SignalID.generate_sequential(1_700_000_000_000, 4)
+
+      {:ok, server_state} = Jido.AgentServer.state(pid)
+      agent = server_state.agent
+
+      thread =
+        [id: session.id]
+        |> Jido.Thread.new()
+        |> Jido.Thread.append(%{
+          kind: :ai_message,
+          payload: %{role: "user", content: "Persisted user message"},
+          refs: %{
+            message_id: user_message_id,
+            message_first_seen_at: SignalID.extract_timestamp(user_message_id),
+            message_first_seen_seq: SignalID.sequence_number(user_message_id)
+          }
+        })
+        |> Jido.Thread.append(%{
+          kind: :ai_message,
+          payload: %{role: "assistant", content: "Persisted assistant reply", request_id: "req-persisted"},
+          refs: %{request_id: "req-persisted"}
+        })
+
+      agent = %{agent | state: Map.put(agent.state, :__thread__, thread)}
+      assert :ok = Murmur.Jido.hibernate(agent)
+
+      ref = Process.monitor(pid)
+      Murmur.Jido.stop_agent(session.id)
+      assert_receive {:DOWN, ^ref, :process, ^pid, _reason}, 5_000
+      assert_eventually(fn -> Murmur.Jido.whereis(session.id) == nil end)
+
+      :ets.insert(
+        :jido_murmur_conversation_snapshots,
+        {session.id, JidoMurmur.ConversationReadModel.new(session.id)}
+      )
+
+      on_exit(fn -> JidoMurmur.ConversationProjector.clear(session.id) end)
+
+      {:ok, view, _html} = live(conn, ~p"/workspaces/#{workspace.id}")
+
+      assert has_element?(view, "#messages-#{session.id}", "Persisted user message")
+      assert has_element?(view, "#messages-#{session.id}", "Persisted assistant reply")
+
+      html = render(view)
+      assert html =~ "Persisted user message"
+      assert html =~ "Persisted assistant reply"
+
+      {user_position, _} = :binary.match(html, "Persisted user message")
+      {assistant_position, _} = :binary.match(html, "Persisted assistant reply")
+
+      assert user_position < assistant_position
     end
   end
 end

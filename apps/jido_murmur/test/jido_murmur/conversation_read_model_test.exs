@@ -119,6 +119,43 @@ defmodule JidoMurmur.ConversationReadModelTest do
       assert user_message.first_seen_at == SignalID.extract_timestamp(message_id)
       assert user_message.first_seen_seq == SignalID.sequence_number(message_id)
     end
+
+    test "reuses visible ingress identity refs when persisted storage returns string keys" do
+      base_timestamp = 1_700_000_000_000
+      earlier_message_id = SignalID.generate_sequential(base_timestamp, 3)
+
+      entries = [
+        %{
+          "id" => "assistant-entry",
+          "seq" => 8,
+          "at" => base_timestamp + 100,
+          "kind" => "ai_message",
+          "payload" => %{"role" => "assistant", "content" => "After you", "request_id" => "req-1"},
+          "refs" => %{"request_id" => "req-1"}
+        },
+        %{
+          "id" => "user-storage-entry",
+          "seq" => 9,
+          "at" => base_timestamp + 200,
+          "kind" => "ai_message",
+          "payload" => %{"role" => "user", "content" => "Before you"},
+          "refs" => %{
+            "message_id" => earlier_message_id,
+            "message_first_seen_at" => SignalID.extract_timestamp(earlier_message_id),
+            "message_first_seen_seq" => SignalID.sequence_number(earlier_message_id)
+          }
+        }
+      ]
+
+      model = ConversationReadModel.from_entries("session-1", entries)
+
+      assert [user_message, assistant_message] = model.messages
+      assert user_message.content == "Before you"
+      assert user_message.id == earlier_message_id
+      assert user_message.first_seen_at == SignalID.extract_timestamp(earlier_message_id)
+      assert user_message.first_seen_seq == SignalID.sequence_number(earlier_message_id)
+      assert assistant_message.content == "After you"
+    end
   end
 
   describe "apply_signal/2" do

@@ -132,6 +132,38 @@ defmodule MurmurWeb.WorkspaceLiveIntegrationTest do
       # Agent column should still be present
       assert has_element?(view2, "#messages-#{session.id}")
     end
+
+    test "pending visible user messages survive remount before completion", %{
+      conn: conn,
+      workspace: workspace,
+      session: session
+    } do
+      topic = JidoMurmur.Topics.agent_messages(workspace.id, session.id)
+      Phoenix.PubSub.subscribe(Murmur.PubSub, topic)
+
+      pause_ref = make_ref()
+      stub_llm_pause(self(), pause_ref)
+
+      {:ok, view, _html} = live(conn, ~p"/workspaces/#{workspace.id}")
+
+      view
+      |> form("#msg-form-#{session.id}",
+        message: %{content: "Remember this message", session_id: session.id}
+      )
+      |> render_submit()
+
+      assert has_element?(view, "#messages-#{session.id}", "Remember this message")
+      assert_receive {:await_started, ^pause_ref, waiter_pid}, 5_000
+
+      {:ok, refreshed_view, _html} = live(conn, ~p"/workspaces/#{workspace.id}")
+
+      assert has_element?(refreshed_view, "#messages-#{session.id}", "Remember this message")
+
+      send(waiter_pid, {:release_await, pause_ref})
+
+      session_id = session.id
+      assert_receive %Jido.Signal{type: "murmur.message.completed", data: %{session_id: ^session_id}}, 5_000
+    end
   end
 
   describe "two agents can work independently in same view" do
@@ -224,6 +256,24 @@ defmodule MurmurWeb.WorkspaceLiveIntegrationTest do
 
     Mox.stub(Mock, :await, fn _mod, _handle, _opts ->
       {:ok, response}
+    end)
+  end
+
+  defp stub_llm_pause(test_pid, pause_ref) do
+    handle = make_ref()
+
+    Mox.stub(Mock, :ask, fn _mod, _pid, _content, _ctx ->
+      {:ok, handle}
+    end)
+
+    Mox.stub(Mock, :await, fn _mod, ^handle, _opts ->
+      send(test_pid, {:await_started, pause_ref, self()})
+
+      receive do
+        {:release_await, ^pause_ref} -> {:ok, "delayed mock response"}
+      after
+        5_000 -> flunk("timed out waiting to release await")
+      end
     end)
   end
 end

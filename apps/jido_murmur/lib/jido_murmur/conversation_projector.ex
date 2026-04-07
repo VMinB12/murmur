@@ -21,6 +21,7 @@ defmodule JidoMurmur.ConversationProjector do
   def snapshot(session) do
     case get_snapshot(session.id) do
       nil -> load_snapshot(session)
+      %ConversationReadModel{messages: []} = model -> refresh_empty_snapshot(session, model)
       model -> model.messages
     end
   end
@@ -30,6 +31,22 @@ defmodule JidoMurmur.ConversationProjector do
     model = load_model(session)
     put_snapshot(session.id, model)
     model.messages
+  end
+
+  @spec put_received_message(session_like(), map()) :: DisplayMessage.t()
+  def put_received_message(session, message)
+      when is_map(session) and is_binary(session.id) and is_map(message) do
+    display_message = DisplayMessage.from_received(message)
+
+    model =
+      case get_snapshot(session.id) do
+        nil -> load_model(session)
+        %ConversationReadModel{} = snapshot -> snapshot
+      end
+
+    next_model = upsert_message(model, display_message)
+    put_snapshot(session.id, next_model)
+    display_message
   end
 
   @spec clear(String.t()) :: true
@@ -56,7 +73,14 @@ defmodule JidoMurmur.ConversationProjector do
   @spec reconcile_session(session_like()) :: [DisplayMessage.t()]
   def reconcile_session(session) do
     previous_model = get_snapshot(session.id) || ConversationReadModel.new(session.id)
-    {next_model, latest_message} = ConversationReadModel.reconcile_entries(previous_model, extract_entries(session))
+    entries = extract_entries(session)
+
+    {next_model, latest_message} =
+      case {entries, previous_model.messages} do
+        {[], [_ | _]} -> {previous_model, nil}
+        _ -> ConversationReadModel.reconcile_entries(previous_model, entries)
+      end
+
     put_snapshot(session.id, next_model)
 
     case latest_message do
@@ -150,5 +174,30 @@ defmodule JidoMurmur.ConversationProjector do
 
   defp put_snapshot(session_id, %ConversationReadModel{} = model) do
     :ets.insert(@table, {session_id, model})
+  end
+
+  defp refresh_empty_snapshot(session, %ConversationReadModel{} = cached_model) do
+    fresh_model =
+      case load_model(session) do
+        %ConversationReadModel{messages: []} ->
+          ConversationReadModel.from_entries(session.id, extract_entries_from_storage(session))
+
+        %ConversationReadModel{} = model ->
+          model
+      end
+
+    case fresh_model do
+      %ConversationReadModel{messages: []} -> cached_model.messages
+      %ConversationReadModel{} = fresh_model ->
+        put_snapshot(session.id, fresh_model)
+        fresh_model.messages
+    end
+  end
+
+  defp upsert_message(%ConversationReadModel{} = model, %DisplayMessage{} = message) do
+    case Enum.find_index(model.messages, &(&1.id == message.id)) do
+      nil -> ConversationReadModel.put_message(model, message)
+      index -> ConversationReadModel.replace_message(model, index, message)
+    end
   end
 end

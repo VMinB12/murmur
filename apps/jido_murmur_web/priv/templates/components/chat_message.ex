@@ -91,6 +91,6 @@ defmodule <%= @app_module %>Web.Components.ChatMessage do
   end
 
   defp markdown_bubble_classes do
-    "prose prose-sm max-w-none [&_*]:text-inherit [&_p]:my-0 [&_pre]:whitespace-pre-wrap"
+    "chat-markdown prose prose-sm max-w-none [&_*]:text-inherit"
   end
 end

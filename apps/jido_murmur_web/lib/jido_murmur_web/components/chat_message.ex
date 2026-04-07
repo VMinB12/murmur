@@ -189,7 +189,7 @@ defmodule JidoMurmurWeb.Components.ChatMessage do
   end
 
   defp markdown_bubble_classes do
-    "prose prose-sm max-w-none [&_*]:text-inherit [&_p]:my-0 [&_pre]:whitespace-pre-wrap"
+    "chat-markdown prose prose-sm max-w-none [&_*]:text-inherit"
   end
 
   defp tool_call_args(tool_call), do: Map.get(tool_call, :args) || %{}

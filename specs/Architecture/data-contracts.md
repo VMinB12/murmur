@@ -284,9 +284,10 @@ Murmur projects them into `ConversationReadModel` and `DisplayMessage`.
 ### Transport Or Persistence Representation
 
 - persistence: PostgreSQL-backed thread-entry rows
-- replay projection: normalized maps consumed by `EntryProjector`
+- replay projection: `ConversationReadModel.ReplayEntry` normalizes Jido and storage entry shapes before `EntryProjector` projects them into the canonical read model
 
 ### Compatibility Notes
 
 - a persisted row format is not automatically the canonical contract for host apps
 - when Murmur needs stable visible identity or ordering semantics beyond raw storage sequence, it carries that information in refs and re-projects it into the canonical read model
+- replay normalization is an explicit adapter boundary, not part of the canonical conversation projection rules themselves

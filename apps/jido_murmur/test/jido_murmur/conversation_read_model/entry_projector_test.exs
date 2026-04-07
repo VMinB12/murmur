@@ -78,7 +78,7 @@ defmodule JidoMurmur.ConversationReadModel.EntryProjectorTest do
       assert step_two.status == :completed
     end
 
-    test "supports legacy kind message entries alongside assistant steps" do
+    test "projects Jido thread message entries alongside assistant steps" do
       entries = [
         %{
           id: "legacy-user",

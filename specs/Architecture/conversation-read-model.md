@@ -42,6 +42,8 @@ That snapshot is derived from:
 - thawed persisted thread state when the agent is not live
 - any in-memory projector state that represents the current in-progress assistant step sequence
 
+Before persisted or thawed thread entries are projected, Murmur first normalizes replay-only storage and runtime entry shapes through a dedicated replay adapter boundary. The canonical projector then works against that normalized replay shape instead of embedding storage-shape cleanup directly into assistant-step projection rules.
+
 The projector cache now stores the full canonical `ConversationReadModel`, not only the rendered message list, so snapshot load and incremental updates reuse the same assistant-step state.
 
 ### 2. Incremental canonical updates
@@ -131,6 +133,7 @@ If token frequency becomes too high later, batching or coalescing can be added a
 - owns assistant-step identity and first-seen ordering attachment
 - owns projector-backed snapshots
 - owns the Murmur conversation update contract
+- owns the replay normalization adapter that translates Jido or storage entry shapes into replay-ready projector input
 
 ### `jido_murmur_web`
 

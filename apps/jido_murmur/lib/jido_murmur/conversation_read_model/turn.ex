@@ -171,11 +171,15 @@ defmodule JidoMurmur.ConversationReadModel.Turn do
     %ToolCall{
       id: incoming.id || existing.id,
       name: incoming.name || existing.name,
-      args: incoming.args || existing.args,
+      args: merge_tool_args(existing.args, incoming.args),
       result: incoming.result || existing.result,
       status: incoming.status || existing.status
     }
   end
+
+  defp merge_tool_args(existing, incoming) when incoming in [nil, "", []], do: existing
+  defp merge_tool_args(existing, incoming) when is_map(incoming) and map_size(incoming) == 0, do: existing
+  defp merge_tool_args(_existing, incoming), do: incoming
 
   defp status_from_tool_calls([], fallback_status), do: fallback_status
 

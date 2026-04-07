@@ -73,6 +73,61 @@ defmodule JidoMurmur.ConversationProjectorTest do
       assert message.id == "req-2-step-1"
     end
 
+    test "tool lifecycle preserves tool call args after completion" do
+      model = ConversationReadModel.new("session-1")
+
+      llm_response =
+        Jido.Signal.new!(
+          "ai.llm.response",
+          %{
+            request_id: "req-2b",
+            result:
+              {:ok,
+               %{
+                 tool_calls: [
+                   %{
+                     id: "call-keep-args",
+                     name: "tell",
+                     arguments: %{"target_agent" => "bob", "intent" => "notify", "message" => "hi"}
+                   }
+                 ]
+               }, []}
+          },
+          source: "/test"
+        )
+
+      assert {:ok, model, message} = ConversationReadModel.apply_signal(model, llm_response)
+
+      assert [%{id: "call-keep-args", args: args, status: :running}] = message.tool_calls
+      assert args == %{"target_agent" => "bob", "intent" => "notify", "message" => "hi"}
+
+      tool_result =
+        Jido.Signal.new!(
+          "ai.tool.result",
+          %{
+            request_id: "req-2b",
+            call_id: "call-keep-args",
+            tool_name: "tell",
+            result: {:ok, %{target: "bob", delivered: true}, []}
+          },
+          source: "/test"
+        )
+
+      assert {:ok, _model, message} = ConversationReadModel.apply_signal(model, tool_result)
+
+      assert [
+               %{
+                 id: "call-keep-args",
+                 name: "tell",
+                 args: %{"target_agent" => "bob", "intent" => "notify", "message" => "hi"},
+                 status: :completed,
+                 result: result
+               }
+             ] = message.tool_calls
+
+      assert result =~ "delivered"
+    end
+
     test "usage merges across multiple signals for one assistant step" do
       model = ConversationReadModel.new("session-1")
 

@@ -18,6 +18,7 @@ All notable changes to this project are documented here. Entries are in reverse 
 
 ### Changed
 
+- Completed tickets 019 through 022: visible direct ingress is now core-owned, the conversation projector caches the full canonical read model without the legacy message-list snapshot path, agent lifecycle orchestration moved behind `AgentHelper`, and Murmur now documents its data model and data contracts explicitly in `specs/Architecture/`.
 - Completed ticket 017 canonical conversation step ordering: top-level chat messages now sort by Murmur-owned first-seen metadata, one outer request can project to multiple assistant-step messages, the legacy `UITurn` read path was removed, and busy follow-up ordering no longer relies on LiveView insertion heuristics.
 - Completed ticket 016 conversation read model and streaming consistency: `jido_murmur` now owns canonical conversation snapshots and incremental updates, `murmur_demo` renders projector-backed conversation state instead of raw `ai.*` stream state, and the redundant `ChatStream` surface was removed from `jido_murmur_web`.
 - Completed ticket 013 agent-centric Phoenix sessions: `session.id` now exports the executing agent session, each react loop remains its own trace, `interaction_id` and discussion rollover were removed from the canonical model, and only immediate parent-trace causation is preserved.

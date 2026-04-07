@@ -38,7 +38,7 @@ defmodule JidoMurmur.Ingress.Input do
           required(:workspace_id) => String.t()
         }
 
-  @spec new(String.t(), keyword()) :: {:ok, t()} | {:error, validation_error()}
+  @spec new(String.t(), list()) :: {:ok, t()} | {:error, validation_error()}
   def new(content, opts \\ []) when is_binary(content) and is_list(opts) do
     normalized_content = String.trim(content)
 
@@ -56,7 +56,7 @@ defmodule JidoMurmur.Ingress.Input do
     end
   end
 
-  @spec direct_message(session_like(), String.t(), keyword()) :: {:ok, t()} | {:error, validation_error()}
+  @spec direct_message(map(), String.t(), list()) :: {:ok, t()} | {:error, validation_error()}
   def direct_message(session, content, opts \\ []) when is_list(opts) do
     with {:ok, extra_refs} <- normalize_extra_refs(Keyword.get(opts, :refs, %{})) do
       new(content,
@@ -70,7 +70,7 @@ defmodule JidoMurmur.Ingress.Input do
     end
   end
 
-  @spec programmatic_message(session_like(), String.t(), keyword()) ::
+    @spec programmatic_message(map(), String.t(), list()) ::
           {:ok, t()} | {:error, validation_error()}
   def programmatic_message(session, content, opts \\ []) when is_list(opts) do
     with {:ok, via} <- normalize_via(Keyword.get(opts, :via)),

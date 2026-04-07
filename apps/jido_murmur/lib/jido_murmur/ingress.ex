@@ -38,29 +38,24 @@ defmodule JidoMurmur.Ingress do
   @spec supervisor_name() :: module()
   def supervisor_name, do: @supervisor
 
-  @spec deliver(session_like(), String.t(), keyword()) ::
+  @spec deliver(session_like(), String.t(), list()) ::
           :queued | :agent_not_running | {:error, {:invalid_input, Input.validation_error()}}
   def deliver(%{id: _, workspace_id: _, agent_profile_id: _, display_name: _} = session, content, opts \\ [])
       when is_binary(content) and is_list(opts) do
     refs = VisibleMessage.attach_identity_refs(Keyword.get(opts, :refs, %{}))
 
-    with {:ok, input} <- Input.direct_message(session, content, Keyword.put(opts, :refs, refs)),
-         {:ok, pid} <- ensure_started(session),
-         :queued <- GenServer.call(pid, {:deliver, session, input}) do
-      VisibleMessage.broadcast_received(session, input, Keyword.get(opts, :kind, :steering))
-      :queued
-    else
-      {:error, :empty_content} -> :queued
+    case Input.direct_message(session, content, Keyword.put(opts, :refs, refs)) do
+      {:ok, input} ->
+        deliver_visible_message(session, input, Keyword.get(opts, :kind, :steering))
 
-      :agent_not_running ->
-        :agent_not_running
+      {:error, :empty_content} -> :queued
 
       {:error, reason} when reason in @invalid_input_reasons ->
         {:error, {:invalid_input, reason}}
     end
   end
 
-  @spec deliver_programmatic(session_like(), String.t(), keyword()) ::
+  @spec deliver_programmatic(session_like(), String.t(), list()) ::
           :queued | :agent_not_running | {:error, {:invalid_input, Input.validation_error()}}
   def deliver_programmatic(%{id: _, workspace_id: _, agent_profile_id: _, display_name: _} = session, content, opts \\ [])
       when is_binary(content) and is_list(opts) do
@@ -70,12 +65,8 @@ defmodule JidoMurmur.Ingress do
   @spec deliver_input(session_like(), Input.t()) ::
           :queued | :agent_not_running | {:error, {:invalid_input, Input.validation_error()}}
   def deliver_input(%{id: _, workspace_id: _, agent_profile_id: _, display_name: _} = session, %Input{} = input) do
-    with :ok <- Input.validate(input),
-         {:ok, pid} <- ensure_started(session) do
-      GenServer.call(pid, {:deliver, session, input})
-    else
-      :agent_not_running ->
-        :agent_not_running
+    case Input.validate(input) do
+      :ok -> deliver_to_coordinator(session, input)
 
       {:error, reason} when reason in @invalid_input_reasons ->
         {:error, {:invalid_input, reason}}
@@ -108,6 +99,24 @@ defmodule JidoMurmur.Ingress do
       {:error, {:already_started, pid}} -> {:ok, pid}
       {:error, {:already_present, _}} -> {:ok, GenServer.whereis(name)}
       {:error, _reason} -> {:error, :agent_not_running}
+    end
+  end
+
+  defp deliver_visible_message(session, %Input{} = input, kind) do
+    case deliver_to_coordinator(session, input) do
+      :queued ->
+        VisibleMessage.broadcast_received(session, input, kind)
+        :queued
+
+      :agent_not_running ->
+        :agent_not_running
+    end
+  end
+
+  defp deliver_to_coordinator(session, %Input{} = input) do
+    case ensure_started(session) do
+      {:ok, pid} -> GenServer.call(pid, {:deliver, session, input})
+      {:error, :agent_not_running} -> :agent_not_running
     end
   end
 end

@@ -1,6 +1,6 @@
 # ADR-008: Core-Owned Visible Ingress Messages
 
-**Status**: Proposed
+**Status**: Accepted
 **Date**: 2026-04-06
 **Ticket**: `specs/tickets/019-core-owned-visible-ingress-messages/`
 

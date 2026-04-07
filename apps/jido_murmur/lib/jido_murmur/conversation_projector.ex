@@ -144,7 +144,6 @@ defmodule JidoMurmur.ConversationProjector do
   defp get_snapshot(session_id) do
     case :ets.lookup(@table, session_id) do
       [{^session_id, %ConversationReadModel{} = model}] -> model
-      [{^session_id, messages}] when is_list(messages) -> ConversationReadModel.new(session_id, messages)
       _ -> nil
     end
   end

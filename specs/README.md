@@ -6,17 +6,13 @@
 
 | Metric | Value |
 |--------|-------|
-| Active tickets | 4 |
-| Last updated | 2026-04-06 |
+| Active tickets | 0 |
+| Last updated | 2026-04-07 |
 
 ## Active Tickets
 
 | # | Title | Status | Owner |
 |---|-------|--------|-------|
-| 019 | [Core-Owned Visible Ingress Messages](tickets/019-core-owned-visible-ingress-messages/) | planned | |
-| 020 | [Conversation Projection State Consolidation](tickets/020-conversation-projection-state-consolidation/) | planned | |
-| 021 | [Agent Lifecycle Boundary Cleanup](tickets/021-agent-lifecycle-boundary-cleanup/) | planned | |
-| 022 | [Data Model And Contract Architecture](tickets/022-data-model-and-contract-architecture/) | planned | |
 
 ## Archived / Superseded
 
@@ -28,6 +24,10 @@
 
 | # | Title | Completed |
 |---|-------|-----------|
+| 022 | [Data Model And Contract Architecture](tickets/022-data-model-and-contract-architecture/) | 2026-04-07 |
+| 021 | [Agent Lifecycle Boundary Cleanup](tickets/021-agent-lifecycle-boundary-cleanup/) | 2026-04-07 |
+| 020 | [Conversation Projection State Consolidation](tickets/020-conversation-projection-state-consolidation/) | 2026-04-07 |
+| 019 | [Core-Owned Visible Ingress Messages](tickets/019-core-owned-visible-ingress-messages/) | 2026-04-07 |
 | 017 | [Canonical Conversation Step Ordering](tickets/017-canonical-conversation-message-ordering/) | 2026-04-06 |
 | 016 | [Conversation Read Model And Streaming Consistency](tickets/016-conversation-read-model-and-streaming-consistency/) | 2026-04-06 |
 | 013 | [Agent-Centric Phoenix Sessions](tickets/013-agent-centric-phoenix-sessions/) | 2026-04-05 |

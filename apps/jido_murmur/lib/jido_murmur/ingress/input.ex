@@ -35,7 +35,8 @@ defmodule JidoMurmur.Ingress.Input do
 
   @type session_like :: %{
           required(:id) => String.t(),
-          required(:workspace_id) => String.t()
+          required(:workspace_id) => String.t(),
+          optional(atom()) => any()
         }
 
   @spec new(String.t(), list()) :: {:ok, t()} | {:error, validation_error()}
@@ -56,7 +57,7 @@ defmodule JidoMurmur.Ingress.Input do
     end
   end
 
-  @spec direct_message(map(), String.t(), list()) :: {:ok, t()} | {:error, validation_error()}
+  @spec direct_message(session_like(), String.t(), list()) :: {:ok, t()} | {:error, validation_error()}
   def direct_message(session, content, opts \\ []) when is_list(opts) do
     with {:ok, extra_refs} <- normalize_extra_refs(Keyword.get(opts, :refs, %{})) do
       new(content,
@@ -70,14 +71,15 @@ defmodule JidoMurmur.Ingress.Input do
     end
   end
 
-    @spec programmatic_message(map(), String.t(), list()) ::
+  @spec programmatic_message(session_like(), String.t(), list()) ::
           {:ok, t()} | {:error, validation_error()}
   def programmatic_message(session, content, opts \\ []) when is_list(opts) do
     with {:ok, via} <- normalize_via(Keyword.get(opts, :via)),
          {:ok, extra_refs} <- normalize_extra_refs(Keyword.get(opts, :refs, %{})),
          {:ok, origin_actor} <- normalize_origin_actor(Keyword.get(opts, :origin_actor), Keyword.get(opts, :sender_name)) do
       refs =
-        Map.merge(extra_refs, %{
+        extra_refs
+        |> Map.merge(%{
           sender_name: Keyword.get(opts, :sender_name) || ActorIdentity.display_name(origin_actor),
           origin_actor: ActorIdentity.serialize(origin_actor),
           sender_trace_id: Keyword.get(opts, :sender_trace_id),

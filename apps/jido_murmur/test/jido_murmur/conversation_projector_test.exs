@@ -310,5 +310,6 @@ defmodule JidoMurmur.ConversationProjectorTest do
       assert [cached_message] = ConversationProjector.snapshot(session)
       assert cached_message.id == message.id
     end
+
   end
 end

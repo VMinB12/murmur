@@ -9,7 +9,8 @@ defmodule JidoMurmur.Runner do
 
   alias JidoMurmur.ActorIdentity
   alias JidoMurmur.Catalog
-  alias JidoMurmur.Ingress.{Input, Metadata}
+  alias JidoMurmur.Ingress.Input
+  alias JidoMurmur.Ingress.Metadata
   alias JidoMurmur.Observability
   alias JidoMurmur.Signals.MessageCompleted
 
@@ -21,7 +22,8 @@ defmodule JidoMurmur.Runner do
           required(:id) => String.t(),
           required(:workspace_id) => String.t(),
           required(:agent_profile_id) => String.t(),
-          required(:display_name) => String.t()
+          required(:display_name) => String.t(),
+          optional(atom()) => any()
         }
 
   @doc false
@@ -57,9 +59,7 @@ defmodule JidoMurmur.Runner do
 
         observe_run_start(session, input, metadata, run)
 
-        request_opts =
-          [tool_context: run.tool_context, request_id: run.request_id]
-          |> maybe_put_extra_refs(input.refs)
+        request_opts = maybe_put_extra_refs([tool_context: run.tool_context, request_id: run.request_id], input.refs)
 
         case llm_adapter().ask(run.agent_module, pid, input.content, request_opts) do
           {:ok, req} ->

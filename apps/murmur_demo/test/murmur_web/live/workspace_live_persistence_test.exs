@@ -16,6 +16,8 @@ defmodule MurmurWeb.WorkspaceLivePersistenceTest do
 
   alias Jido.Signal.ID, as: SignalID
   alias JidoMurmur.Catalog
+  alias JidoMurmur.ConversationReadModel
+  alias JidoMurmur.DisplayMessage
   alias JidoMurmur.Workspaces
 
   defp assert_eventually(fun, retries \\ 50) do
@@ -159,6 +161,66 @@ defmodule MurmurWeb.WorkspaceLivePersistenceTest do
       {assistant_position, _} = :binary.match(html, "Persisted assistant reply")
 
       assert user_position < assistant_position
+    end
+
+    test "stale non-empty projector cache is refreshed from persisted storage on mount", %{
+      conn: conn,
+      workspace: workspace,
+      session: session,
+      pid: pid
+    } do
+      user_message_id = SignalID.generate_sequential(1_700_000_000_000, 8)
+
+      {:ok, server_state} = Jido.AgentServer.state(pid)
+      agent = server_state.agent
+
+      thread =
+        [id: session.id]
+        |> Jido.Thread.new()
+        |> Jido.Thread.append(%{
+          kind: :ai_message,
+          payload: %{role: "user", content: "Fresh persisted user"},
+          refs: %{
+            message_id: user_message_id,
+            message_first_seen_at: SignalID.extract_timestamp(user_message_id),
+            message_first_seen_seq: SignalID.sequence_number(user_message_id)
+          }
+        })
+        |> Jido.Thread.append(%{
+          kind: :ai_message,
+          payload: %{role: "assistant", content: "Fresh persisted assistant", request_id: "req-fresh"},
+          refs: %{request_id: "req-fresh"}
+        })
+
+      agent = %{agent | state: Map.put(agent.state, :__thread__, thread)}
+      assert :ok = Murmur.Jido.hibernate(agent)
+
+      ref = Process.monitor(pid)
+      Murmur.Jido.stop_agent(session.id)
+      assert_receive {:DOWN, ^ref, :process, ^pid, _reason}, 5_000
+      assert_eventually(fn -> Murmur.Jido.whereis(session.id) == nil end)
+
+      stale_message =
+        DisplayMessage.assistant("Older cached reply",
+          id: "cached-step",
+          request_id: "req-cached",
+          step_index: 1,
+          first_seen_at: 10,
+          first_seen_seq: 1
+        )
+
+      :ets.insert(
+        :jido_murmur_conversation_snapshots,
+        {session.id, ConversationReadModel.new(session.id, [stale_message])}
+      )
+
+      on_exit(fn -> JidoMurmur.ConversationProjector.clear(session.id) end)
+
+      {:ok, view, _html} = live(conn, ~p"/workspaces/#{workspace.id}")
+
+      assert has_element?(view, "#messages-#{session.id}", "Fresh persisted user")
+      assert has_element?(view, "#messages-#{session.id}", "Fresh persisted assistant")
+      refute render(view) =~ "Older cached reply"
     end
   end
 end

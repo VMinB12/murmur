@@ -6,7 +6,10 @@ defmodule JidoMurmur.Ingress do
   deciding whether to call `ask`, `steer`, or `inject`.
   """
 
-  alias JidoMurmur.Ingress.{Coordinator, Input, ProgrammaticDelivery, VisibleMessage}
+  alias JidoMurmur.Ingress.Coordinator
+  alias JidoMurmur.Ingress.Input
+  alias JidoMurmur.Ingress.ProgrammaticDelivery
+  alias JidoMurmur.Ingress.VisibleMessage
 
   @registry __MODULE__.Registry
   @supervisor __MODULE__.Supervisor
@@ -29,7 +32,8 @@ defmodule JidoMurmur.Ingress do
           required(:id) => String.t(),
           required(:workspace_id) => String.t(),
           required(:agent_profile_id) => String.t(),
-          required(:display_name) => String.t()
+          required(:display_name) => String.t(),
+          optional(atom()) => any()
         }
 
   @spec registry_name() :: module()
@@ -48,7 +52,8 @@ defmodule JidoMurmur.Ingress do
       {:ok, input} ->
         deliver_visible_message(session, input, Keyword.get(opts, :kind, :steering))
 
-      {:error, :empty_content} -> :queued
+      {:error, :empty_content} ->
+        :queued
 
       {:error, reason} when reason in @invalid_input_reasons ->
         {:error, {:invalid_input, reason}}
@@ -66,7 +71,8 @@ defmodule JidoMurmur.Ingress do
           :queued | :agent_not_running | {:error, {:invalid_input, Input.validation_error()}}
   def deliver_input(%{id: _, workspace_id: _, agent_profile_id: _, display_name: _} = session, %Input{} = input) do
     case Input.validate(input) do
-      :ok -> deliver_to_coordinator(session, input)
+      :ok ->
+        deliver_to_coordinator(session, input)
 
       {:error, reason} when reason in @invalid_input_reasons ->
         {:error, {:invalid_input, reason}}

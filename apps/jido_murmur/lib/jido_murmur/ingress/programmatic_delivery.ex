@@ -7,13 +7,15 @@ defmodule JidoMurmur.Ingress.ProgrammaticDelivery do
   """
 
   alias JidoMurmur.Ingress
-  alias JidoMurmur.Ingress.{Input, VisibleMessage}
+  alias JidoMurmur.Ingress.Input
+  alias JidoMurmur.Ingress.VisibleMessage
 
   @type session_like :: %{
           required(:id) => String.t(),
-      required(:workspace_id) => String.t(),
-      required(:agent_profile_id) => String.t(),
-      required(:display_name) => String.t()
+          required(:workspace_id) => String.t(),
+          required(:agent_profile_id) => String.t(),
+          required(:display_name) => String.t(),
+          optional(atom()) => any()
         }
 
   @invalid_input_reasons [

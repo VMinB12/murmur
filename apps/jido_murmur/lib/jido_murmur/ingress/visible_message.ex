@@ -12,6 +12,13 @@ defmodule JidoMurmur.Ingress.VisibleMessage do
   @first_seen_seq_key :message_first_seen_seq
   @reserved_extra_keys [@message_id_key, @first_seen_at_key, @first_seen_seq_key]
 
+  @type session_like :: %{
+          required(:id) => String.t(),
+          required(:workspace_id) => String.t(),
+          required(:agent_profile_id) => String.t(),
+          optional(atom()) => any()
+        }
+
   @spec attach_identity_refs(map()) :: map()
   def attach_identity_refs(%{} = extra_refs) do
     message_id = Map.get(extra_refs, @message_id_key) || SignalID.generate!()
@@ -24,7 +31,7 @@ defmodule JidoMurmur.Ingress.VisibleMessage do
 
   def attach_identity_refs(other), do: other
 
-  @spec broadcast_received(map(), Input.t(), atom() | String.t()) :: :ok
+  @spec broadcast_received(session_like(), Input.t(), atom() | String.t()) :: :ok
   def broadcast_received(session, %Input{} = input, message_kind) do
     {:ok, metadata} = Input.metadata(input)
     identity = identity(metadata.extra)

@@ -43,9 +43,24 @@ defmodule Murmur.Umbrella.MixProject do
         "deps.unlock --unused",
         "format",
         "test",
+        &run_umbrella_dialyzer/1,
         "credo --strict",
         "sobelow --root apps/murmur_demo --config"
       ]
     ]
+  end
+
+  defp run_umbrella_dialyzer(_args) do
+    {_output, exit_code} =
+      System.cmd("mix", ["dialyzer"],
+        cd: File.cwd!(),
+        env: [{"MIX_ENV", "dev"}],
+        into: IO.stream(:stdio, :line),
+        stderr_to_stdout: true
+      )
+
+    if exit_code != 0 do
+      Mix.raise("mix dialyzer failed with exit code #{exit_code}")
+    end
   end
 end

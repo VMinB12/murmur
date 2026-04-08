@@ -14,15 +14,15 @@ defmodule JidoMurmur.ConversationProjector do
   @type session_like :: %{
           required(:id) => String.t(),
           required(:workspace_id) => String.t(),
-          required(:agent_profile_id) => String.t()
+          required(:agent_profile_id) => String.t(),
+          optional(atom()) => any()
         }
 
   @spec snapshot(session_like()) :: [DisplayMessage.t()]
   def snapshot(session) do
     case get_snapshot(session.id) do
       nil -> load_snapshot(session)
-      %ConversationReadModel{messages: []} = model -> refresh_empty_snapshot(session, model)
-      model -> model.messages
+      %ConversationReadModel{} = model -> refresh_snapshot(session, model)
     end
   end
 
@@ -34,8 +34,7 @@ defmodule JidoMurmur.ConversationProjector do
   end
 
   @spec put_received_message(session_like(), map()) :: DisplayMessage.t()
-  def put_received_message(session, message)
-      when is_map(session) and is_binary(session.id) and is_map(message) do
+  def put_received_message(session, message) when is_map(session) and is_binary(session.id) and is_map(message) do
     display_message = DisplayMessage.from_received(message)
 
     model =
@@ -75,10 +74,12 @@ defmodule JidoMurmur.ConversationProjector do
     previous_model = get_snapshot(session.id) || ConversationReadModel.new(session.id)
     entries = extract_entries(session)
 
+    {candidate_model, candidate_latest_message} = ConversationReadModel.reconcile_entries(previous_model, entries)
+
     {next_model, latest_message} =
-      case {entries, previous_model.messages} do
-        {[], [_ | _]} -> {previous_model, nil}
-        _ -> ConversationReadModel.reconcile_entries(previous_model, entries)
+      case choose_snapshot_model(previous_model, candidate_model) do
+        ^previous_model -> {previous_model, nil}
+        %ConversationReadModel{} = resolved_model -> {resolved_model, candidate_latest_message}
       end
 
     put_snapshot(session.id, next_model)
@@ -176,7 +177,7 @@ defmodule JidoMurmur.ConversationProjector do
     :ets.insert(@table, {session_id, model})
   end
 
-  defp refresh_empty_snapshot(session, %ConversationReadModel{} = cached_model) do
+  defp refresh_snapshot(session, %ConversationReadModel{} = cached_model) do
     fresh_model =
       case load_model(session) do
         %ConversationReadModel{messages: []} ->
@@ -186,12 +187,79 @@ defmodule JidoMurmur.ConversationProjector do
           model
       end
 
-    case fresh_model do
-      %ConversationReadModel{messages: []} -> cached_model.messages
-      %ConversationReadModel{} = fresh_model ->
-        put_snapshot(session.id, fresh_model)
-        fresh_model.messages
+    resolved_model = choose_snapshot_model(cached_model, fresh_model)
+
+    if resolved_model != cached_model do
+      put_snapshot(session.id, resolved_model)
     end
+
+    resolved_model.messages
+  end
+
+  defp choose_snapshot_model(%ConversationReadModel{} = cached_model, %ConversationReadModel{messages: []}) do
+    cached_model
+  end
+
+  defp choose_snapshot_model(%ConversationReadModel{messages: []}, %ConversationReadModel{} = fresh_model) do
+    fresh_model
+  end
+
+  defp choose_snapshot_model(%ConversationReadModel{} = cached_model, %ConversationReadModel{} = fresh_model) do
+    case compare_model_freshness(fresh_model, cached_model) do
+      :gt -> fresh_model
+      _ -> cached_model
+    end
+  end
+
+  defp compare_model_freshness(%ConversationReadModel{} = left, %ConversationReadModel{} = right) do
+    freshness_signature(left)
+    |> compare_signatures(freshness_signature(right))
+  end
+
+  defp compare_signatures(left, right) when left > right, do: :gt
+  defp compare_signatures(left, right) when left < right, do: :lt
+  defp compare_signatures(_left, _right), do: :eq
+
+  defp freshness_signature(%ConversationReadModel{messages: messages}) do
+    {latest_message_marker(messages), length(messages), total_message_weight(messages)}
+  end
+
+  defp latest_message_marker(messages) do
+    messages
+    |> Enum.map(&message_marker/1)
+    |> Enum.max(fn -> {0, 0} end)
+  end
+
+  defp message_marker(message) do
+    {Map.get(message, :first_seen_at) || 0, Map.get(message, :first_seen_seq) || 0}
+  end
+
+  defp total_message_weight(messages) do
+    Enum.reduce(messages, 0, fn message, total -> total + message_weight(message) end)
+  end
+
+  defp message_weight(message) do
+    content_weight = message |> Map.get(:content, "") |> to_string() |> String.length()
+    thinking_weight = message |> Map.get(:thinking, "") |> to_string() |> String.length()
+
+    tool_weight =
+      message
+      |> Map.get(:tool_calls, [])
+      |> Enum.reduce(0, fn tool_call, total ->
+        result_length = tool_call |> Map.get(:result, "") |> to_string() |> String.length()
+        args_size = tool_call |> Map.get(:args, %{}) |> map_size()
+        total + result_length + args_size
+      end)
+
+    usage_weight =
+      message
+      |> Map.get(:usage)
+      |> case do
+        usage when is_map(usage) -> map_size(usage)
+        _ -> 0
+      end
+
+    content_weight + thinking_weight + tool_weight + usage_weight
   end
 
   defp upsert_message(%ConversationReadModel{} = model, %DisplayMessage{} = message) do

@@ -64,6 +64,25 @@ defmodule JidoMurmur.Integration.MessageFlowTest do
     assert_receive %Jido.Signal{type: "murmur.message.completed"}, 10_000
   end
 
+  test "completion does not wipe the projector snapshot", %{session: session} do
+    assert {:ok, _pid} = AgentHelper.start_agent(session)
+
+    Phoenix.PubSub.subscribe(
+      JidoMurmur.pubsub(),
+      JidoMurmur.Topics.agent_messages(session.workspace_id, session.id)
+    )
+
+    LLM.Mock.set_response(%{content: "Snapshot response"})
+
+    assert :queued = Ingress.deliver(session, "Snapshot request")
+    assert_receive %Jido.Signal{type: "murmur.message.completed"}, 10_000
+
+    session_id = session.id
+    assert [{^session_id, _snapshot}] = :ets.lookup(:jido_murmur_conversation_snapshots, session_id)
+
+    assert [%{content: "Snapshot request"}] = JidoMurmur.ConversationProjector.snapshot(session)
+  end
+
   test "root turn attrs are present while the request is active", %{session: session} do
     assert {:ok, _pid} = AgentHelper.start_agent(session)
     Phoenix.PubSub.subscribe(JidoMurmur.pubsub(), JidoMurmur.Topics.agent_messages(session.workspace_id, session.id))

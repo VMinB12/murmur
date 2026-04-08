@@ -6,13 +6,15 @@
 
 | Metric | Value |
 |--------|-------|
-| Active tickets | 0 |
-| Last updated | 2026-04-07 |
+| Active tickets | 2 |
+| Last updated | 2026-04-08 |
 
 ## Active Tickets
 
 | # | Title | Status | Owner |
 |---|-------|--------|-------|
+| 024 | [Conversation Snapshot Freshness Contract](tickets/024-conversation-snapshot-freshness-contract/) | research | |
+| 025 | [Shared Session Contract Type](tickets/025-shared-session-contract-type/) | research | |
 
 ## Archived / Superseded
 

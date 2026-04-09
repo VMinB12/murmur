@@ -17,7 +17,7 @@ See [data-model.md](data-model.md) for the canonical entity and read-model view 
 | `stop_agent/1` | `(session_id) → :ok` | Stop a running agent session if it exists |
 | `load_messages/1` | `(session) → [map()]` | Load conversation history (live process or storage) |
 | `load_artifacts/1` | `(session) → [map()]` | Load generated artifacts from agent state |
-| `subscribe/1` | `(session) → :ok` | Subscribe to all PubSub topics for a session |
+| `subscribe/1` | `(session) → :ok` | Subscribe to session message, canonical conversation, and artifact topics |
 | `unsubscribe/1` | `(session) → :ok` | Unsubscribe from all PubSub topics for a session |
 | `cleanup_session_storage/1` | `(session) → :ok` | Delete one session checkpoint, thread, and projector snapshot |
 
@@ -66,7 +66,6 @@ All topics follow `workspace:{wid}:...` for multi-workspace isolation:
 | Function | Topic Pattern |
 |----------|---------------|
 | `agent_messages/2` | `workspace:{wid}:agent:{sid}:messages` |
-| `agent_stream/2` | `workspace:{wid}:agent:{sid}:stream` |
 | `agent_artifacts/2` | `workspace:{wid}:agent:{sid}:artifacts` |
 | `workspace_tasks/1` | `workspace:{wid}:tasks` |
 | `workspace/1` | `workspace:{wid}` |
@@ -154,7 +153,7 @@ All plugins use `Jido.Plugin`, declaration-ordered:
 
 | Plugin | Purpose |
 |--------|---------|
-| `StreamingPlugin` | Broadcasts lifecycle signals via PubSub for real-time UI |
+| `StreamingPlugin` | Intercepts raw lifecycle signals, feeds the canonical conversation projector, and records observability events |
 
 ### Observability
 

@@ -22,11 +22,11 @@
 
 ## Acceptance Criteria
 
-- [ ] The demo chat surface no longer subscribes to the raw agent stream topic for conversation rendering.
-- [ ] Dead `ai.*` chat handlers and related compatibility assumptions are removed from the demo chat surface.
-- [ ] If no current runtime consumer remains, the extra raw-stream PubSub topic and broadcast path are removed.
-- [ ] Canonical chat behavior continues to rely on Murmur-owned visible-ingress, conversation-update, completion, and failure contracts.
-- [ ] Internal canonical reduction from raw `ai.*` lifecycle facts remains unchanged.
+- [x] The demo chat surface no longer subscribes to the raw agent stream topic for conversation rendering.
+- [x] Dead `ai.*` chat handlers and related compatibility assumptions are removed from the demo chat surface.
+- [x] If no current runtime consumer remains, the extra raw-stream PubSub topic and broadcast path are removed.
+- [x] Canonical chat behavior continues to rely on Murmur-owned visible-ingress, conversation-update, completion, and failure contracts.
+- [x] Internal canonical reduction from raw `ai.*` lifecycle facts remains unchanged.
 
 ## Scope
 

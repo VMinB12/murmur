@@ -22,11 +22,11 @@
 
 ## Acceptance Criteria
 
-- [ ] `ConversationProjector` no longer performs ad hoc live-process lookup and thaw-driven offline history recovery internally for snapshot loading and reconciliation.
-- [ ] The conversation snapshot path uses one dedicated source boundary that returns replay-ready entry data for live and offline sessions.
-- [ ] Offline conversation snapshot reconstruction reads persisted thread history directly rather than thawing a full agent only to extract thread entries.
-- [ ] Canonical `ConversationReadModel` and `DisplayMessage` behavior remain unchanged for live and offline snapshots.
-- [ ] Existing thaw-based behavior outside the conversation snapshot path remains out of scope and unchanged.
+- [x] `ConversationProjector` no longer performs ad hoc live-process lookup and thaw-driven offline history recovery internally for snapshot loading and reconciliation.
+- [x] The conversation snapshot path uses one dedicated source boundary that returns replay-ready entry data for live and offline sessions.
+- [x] Offline conversation snapshot reconstruction reads persisted thread history directly rather than thawing a full agent only to extract thread entries.
+- [x] Canonical `ConversationReadModel` and `DisplayMessage` behavior remain unchanged for live and offline snapshots.
+- [x] Existing thaw-based behavior outside the conversation snapshot path remains out of scope and unchanged.
 
 ## Scope
 

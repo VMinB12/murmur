@@ -32,7 +32,7 @@ defmodule MurmurWeb.WorkspaceLiveHelpersTest do
       end
     end)
 
-    %{workspace: workspace, session: session, pid: pid, agent_module: agent_module}
+    %{workspace: workspace, session: session, pid: pid}
   end
 
   describe "AgentServer.state/1 returns AgentServer.State, not Agent" do
@@ -108,14 +108,4 @@ defmodule MurmurWeb.WorkspaceLiveHelpersTest do
     end
   end
 
-  describe "hibernate_agent/1 persists agent state" do
-    test "hibernate succeeds on a fresh agent", %{session: session, agent_module: agent_module} do
-      result = WorkspaceState.hibernate_agent(session.id)
-      assert result == :ok
-
-      # Verify we can thaw the agent back
-      {:ok, restored_agent} = Murmur.Jido.thaw(agent_module, session.id)
-      assert restored_agent.id == session.id
-    end
-  end
 end

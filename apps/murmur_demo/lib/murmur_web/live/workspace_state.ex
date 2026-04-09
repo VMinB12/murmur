@@ -73,18 +73,4 @@ defmodule MurmurWeb.Live.WorkspaceState do
     end
   end
 
-  @spec hibernate_agent(String.t()) :: :ok
-  def hibernate_agent(session_id) when is_binary(session_id) do
-    case Murmur.Jido.whereis(session_id) do
-      nil ->
-        :ok
-
-      _pid ->
-        case Jido.AgentServer.state(Murmur.Jido.whereis(session_id)) do
-          {:ok, %{agent: agent}} -> Murmur.Jido.hibernate(agent)
-          _ -> :ok
-        end
-    end
-  end
-
 end

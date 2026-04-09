@@ -245,6 +245,9 @@ defmodule JidoMurmur.ConversationProjectorTest do
 
       assert snapshot.messages == [message]
       assert snapshot.step_indexes == %{"req-5" => 1}
+      assert snapshot.source == :signal
+      assert snapshot.persisted_rev == 0
+      assert snapshot.live_revision == 1
     end
 
     test "visible ingress messages update the cached snapshot" do
@@ -278,8 +281,45 @@ defmodule JidoMurmur.ConversationProjectorTest do
       assert %{id: ^message_id, content: "Remember this message"} =
                ConversationProjector.put_received_message(session, message)
 
+      assert [
+               {^session_id, %ConversationReadModel{} = snapshot}
+             ] = :ets.lookup(:jido_murmur_conversation_snapshots, session_id)
+
+      assert snapshot.source == :visible_message
+      assert snapshot.live_revision == 1
+
       assert [%{id: ^message_id, content: "Remember this message"}] =
                ConversationProjector.snapshot(session)
+    end
+
+    test "snapshot preserves live-advanced cached state during refresh" do
+      session_id = Ecto.UUID.generate()
+
+      session = %{
+        id: session_id,
+        workspace_id: Ecto.UUID.generate()
+      }
+
+      message =
+        JidoMurmur.DisplayMessage.user("Fresh live message",
+          id: Ecto.UUID.generate(),
+          first_seen_at: 100,
+          first_seen_seq: 1
+        )
+
+      :ets.insert(
+        :jido_murmur_conversation_snapshots,
+        {session_id,
+         ConversationReadModel.new(session_id, [message],
+           source: :visible_message,
+           live_revision: 1
+         )}
+      )
+
+      on_exit(fn -> ConversationProjector.clear(session_id) end)
+
+      assert [returned_message] = ConversationProjector.snapshot(session)
+      assert returned_message.id == message.id
     end
 
     test "reconcile_session preserves a non-empty cached snapshot when runtime extraction is empty" do

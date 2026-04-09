@@ -1,11 +1,11 @@
 ---
 id: "025"
 title: "Shared Session Contract Type"
-status: research
+status: done
 jira: ""
 owner: ""
 created: 2026-04-08
-updated: 2026-04-08
+updated: 2026-04-09
 ---
 
 # 025 — Shared Session Contract Type

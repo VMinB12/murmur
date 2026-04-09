@@ -11,12 +11,17 @@ defmodule JidoMurmur.ConversationReadModel do
   alias JidoMurmur.DisplayMessage
 
   @enforce_keys [:session_id]
-  defstruct [:session_id, messages: [], step_indexes: %{}]
+    defstruct [:session_id, messages: [], step_indexes: %{}, source: :initial, persisted_rev: 0, live_revision: 0]
+
+    @type source :: :initial | :live_thread | :signal | :storage | :visible_message
 
   @type t :: %__MODULE__{
           session_id: String.t(),
           messages: [DisplayMessage.t()],
-          step_indexes: %{optional(String.t()) => pos_integer()}
+      step_indexes: %{optional(String.t()) => pos_integer()},
+      source: source(),
+      persisted_rev: non_neg_integer(),
+      live_revision: non_neg_integer()
         }
 
   @spec new(String.t(), [DisplayMessage.t()], keyword()) :: t()
@@ -27,13 +32,17 @@ defmodule JidoMurmur.ConversationReadModel do
     %__MODULE__{
       session_id: session_id,
       messages: sorted_messages,
-      step_indexes: Keyword.get(opts, :step_indexes, build_step_indexes(sorted_messages))
+      step_indexes: Keyword.get(opts, :step_indexes, build_step_indexes(sorted_messages)),
+      source: Keyword.get(opts, :source, :initial),
+      persisted_rev: normalize_non_neg_integer(Keyword.get(opts, :persisted_rev, 0)),
+      live_revision: normalize_non_neg_integer(Keyword.get(opts, :live_revision, 0))
     }
   end
 
-  @spec from_entries(String.t(), list()) :: t()
-  def from_entries(session_id, entries) when is_binary(session_id) and is_list(entries) do
-    EntryProjector.project_entries(session_id, entries)
+  @spec from_entries(String.t(), list(), keyword()) :: t()
+  def from_entries(session_id, entries, opts \\ [])
+      when is_binary(session_id) and is_list(entries) and is_list(opts) do
+    EntryProjector.project_entries(session_id, entries, opts)
   end
 
   @spec apply_signal(t(), Jido.Signal.t()) :: {:ok, t(), DisplayMessage.t()} | :ignore
@@ -48,10 +57,19 @@ defmodule JidoMurmur.ConversationReadModel do
     end
   end
 
-  @spec reconcile_entries(t(), list()) :: {t(), DisplayMessage.t() | nil}
-  def reconcile_entries(%__MODULE__{session_id: session_id}, entries) when is_list(entries) do
-    next_model = from_entries(session_id, entries)
+  @spec reconcile_entries(t(), list(), keyword()) :: {t(), DisplayMessage.t() | nil}
+  def reconcile_entries(%__MODULE__{session_id: session_id}, entries, opts \\ [])
+      when is_list(entries) and is_list(opts) do
+    next_model = from_entries(session_id, entries, opts)
     {next_model, latest_assistant_message(next_model.messages)}
+  end
+
+  @spec ahead_of_persistence?(t()) :: boolean()
+  def ahead_of_persistence?(%__MODULE__{live_revision: live_revision}), do: live_revision > 0
+
+  @spec advance_live_revision(t(), source()) :: t()
+  def advance_live_revision(%__MODULE__{} = model, source) when is_atom(source) do
+    %{model | source: source, live_revision: model.live_revision + 1}
   end
 
   @spec next_step_index(t(), String.t() | nil) :: pos_integer()
@@ -162,7 +180,7 @@ defmodule JidoMurmur.ConversationReadModel do
         put_message(model, updated_message)
       end
 
-    {:ok, next_model, updated_message}
+    {:ok, advance_live_revision(next_model, :signal), updated_message}
   end
 
   defp resolve_step(%__MODULE__{} = model, request_id, signal, :llm) do
@@ -294,6 +312,9 @@ defmodule JidoMurmur.ConversationReadModel do
     sorted_messages = DisplayMessage.sort_messages(messages)
     %{model | messages: sorted_messages, step_indexes: build_step_indexes(sorted_messages)}
   end
+
+  defp normalize_non_neg_integer(value) when is_integer(value) and value >= 0, do: value
+  defp normalize_non_neg_integer(_value), do: 0
 
   defp build_step_indexes(messages) do
     Enum.reduce(messages, %{}, &accumulate_step_index/2)

@@ -10,6 +10,7 @@ defmodule JidoMurmur.Ingress do
   alias JidoMurmur.Ingress.Input
   alias JidoMurmur.Ingress.ProgrammaticDelivery
   alias JidoMurmur.Ingress.VisibleMessage
+  alias JidoMurmur.SessionContract
 
   @registry __MODULE__.Registry
   @supervisor __MODULE__.Supervisor
@@ -28,13 +29,7 @@ defmodule JidoMurmur.Ingress do
     :invalid_expected_request_id
   ]
 
-  @type session_like :: %{
-          required(:id) => String.t(),
-          required(:workspace_id) => String.t(),
-          required(:agent_profile_id) => String.t(),
-          required(:display_name) => String.t(),
-          optional(atom()) => any()
-        }
+  @type session_like :: SessionContract.target()
 
   @spec registry_name() :: module()
   def registry_name, do: @registry
@@ -109,20 +104,34 @@ defmodule JidoMurmur.Ingress do
   end
 
   defp deliver_visible_message(session, %Input{} = input, kind) do
-    case deliver_to_coordinator(session, input) do
-      :queued ->
-        VisibleMessage.broadcast_received(session, input, kind)
-        :queued
+    message = VisibleMessage.build_message(input, kind)
 
-      :agent_not_running ->
+    case ensure_started(session) do
+      {:ok, pid} ->
+        _ = JidoMurmur.ConversationProjector.put_received_message(session, message)
+
+        case deliver_to_coordinator(pid, session, input) do
+          :queued ->
+            VisibleMessage.broadcast_received(session, message)
+            :queued
+
+          :agent_not_running ->
+            :agent_not_running
+        end
+
+      {:error, :agent_not_running} ->
         :agent_not_running
     end
   end
 
   defp deliver_to_coordinator(session, %Input{} = input) do
     case ensure_started(session) do
-      {:ok, pid} -> GenServer.call(pid, {:deliver, session, input})
+      {:ok, pid} -> deliver_to_coordinator(pid, session, input)
       {:error, :agent_not_running} -> :agent_not_running
     end
+  end
+
+  defp deliver_to_coordinator(pid, session, %Input{} = input) when is_pid(pid) do
+    GenServer.call(pid, {:deliver, session, input})
   end
 end

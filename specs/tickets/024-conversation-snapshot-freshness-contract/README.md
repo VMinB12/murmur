@@ -1,13 +1,13 @@
 ---
 id: "024"
 title: "Conversation Snapshot Freshness Contract"
-status: research
+status: done
 jira: ""
 owner: ""
 created: 2026-04-08
-updated: 2026-04-08
+updated: 2026-04-09
 ---
 
 # 024 — Conversation Snapshot Freshness Contract
 
-Formalize the canonical freshness and source-of-truth rules for Murmur conversation snapshots so the projector cache cannot silently diverge from runtime or persisted history. This follow-up ticket exists because the refresh and replay bug was fixed successfully, but the underlying projector lifecycle still relies on heuristic recovery paths instead of an explicit freshness contract between live thread state, replayed persisted entries, and ETS-cached `ConversationReadModel` values.
+Formalize the canonical freshness and source-of-truth rules for Murmur conversation snapshots so the projector cache cannot silently diverge from runtime or persisted history. This ticket now tracks the stronger approach: keep one canonical `ConversationReadModel`, keep the ETS cache as its canonical materialized in-memory form, and make source provenance plus revision semantics explicit so snapshot serving and reconciliation stop relying on heuristic freshness recovery. The projector source-boundary cleanup and the dead `ai.*` chat-path removal are now tracked separately in tickets `026` and `027`.

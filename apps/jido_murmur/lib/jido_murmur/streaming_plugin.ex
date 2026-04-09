@@ -1,12 +1,11 @@
 defmodule JidoMurmur.StreamingPlugin do
   @moduledoc """
   Jido Plugin that intercepts lifecycle signals emitted by the ReAct
-  strategy and forwards them to the LiveView via PubSub.
+  strategy and reduces them into Murmur-owned canonical conversation updates.
 
-  Each matched signal is broadcast directly as a `%Jido.Signal{}` struct
-  on a session-scoped PubSub topic. The `subject` field is populated with
-  the agent's session path. The LiveView pattern-matches on the signal
-  type to decide what to render.
+  Raw `ai.*` lifecycle facts remain internal projector inputs and observability
+  events. Chat surfaces subscribe to canonical Murmur-owned signals instead of
+  the raw lifecycle transport.
   """
 
   use Jido.Plugin,
@@ -31,7 +30,6 @@ defmodule JidoMurmur.StreamingPlugin do
   def handle_signal(signal, context) do
     session_id = context.agent.id
     workspace_id = context.agent.state[:workspace_id]
-    topic = stream_topic(workspace_id, session_id)
 
     :telemetry.execute(
       [:jido_murmur, :streaming, :signal],
@@ -52,14 +50,8 @@ defmodule JidoMurmur.StreamingPlugin do
     _ = JidoMurmur.ConversationProjector.apply_signal(workspace_id, session_id, context.agent, signal)
 
     Observability.record_signal(signal, %{workspace_id: workspace_id, session_id: session_id})
-
-    Phoenix.PubSub.broadcast(JidoMurmur.pubsub(), topic, signal)
     {:ok, :continue}
   end
-
-  @doc "Returns the PubSub topic for agent signals for the given session."
-  def stream_topic(workspace_id, session_id),
-    do: JidoMurmur.Topics.agent_stream(workspace_id, session_id)
 
   defp maybe_attach_request_id(%Jido.Signal{data: data} = signal, _session_id) when not is_map(data), do: signal
 

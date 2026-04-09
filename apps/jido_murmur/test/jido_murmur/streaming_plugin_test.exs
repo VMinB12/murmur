@@ -8,71 +8,16 @@ defmodule JidoMurmur.StreamingPluginTest do
   end
 
   describe "handle_signal/2" do
-    test "broadcasts signal to PubSub on stream topic" do
-      workspace_id = Ecto.UUID.generate()
-      session_id = Ecto.UUID.generate()
-      topic = StreamingPlugin.stream_topic(workspace_id, session_id)
-      Phoenix.PubSub.subscribe(JidoMurmur.pubsub(), topic)
-
-      signal = Jido.Signal.new!("ai.llm.delta", %{content: "Hello"}, source: "/test")
-
-      assert {:ok, :continue} = StreamingPlugin.handle_signal(signal, build_context(session_id, workspace_id))
-
-      assert_receive %Jido.Signal{type: "ai.llm.delta", subject: "/agents/" <> _}
-    end
-
-    test "handles ai.llm.response signal" do
-      workspace_id = Ecto.UUID.generate()
-      session_id = Ecto.UUID.generate()
-      topic = StreamingPlugin.stream_topic(workspace_id, session_id)
-      Phoenix.PubSub.subscribe(JidoMurmur.pubsub(), topic)
-
-      signal = Jido.Signal.new!("ai.llm.response", %{content: "Full response"}, source: "/test")
-
-      assert {:ok, :continue} = StreamingPlugin.handle_signal(signal, build_context(session_id, workspace_id))
-
-      assert_receive %Jido.Signal{type: "ai.llm.response", subject: "/agents/" <> _}
-    end
-
-    test "handles ai.tool.result signal" do
-      workspace_id = Ecto.UUID.generate()
-      session_id = Ecto.UUID.generate()
-      topic = StreamingPlugin.stream_topic(workspace_id, session_id)
-      Phoenix.PubSub.subscribe(JidoMurmur.pubsub(), topic)
-
-      signal = Jido.Signal.new!("ai.tool.result", %{tool: "search", result: "found"}, source: "/test")
-
-      assert {:ok, :continue} = StreamingPlugin.handle_signal(signal, build_context(session_id, workspace_id))
-
-      assert_receive %Jido.Signal{type: "ai.tool.result", subject: "/agents/" <> _}
-    end
-
-    test "handles ai.tool.started signal" do
-      workspace_id = Ecto.UUID.generate()
-      session_id = Ecto.UUID.generate()
-      topic = StreamingPlugin.stream_topic(workspace_id, session_id)
-      Phoenix.PubSub.subscribe(JidoMurmur.pubsub(), topic)
-
-      signal =
-        Jido.Signal.new!("ai.tool.started", %{tool_name: "search", arguments: %{query: "phoenix"}},
-          source: "/test"
-        )
-
-      assert {:ok, :continue} = StreamingPlugin.handle_signal(signal, build_context(session_id, workspace_id))
-
-      assert_receive %Jido.Signal{type: "ai.tool.started", subject: "/agents/" <> _}
-    end
-
-    test "emits canonical conversation updates when a request id is active" do
+    test "emits canonical conversation updates instead of raw stream broadcasts" do
       workspace_id = Ecto.UUID.generate()
       session_id = Ecto.UUID.generate()
       request_id = Ecto.UUID.generate()
-
-      stream_topic = StreamingPlugin.stream_topic(workspace_id, session_id)
+      stream_topic = "workspace:#{workspace_id}:agent:#{session_id}:stream"
       conversation_topic = JidoMurmur.Topics.agent_conversation(workspace_id, session_id)
 
       Phoenix.PubSub.subscribe(JidoMurmur.pubsub(), stream_topic)
       Phoenix.PubSub.subscribe(JidoMurmur.pubsub(), conversation_topic)
+
       :ets.insert(:jido_murmur_active_runners, {session_id, request_id})
 
       on_exit(fn ->
@@ -89,7 +34,7 @@ defmodule JidoMurmur.StreamingPluginTest do
 
       assert {:ok, :continue} = StreamingPlugin.handle_signal(signal, build_context(session_id, workspace_id))
 
-      assert_receive %Jido.Signal{type: "ai.llm.delta", subject: "/agents/" <> _}
+      refute_receive %Jido.Signal{type: "ai.llm.delta"}, 50
 
       assert_receive %Jido.Signal{
                        type: "murmur.conversation.updated",
@@ -102,50 +47,20 @@ defmodule JidoMurmur.StreamingPluginTest do
       assert message_id == request_id <> "-step-1"
     end
 
-    test "handles ai.request.started signal" do
+    test "returns continue for non-projecting lifecycle signals without raw broadcast" do
       workspace_id = Ecto.UUID.generate()
       session_id = Ecto.UUID.generate()
-      topic = StreamingPlugin.stream_topic(workspace_id, session_id)
-      Phoenix.PubSub.subscribe(JidoMurmur.pubsub(), topic)
+      stream_topic = "workspace:#{workspace_id}:agent:#{session_id}:stream"
+      conversation_topic = JidoMurmur.Topics.agent_conversation(workspace_id, session_id)
+
+      Phoenix.PubSub.subscribe(JidoMurmur.pubsub(), stream_topic)
+      Phoenix.PubSub.subscribe(JidoMurmur.pubsub(), conversation_topic)
 
       signal = Jido.Signal.new!("ai.request.started", %{}, source: "/test")
 
       assert {:ok, :continue} = StreamingPlugin.handle_signal(signal, build_context(session_id, workspace_id))
 
-      assert_receive %Jido.Signal{type: "ai.request.started", subject: "/agents/" <> _}
-    end
-
-    test "handles ai.request.failed signal" do
-      workspace_id = Ecto.UUID.generate()
-      session_id = Ecto.UUID.generate()
-      topic = StreamingPlugin.stream_topic(workspace_id, session_id)
-      Phoenix.PubSub.subscribe(JidoMurmur.pubsub(), topic)
-
-      signal = Jido.Signal.new!("ai.request.failed", %{error: "timeout"}, source: "/test")
-
-      assert {:ok, :continue} = StreamingPlugin.handle_signal(signal, build_context(session_id, workspace_id))
-
-      assert_receive %Jido.Signal{type: "ai.request.failed", subject: "/agents/" <> _}
-    end
-
-    test "preserves existing subject if already set" do
-      workspace_id = Ecto.UUID.generate()
-      session_id = Ecto.UUID.generate()
-      topic = StreamingPlugin.stream_topic(workspace_id, session_id)
-      Phoenix.PubSub.subscribe(JidoMurmur.pubsub(), topic)
-
-      signal = Jido.Signal.new!("ai.llm.delta", %{content: "Hello"}, source: "/test", subject: "/custom/subject")
-
-      assert {:ok, :continue} = StreamingPlugin.handle_signal(signal, build_context(session_id, workspace_id))
-
-      assert_receive %Jido.Signal{type: "ai.llm.delta", subject: "/custom/subject"}
-    end
-  end
-
-  describe "stream_topic/2" do
-    test "returns workspace-scoped topic" do
-      assert StreamingPlugin.stream_topic("ws-1", "abc-123") ==
-               "workspace:ws-1:agent:abc-123:stream"
+      refute_receive %Jido.Signal{}, 50
     end
   end
 end

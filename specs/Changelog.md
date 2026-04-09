@@ -18,6 +18,7 @@ All notable changes to this project are documented here. Entries are in reverse 
 
 ### Changed
 
+- Completed tickets 024 through 027: conversation snapshots now load through a dedicated live-or-storage source boundary, the canonical read model carries explicit source and persistence freshness metadata, shared session map contracts are centralized under `JidoMurmur.SessionContract`, and the dead raw `ai.*` chat PubSub path has been removed in favor of Murmur-owned canonical conversation updates only.
 - Completed ticket 023 tell intent contract: `tell` now requires an advisory `intent` enum, inter-agent messages use a reusable hidden HTML-comment envelope, tell-generated messages render through markdown while direct human messages remain raw text, and the final validation pass now includes a clean `mix dialyzer` run on this change set.
 - Completed tickets 019 through 022: visible direct ingress is now core-owned, the conversation projector caches the full canonical read model without the legacy message-list snapshot path, agent lifecycle orchestration moved behind `AgentHelper`, and Murmur now documents its data model and data contracts explicitly in `specs/Architecture/`.
 - Completed ticket 017 canonical conversation step ordering: top-level chat messages now sort by Murmur-owned first-seen metadata, one outer request can project to multiple assistant-step messages, the legacy `UITurn` read path was removed, and busy follow-up ordering no longer relies on LiveView insertion heuristics.

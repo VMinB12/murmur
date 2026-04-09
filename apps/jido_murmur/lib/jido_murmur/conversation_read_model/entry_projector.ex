@@ -9,12 +9,13 @@ defmodule JidoMurmur.ConversationReadModel.EntryProjector do
   alias JidoMurmur.DisplayMessage
   alias JidoMurmur.DisplayMessage.ToolCall
 
-  @spec project_entries(String.t(), [struct() | map()]) :: ConversationReadModel.t()
-  def project_entries(session_id, entries) when is_binary(session_id) and is_list(entries) do
+  @spec project_entries(String.t(), [struct() | map()], keyword()) :: ConversationReadModel.t()
+  def project_entries(session_id, entries, opts \\ [])
+      when is_binary(session_id) and is_list(entries) and is_list(opts) do
     entries
     |> Enum.map(&ReplayEntry.normalize/1)
     |> Enum.filter(&ReplayEntry.relevant?/1)
-    |> Enum.reduce(ConversationReadModel.new(session_id), &reduce_entry/2)
+    |> Enum.reduce(ConversationReadModel.new(session_id, [], opts), &reduce_entry/2)
   end
 
   defp reduce_entry(entry, model) do

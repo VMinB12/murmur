@@ -97,11 +97,10 @@ defmodule JidoMurmur.AgentHelper do
     end
   end
 
-  @doc "Subscribe to all PubSub topics for a session (workspace agent, streaming, artifacts)."
+  @doc "Subscribe to all PubSub topics for a session (messages, conversation, artifacts)."
   def subscribe(session) do
     pubsub = JidoMurmur.pubsub()
     Phoenix.PubSub.subscribe(pubsub, JidoMurmur.Topics.agent_messages(session.workspace_id, session.id))
-    Phoenix.PubSub.subscribe(pubsub, JidoMurmur.Topics.agent_stream(session.workspace_id, session.id))
     Phoenix.PubSub.subscribe(pubsub, JidoMurmur.Topics.agent_conversation(session.workspace_id, session.id))
     Phoenix.PubSub.subscribe(pubsub, JidoMurmur.Topics.agent_artifacts(session.workspace_id, session.id))
     :ok
@@ -111,7 +110,6 @@ defmodule JidoMurmur.AgentHelper do
   def unsubscribe(session) do
     pubsub = JidoMurmur.pubsub()
     Phoenix.PubSub.unsubscribe(pubsub, JidoMurmur.Topics.agent_messages(session.workspace_id, session.id))
-    Phoenix.PubSub.unsubscribe(pubsub, JidoMurmur.Topics.agent_stream(session.workspace_id, session.id))
     Phoenix.PubSub.unsubscribe(pubsub, JidoMurmur.Topics.agent_conversation(session.workspace_id, session.id))
     Phoenix.PubSub.unsubscribe(pubsub, JidoMurmur.Topics.agent_artifacts(session.workspace_id, session.id))
     :ok

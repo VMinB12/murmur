@@ -12,19 +12,14 @@ defmodule JidoMurmur.Runner do
   alias JidoMurmur.Ingress.Input
   alias JidoMurmur.Ingress.Metadata
   alias JidoMurmur.Observability
+  alias JidoMurmur.SessionContract
   alias JidoMurmur.Signals.MessageCompleted
 
   require Logger
 
   @active_table :jido_murmur_active_runners
 
-  @type session_like :: %{
-          required(:id) => String.t(),
-          required(:workspace_id) => String.t(),
-          required(:agent_profile_id) => String.t(),
-          required(:display_name) => String.t(),
-          optional(atom()) => any()
-        }
+  @type session_like :: SessionContract.target()
 
   @doc false
   @spec start_run(session_like(), Input.t()) :: {:ok, String.t()} | {:error, term()}
@@ -160,9 +155,9 @@ defmodule JidoMurmur.Runner do
           %{session_id: session.id, request_id: request_id}
         )
 
-        hibernate_agent(session.id)
-
         JidoMurmur.ConversationProjector.reconcile_session(session)
+
+        hibernate_agent(session.id)
 
         signal =
           MessageCompleted.new!(

@@ -14,7 +14,6 @@ defmodule JidoMurmur.Integration.JidoInterplayTest do
   alias JidoMurmur.LLM
   alias JidoMurmur.Observability.SessionCache
   alias JidoMurmur.Observability.Store
-  alias JidoMurmur.StreamingPlugin
   alias JidoMurmur.Workspaces
 
   @llm_span_table :jido_murmur_obs_llm_spans
@@ -57,9 +56,7 @@ defmodule JidoMurmur.Integration.JidoInterplayTest do
       assert {:ok, pid} = AgentHelper.start_agent(session)
       assert is_pid(pid)
 
-      # Subscribe to streaming topic (StreamingPlugin broadcasts here)
       pubsub = JidoMurmur.pubsub()
-      Phoenix.PubSub.subscribe(pubsub, StreamingPlugin.stream_topic(session.workspace_id, session.id))
 
       # Subscribe to custom plugin topic
       Phoenix.PubSub.subscribe(pubsub, "custom_plugin:#{session.id}")

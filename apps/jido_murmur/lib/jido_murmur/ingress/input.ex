@@ -9,6 +9,7 @@ defmodule JidoMurmur.Ingress.Input do
 
   alias JidoMurmur.ActorIdentity
   alias JidoMurmur.Ingress.Metadata
+  alias JidoMurmur.SessionContract
 
   @enforce_keys [:content]
   defstruct [:content, :source, refs: %{}, expected_request_id: nil]
@@ -33,11 +34,7 @@ defmodule JidoMurmur.Ingress.Input do
           | :invalid_hop_count
           | :invalid_expected_request_id
 
-  @type session_like :: %{
-          required(:id) => String.t(),
-          required(:workspace_id) => String.t(),
-          optional(atom()) => any()
-        }
+  @type session_like :: SessionContract.identity()
 
   @spec new(String.t(), list()) :: {:ok, t()} | {:error, validation_error()}
   def new(content, opts \\ []) when is_binary(content) and is_list(opts) do

@@ -9,12 +9,6 @@ defmodule JidoMurmur.TopicsTest do
     end
   end
 
-  describe "agent_stream/2" do
-    test "returns workspace-scoped stream topic" do
-      assert Topics.agent_stream("ws-1", "sess-1") == "workspace:ws-1:agent:sess-1:stream"
-    end
-  end
-
   describe "agent_messages/2" do
     test "returns workspace-scoped messages topic" do
       assert Topics.agent_messages("ws-1", "sess-1") == "workspace:ws-1:agent:sess-1:messages"

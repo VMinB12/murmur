@@ -10,10 +10,6 @@ defmodule JidoMurmur.Topics do
   def agent_artifacts(workspace_id, session_id),
     do: "workspace:#{workspace_id}:agent:#{session_id}:artifacts"
 
-  @spec agent_stream(String.t(), String.t()) :: String.t()
-  def agent_stream(workspace_id, session_id),
-    do: "workspace:#{workspace_id}:agent:#{session_id}:stream"
-
   @spec agent_messages(String.t(), String.t()) :: String.t()
   def agent_messages(workspace_id, session_id),
     do: "workspace:#{workspace_id}:agent:#{session_id}:messages"

@@ -4,19 +4,15 @@ defmodule JidoMurmur.ConversationProjector do
   updates.
   """
 
-  alias JidoMurmur.Catalog
   alias JidoMurmur.ConversationReadModel
+  alias JidoMurmur.ConversationSnapshotSource
   alias JidoMurmur.DisplayMessage
+  alias JidoMurmur.SessionContract
   alias JidoMurmur.Signals.ConversationUpdated
 
   @table :jido_murmur_conversation_snapshots
 
-  @type session_like :: %{
-          required(:id) => String.t(),
-          required(:workspace_id) => String.t(),
-          required(:agent_profile_id) => String.t(),
-          optional(atom()) => any()
-        }
+  @type session_like :: SessionContract.identity()
 
   @spec snapshot(session_like()) :: [DisplayMessage.t()]
   def snapshot(session) do
@@ -43,7 +39,11 @@ defmodule JidoMurmur.ConversationProjector do
         %ConversationReadModel{} = snapshot -> snapshot
       end
 
-    next_model = upsert_message(model, display_message)
+    next_model =
+      model
+      |> upsert_message(display_message)
+      |> ConversationReadModel.advance_live_revision(:visible_message)
+
     put_snapshot(session.id, next_model)
     display_message
   end
@@ -72,12 +72,16 @@ defmodule JidoMurmur.ConversationProjector do
   @spec reconcile_session(session_like()) :: [DisplayMessage.t()]
   def reconcile_session(session) do
     previous_model = get_snapshot(session.id) || ConversationReadModel.new(session.id)
-    entries = extract_entries(session)
+    source = ConversationSnapshotSource.load(session)
 
-    {candidate_model, candidate_latest_message} = ConversationReadModel.reconcile_entries(previous_model, entries)
+    {candidate_model, candidate_latest_message} =
+      ConversationReadModel.reconcile_entries(previous_model, source.entries,
+        source: source.source,
+        persisted_rev: source.persisted_rev
+      )
 
     {next_model, latest_message} =
-      case choose_snapshot_model(previous_model, candidate_model) do
+      case choose_snapshot_model(:reconcile, previous_model, candidate_model) do
         ^previous_model -> {previous_model, nil}
         %ConversationReadModel{} = resolved_model -> {resolved_model, candidate_latest_message}
       end
@@ -110,9 +114,14 @@ defmodule JidoMurmur.ConversationProjector do
   defp ensure_model(session_id, agent) do
     case get_snapshot(session_id) do
       nil ->
-        session_id
-        |> ConversationReadModel.from_entries(extract_entries_from_agent(agent))
-        |> tap(fn model -> put_snapshot(session_id, model) end)
+        model =
+          case ConversationSnapshotSource.from_agent(agent) do
+            %ConversationSnapshotSource{} = source -> build_model(session_id, source)
+            nil -> ConversationReadModel.new(session_id)
+          end
+
+        put_snapshot(session_id, model)
+        model
 
       model ->
         model
@@ -120,41 +129,10 @@ defmodule JidoMurmur.ConversationProjector do
   end
 
   defp load_model(session) do
-    ConversationReadModel.from_entries(session.id, extract_entries(session))
+    session
+    |> ConversationSnapshotSource.load()
+    |> then(&build_model(session.id, &1))
   end
-
-  defp extract_entries(session) do
-    jido_mod = JidoMurmur.jido_mod()
-
-    case safe_whereis(jido_mod, session.id) do
-      pid when is_pid(pid) ->
-        case Jido.AgentServer.state(pid) do
-          {:ok, %{agent: agent}} -> extract_entries_from_agent(agent)
-          _ -> extract_entries_from_storage(session)
-        end
-
-      _ ->
-        extract_entries_from_storage(session)
-    end
-  end
-
-  defp safe_whereis(jido_mod, session_id) do
-    jido_mod.whereis(session_id)
-  rescue
-    ArgumentError -> nil
-  end
-
-  defp extract_entries_from_storage(session) do
-    agent_module = Catalog.agent_module(session.agent_profile_id)
-
-    case JidoMurmur.jido_mod().thaw(agent_module, session.id) do
-      {:ok, agent} -> extract_entries_from_agent(agent)
-      {:error, :not_found} -> []
-    end
-  end
-
-  defp extract_entries_from_agent(%{state: %{__thread__: %{entries: entries}}}) when is_list(entries), do: entries
-  defp extract_entries_from_agent(_agent), do: []
 
   defp broadcast_update(workspace_id, session_id, %DisplayMessage{} = message) do
     signal =
@@ -178,16 +156,9 @@ defmodule JidoMurmur.ConversationProjector do
   end
 
   defp refresh_snapshot(session, %ConversationReadModel{} = cached_model) do
-    fresh_model =
-      case load_model(session) do
-        %ConversationReadModel{messages: []} ->
-          ConversationReadModel.from_entries(session.id, extract_entries_from_storage(session))
+    fresh_model = load_model(session)
 
-        %ConversationReadModel{} = model ->
-          model
-      end
-
-    resolved_model = choose_snapshot_model(cached_model, fresh_model)
+    resolved_model = choose_snapshot_model(:refresh, cached_model, fresh_model)
 
     if resolved_model != cached_model do
       put_snapshot(session.id, resolved_model)
@@ -196,70 +167,65 @@ defmodule JidoMurmur.ConversationProjector do
     resolved_model.messages
   end
 
-  defp choose_snapshot_model(%ConversationReadModel{} = cached_model, %ConversationReadModel{messages: []}) do
-    cached_model
+  defp build_model(session_id, %ConversationSnapshotSource{} = source) do
+    ConversationReadModel.from_entries(session_id, source.entries,
+      source: source.source,
+      persisted_rev: source.persisted_rev
+    )
   end
 
-  defp choose_snapshot_model(%ConversationReadModel{messages: []}, %ConversationReadModel{} = fresh_model) do
-    fresh_model
-  end
-
-  defp choose_snapshot_model(%ConversationReadModel{} = cached_model, %ConversationReadModel{} = fresh_model) do
-    case compare_model_freshness(fresh_model, cached_model) do
-      :gt -> fresh_model
-      _ -> cached_model
+  defp choose_snapshot_model(
+         :refresh,
+         %ConversationReadModel{} = cached_model,
+         %ConversationReadModel{source: :live_thread} = fresh_model
+       ) do
+    if ConversationReadModel.ahead_of_persistence?(cached_model) do
+      cached_model
+    else
+      choose_snapshot_model(:reconcile, cached_model, fresh_model)
     end
   end
 
-  defp compare_model_freshness(%ConversationReadModel{} = left, %ConversationReadModel{} = right) do
-    freshness_signature(left)
-    |> compare_signatures(freshness_signature(right))
+  defp choose_snapshot_model(
+         _mode,
+         %ConversationReadModel{messages: [_ | _]} = cached_model,
+         %ConversationReadModel{messages: []}
+       ) do
+    cached_model
   end
 
-  defp compare_signatures(left, right) when left > right, do: :gt
-  defp compare_signatures(left, right) when left < right, do: :lt
-  defp compare_signatures(_left, _right), do: :eq
-
-  defp freshness_signature(%ConversationReadModel{messages: messages}) do
-    {latest_message_marker(messages), length(messages), total_message_weight(messages)}
+  defp choose_snapshot_model(:refresh, %ConversationReadModel{} = cached_model, %ConversationReadModel{} = fresh_model) do
+    choose_snapshot_model(:reconcile, cached_model, fresh_model)
   end
 
-  defp latest_message_marker(messages) do
-    messages
-    |> Enum.map(&message_marker/1)
-    |> Enum.max(fn -> {0, 0} end)
+  defp choose_snapshot_model(:reconcile, %ConversationReadModel{} = cached_model, %ConversationReadModel{} = fresh_model) do
+    if replay_confirms_cache?(cached_model, fresh_model) do
+      fresh_model
+    else
+      cached_model
+    end
   end
 
-  defp message_marker(message) do
-    {Map.get(message, :first_seen_at) || 0, Map.get(message, :first_seen_seq) || 0}
+  defp replay_confirms_cache?(%ConversationReadModel{} = cached_model, %ConversationReadModel{} = fresh_model) do
+    fresh_model.persisted_rev > cached_model.persisted_rev and
+      replay_supersedes_cache?(cached_model, fresh_model)
   end
 
-  defp total_message_weight(messages) do
-    Enum.reduce(messages, 0, fn message, total -> total + message_weight(message) end)
+  defp replay_supersedes_cache?(%ConversationReadModel{} = cached_model, %ConversationReadModel{} = fresh_model) do
+    if ConversationReadModel.ahead_of_persistence?(cached_model) do
+      cached_ids_confirmed?(cached_model.messages, fresh_model.messages)
+    else
+      true
+    end
   end
 
-  defp message_weight(message) do
-    content_weight = message |> Map.get(:content, "") |> to_string() |> String.length()
-    thinking_weight = message |> Map.get(:thinking, "") |> to_string() |> String.length()
+  defp cached_ids_confirmed?([], _fresh_messages), do: true
 
-    tool_weight =
-      message
-      |> Map.get(:tool_calls, [])
-      |> Enum.reduce(0, fn tool_call, total ->
-        result_length = tool_call |> Map.get(:result, "") |> to_string() |> String.length()
-        args_size = tool_call |> Map.get(:args, %{}) |> map_size()
-        total + result_length + args_size
-      end)
+  defp cached_ids_confirmed?(cached_messages, fresh_messages) do
+    cached_ids = MapSet.new(Enum.map(cached_messages, & &1.id))
+    fresh_ids = MapSet.new(Enum.map(fresh_messages, & &1.id))
 
-    usage_weight =
-      message
-      |> Map.get(:usage)
-      |> case do
-        usage when is_map(usage) -> map_size(usage)
-        _ -> 0
-      end
-
-    content_weight + thinking_weight + tool_weight + usage_weight
+    MapSet.subset?(cached_ids, fresh_ids)
   end
 
   defp upsert_message(%ConversationReadModel{} = model, %DisplayMessage{} = message) do

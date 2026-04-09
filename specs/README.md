@@ -6,15 +6,13 @@
 
 | Metric | Value |
 |--------|-------|
-| Active tickets | 2 |
-| Last updated | 2026-04-08 |
+| Active tickets | 0 |
+| Last updated | 2026-04-09 |
 
 ## Active Tickets
 
 | # | Title | Status | Owner |
 |---|-------|--------|-------|
-| 024 | [Conversation Snapshot Freshness Contract](tickets/024-conversation-snapshot-freshness-contract/) | research | |
-| 025 | [Shared Session Contract Type](tickets/025-shared-session-contract-type/) | research | |
 
 ## Archived / Superseded
 
@@ -26,6 +24,10 @@
 
 | # | Title | Completed |
 |---|-------|-----------|
+| 027 | [Remove Raw AI Stream Chat Path](tickets/027-remove-raw-ai-stream-chat-path/) | 2026-04-09 |
+| 026 | [Conversation Snapshot Source Boundary Cleanup](tickets/026-conversation-snapshot-source-boundary-cleanup/) | 2026-04-09 |
+| 025 | [Shared Session Contract Type](tickets/025-shared-session-contract-type/) | 2026-04-09 |
+| 024 | [Conversation Snapshot Freshness Contract](tickets/024-conversation-snapshot-freshness-contract/) | 2026-04-09 |
 | 023 | [Tell Intent Contract](tickets/023-tell-intent-contract/) | 2026-04-07 |
 | 022 | [Data Model And Contract Architecture](tickets/022-data-model-and-contract-architecture/) | 2026-04-07 |
 | 021 | [Agent Lifecycle Boundary Cleanup](tickets/021-agent-lifecycle-boundary-cleanup/) | 2026-04-07 |

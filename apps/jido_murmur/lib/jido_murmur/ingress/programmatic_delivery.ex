@@ -6,17 +6,13 @@ defmodule JidoMurmur.Ingress.ProgrammaticDelivery do
   canonical ingress input delivered through `JidoMurmur.Ingress`.
   """
 
+  alias JidoMurmur.ConversationProjector
   alias JidoMurmur.Ingress
   alias JidoMurmur.Ingress.Input
   alias JidoMurmur.Ingress.VisibleMessage
+  alias JidoMurmur.SessionContract
 
-  @type session_like :: %{
-          required(:id) => String.t(),
-          required(:workspace_id) => String.t(),
-          required(:agent_profile_id) => String.t(),
-          required(:display_name) => String.t(),
-          optional(atom()) => any()
-        }
+  @type session_like :: SessionContract.target()
 
   @invalid_input_reasons [
     :empty_content,
@@ -58,20 +54,31 @@ defmodule JidoMurmur.Ingress.ProgrammaticDelivery do
            refs: VisibleMessage.attach_identity_refs(Keyword.get(opts, :refs, %{}))
          ) do
       {:ok, input} ->
-        case Ingress.deliver_input(session, input) do
-          :queued ->
-            VisibleMessage.broadcast_received(session, input, message_kind)
-            :queued
-
-          :agent_not_running ->
-            :agent_not_running
-
-          {:error, {:invalid_input, reason}} ->
-            {:error, {:invalid_input, reason}}
-        end
+        message = VisibleMessage.build_message(input, message_kind)
+        deliver_visible_input(session, input, message)
 
       {:error, reason} when reason in @invalid_input_reasons ->
         {:error, {:invalid_input, reason}}
+    end
+  end
+
+  defp deliver_visible_input(session, %Input{} = input, message) do
+    case Ingress.ensure_started(session) do
+      {:ok, pid} -> queue_visible_input(pid, session, input, message)
+      {:error, :agent_not_running} -> :agent_not_running
+    end
+  end
+
+  defp queue_visible_input(pid, session, %Input{} = input, message) when is_pid(pid) do
+    _ = ConversationProjector.put_received_message(session, message)
+
+    case GenServer.call(pid, {:deliver, session, input}) do
+      :queued ->
+        VisibleMessage.broadcast_received(session, message)
+        :queued
+
+      :agent_not_running ->
+        :agent_not_running
     end
   end
 end

@@ -39,12 +39,20 @@ When a UI mounts or reconnects, it loads a conversation snapshot for each sessio
 That snapshot is derived from:
 
 - live thread state when the agent is running
-- thawed persisted thread state when the agent is not live
+- persisted thread history read directly from storage when the agent is not live
 - any in-memory projector state that represents the current in-progress assistant step sequence
 
 Before persisted or thawed thread entries are projected, Murmur first normalizes replay-only storage and runtime entry shapes through a dedicated replay adapter boundary. The canonical projector then works against that normalized replay shape instead of embedding storage-shape cleanup directly into assistant-step projection rules.
 
 The projector cache now stores the full canonical `ConversationReadModel`, not only the rendered message list, so snapshot load and incremental updates reuse the same assistant-step state.
+
+The cached read model also carries explicit freshness metadata:
+
+- the last source that confirmed or advanced the model
+- the persisted thread revision known to be included
+- the live-side revision count that has advanced the cache beyond that persisted baseline
+
+Snapshot refresh keeps live-ahead cache state over live-thread replay, while completion reconciliation only replaces the cache once persisted revision metadata proves replay is newer.
 
 ### 2. Incremental canonical updates
 
@@ -110,6 +118,8 @@ It is intentionally **not**:
 
 - full conversation snapshot on every token
 - raw `ai.*` lifecycle stream as the rendering protocol
+
+The older raw `ai.*` chat PubSub path has been removed from the demo surface, so canonical conversation updates are now the only chat-rendering transport contract.
 
 This keeps rendering ownership centralized without forcing large full-state payloads on every small text update.
 

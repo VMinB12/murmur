@@ -13,7 +13,6 @@ defmodule JidoMurmur.Integration.MessageFlowTest do
   alias JidoMurmur.LLM
   alias JidoMurmur.Observability.SessionCache
   alias JidoMurmur.Observability.Store
-  alias JidoMurmur.StreamingPlugin
   alias JidoMurmur.Workspaces
 
   @turn_table :jido_murmur_obs_turns
@@ -46,13 +45,12 @@ defmodule JidoMurmur.Integration.MessageFlowTest do
     %{workspace: workspace, session: session}
   end
 
-  test "end-to-end: start agent, subscribe streaming, send message, receive completion",
+  test "end-to-end: start agent, send message, receive completion",
        %{session: session} do
     assert {:ok, pid} = AgentHelper.start_agent(session)
     assert is_pid(pid)
 
     pubsub = JidoMurmur.pubsub()
-    Phoenix.PubSub.subscribe(pubsub, StreamingPlugin.stream_topic(session.workspace_id, session.id))
 
     agent_topic = JidoMurmur.Topics.agent_messages(session.workspace_id, session.id)
     Phoenix.PubSub.subscribe(pubsub, agent_topic)

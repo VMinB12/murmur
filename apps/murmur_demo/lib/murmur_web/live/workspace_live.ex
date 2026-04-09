@@ -330,11 +330,6 @@ defmodule MurmurWeb.WorkspaceLive do
   end
 
   @impl true
-  def handle_info(%Jido.Signal{type: "ai." <> _}, socket) do
-    {:noreply, socket}
-  end
-
-  @impl true
   def handle_info(%Jido.Signal{type: "artifact." <> _name, data: %SignalUpdate{} = data} = signal, socket) do
     session_id = extract_session_id(signal)
     artifact_name = data.name

@@ -28,6 +28,7 @@ Each contract describes:
 
 | Contract | Owner | Primary Producers | Primary Consumers |
 |----------|-------|-------------------|-------------------|
+| Shared session contract | `JidoMurmur.SessionContract` | `Workspaces`, host apps, runtime helpers | `Ingress`, `Runner`, `ConversationProjector`, `VisibleMessage` |
 | Canonical ingress input | `JidoMurmur.Ingress.Input` | `WorkspaceLive`, task notifications, tell delivery, other host-app producers | `Ingress`, `Coordinator`, `Runner` |
 | Visible ingress message | `JidoMurmur.Signals.MessageReceived` | `JidoMurmur.Ingress.VisibleMessage` | LiveViews and other UI subscribers |
 | Canonical conversation update | `JidoMurmur.Signals.ConversationUpdated` plus `DisplayMessage` | `ConversationProjector` | LiveViews and reconnect snapshot loaders |
@@ -35,6 +36,42 @@ Each contract describes:
 | Artifact update | `JidoArtifacts.SignalUpdate` and `Envelope` | artifact-producing agents and plugins | artifact panels and host-app renderers |
 | Task updates | `TaskCreated`, `TaskUpdated`, and task records | humans, agent actions, `jido_tasks` | task board UI, assignee notification flow |
 | Persisted thread entry replay | Jido thread entry format projected by Murmur | Jido runtime and strategy pipeline | `ConversationReadModel.EntryProjector` |
+
+## Shared Session Contract
+
+### Owner
+
+`JidoMurmur.SessionContract`
+
+### Producers
+
+- `JidoMurmur.Workspaces`
+- host apps and runtime helpers that pass session-shaped maps into Murmur
+
+### Consumers
+
+- `JidoMurmur.Ingress`
+- `JidoMurmur.Runner`
+- `JidoMurmur.ConversationProjector`
+- `JidoMurmur.Ingress.VisibleMessage`
+
+### Canonical Shape
+
+The shared internal contract is layered:
+
+- `identity`: `id`, `workspace_id`
+- `target`: `id`, `workspace_id`, `agent_profile_id`, `display_name`
+
+Both variants remain open maps so richer runtime session structs can cross these boundaries without each module redefining the same widening rules.
+
+### Transport Or Persistence Representation
+
+This is a runtime-only internal boundary contract. It is not a wire payload or storage representation.
+
+### Compatibility Notes
+
+- new session-shaped boundary requirements should extend `JidoMurmur.SessionContract` rather than redefine local `session_like` aliases
+- read-side boundaries should depend on the narrowest session variant they need
 
 ## Canonical Ingress Input
 
@@ -164,6 +201,8 @@ Important semantics:
 - reconnect snapshot: `ConversationProjector.snapshot/1` returns the message list derived from the cached `ConversationReadModel`
 - persistence representation: Jido thread entries replayed through `ConversationReadModel.EntryProjector`
 
+The cached `ConversationReadModel` also tracks source provenance, persisted revision, and live-advance metadata so refresh and reconciliation can choose between cache and replay by contract rather than by message-shape heuristics.
+
 ### Compatibility Notes
 
 - host UIs should render `DisplayMessage`, not raw `ai.*` signals and not raw thread-entry payloads
@@ -291,6 +330,8 @@ Murmur projects them into `ConversationReadModel` and `DisplayMessage`.
 
 - persistence: PostgreSQL-backed thread-entry rows
 - replay projection: `ConversationReadModel.ReplayEntry` normalizes Jido and storage entry shapes before `EntryProjector` projects them into the canonical read model
+
+Offline conversation snapshots now read persisted thread history directly through the configured Jido storage adapter instead of thawing a full runtime agent only to recover thread entries.
 
 ### Compatibility Notes
 
